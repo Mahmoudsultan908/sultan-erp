@@ -80,6 +80,17 @@ async function renderPurchases(c) {
     purSupplierId = null;
     purPayType = 'cash';
 
+    // ★ استئناف من أمر شراء (لو جاي من صفحة purchase-orders.js)
+    if (window._pendingPOConversion) {
+        const pending = window._pendingPOConversion;
+        window._pendingPOConversion = null;
+        if (pending.items && pending.items.length) {
+            purItems = pending.items.map(it => ({ id: Date.now()+Math.random(), ...it }));
+            purItems.push({ id: Date.now()+Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' });
+        }
+        if (pending.supplierId) purSupplierId = pending.supplierId;
+    }
+
     c.innerHTML = `
     <div class="inv-root density-${localStorage.getItem('inv_density') || 'cozy'}">
         ${purHeaderHTML()}
@@ -119,6 +130,7 @@ async function renderPurchases(c) {
     purBindEvents();
     purRenderItems();
     purUpdateSummary();
+    purUpdateSupplierChip();
 }
 
 // ════════════════════════════════════════════════════════════

@@ -106,6 +106,17 @@ async function renderSales(c) {
     invCustId = null;
     invPayType = 'cash';
 
+    // ★ استئناف من عرض سعر (لو جاي من صفحة quotations.js)
+    if (window._pendingQuoteConversion) {
+        const pending = window._pendingQuoteConversion;
+        window._pendingQuoteConversion = null;
+        if (pending.items && pending.items.length) {
+            invItems = pending.items.map(it => ({ id: Date.now()+Math.random(), ...it }));
+            invItems.push({ id: Date.now()+Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', stock: 0 });
+        }
+        if (pending.customerId) invCustId = pending.customerId;
+    }
+
     c.innerHTML = `
     <div class="inv-root density-${invGetDensity()}">
         ${invHeaderHTML()}
@@ -152,6 +163,7 @@ async function renderSales(c) {
     invBindEvents();
     invRenderItems();
     invUpdateSummary();
+    invUpdateCustomerChip();
     invRenderDrafts();
     invStartAutoSave();
     setTimeout(() => {

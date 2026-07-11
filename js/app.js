@@ -71,11 +71,13 @@ function buildLayout() {
 
         <div class="nav-group">المبيعات والعملاء</div>
         <div class="nav-item" data-mod="sales" onclick="loadMod(this, 'sales')">🧾 فاتورة المبيعات</div>
+        <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
         <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="customers" onclick="loadMod(this, 'customers')">📇 كشف حساب عميل</div>
 
         <div class="nav-group">المشتريات والموردين</div>
         <div class="nav-item" data-mod="purchases" onclick="loadMod(this, 'purchases')">📥 فاتورة المشتريات</div>
+        <div class="nav-item" data-mod="purchase-orders" onclick="loadMod(this, 'purchase-orders')">📋 أوامر الشراء</div>
         <div class="nav-item" data-mod="payments" onclick="loadMod(this, 'payments')">💸 دفع الموردين</div>
         <div class="nav-item" data-mod="suppliers" onclick="loadMod(this, 'suppliers')">📇 كشف حساب مورد</div>
 
@@ -156,7 +158,9 @@ window.loadMod = async function(el, modName) {
         'expenses': 'لوحة تحكم المصروفات',
         'stock-transfer': 'تحويل مخزون',
         'sales': 'فاتورة مبيعات جديدة',
+        'quotations': 'عروض الأسعار',
         'purchases': 'فاتورة مشتريات جديدة',
+        'purchase-orders': 'أوامر الشراء',
         'payments': 'دفع الموردين (سندات صرف)',
         'collections': 'تحصيل العملاء (سندات قبض)',
         'customers': 'كشف حساب عميل',
@@ -185,7 +189,9 @@ window.loadMod = async function(el, modName) {
     if (modName === 'expenses' && typeof renderExpenses === 'function') await renderExpenses(c);
     if (modName === 'stock-transfer' && typeof renderStockTransfer === 'function') await renderStockTransfer(c);
     if (modName === 'sales' && typeof renderSales === 'function') await renderSales(c);
+    if (modName === 'quotations' && typeof renderQuotations === 'function') await renderQuotations(c);
     if (modName === 'purchases' && typeof renderPurchases === 'function') await renderPurchases(c);
+    if (modName === 'purchase-orders' && typeof renderPurchaseOrders === 'function') await renderPurchaseOrders(c);
     if (modName === 'payments' && typeof renderPayments === 'function') await renderPayments(c);
     if (modName === 'collections' && typeof renderCollections === 'function') await renderCollections(c);
     if (modName === 'customers' && typeof renderCustomers === 'function') await renderCustomers(c);
