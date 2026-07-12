@@ -317,9 +317,13 @@ async function renderBalanceSheet(c) {
     }
 }
 
+// ملاحظة: accApplyTbFilter مش موجودة هنا عمداً — بتتحدد ديناميكياً
+// جوه accLoadTrialBalance() وقت ما شاشة ميزان المراجعة تُفتح فعلاً.
+// أي محاولة نشيرلها هنا (كمعرّف عادي) وقت تحميل السكريبت هتفشل بـ
+// ReferenceError لأنها لسه مش موجودة في اللحظة دي.
 Object.assign(window, {
     renderChartOfAccounts, accOpenAddAccount, accSaveAccount,
     renderJournalView, accViewEntry,
-    renderTrialBalance, accLoadTrialBalance, accApplyTbFilter,
+    renderTrialBalance, accLoadTrialBalance,
     renderBalanceSheet,
 });

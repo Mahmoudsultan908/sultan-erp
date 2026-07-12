@@ -107,4 +107,8 @@ async function cmLoadData(c, from, to, refType) {
     }
 }
 
-Object.assign(window, { renderCashMovement, cmLoadData, cmApplyFilter });
+// ملاحظة: cmApplyFilter مش موجودة هنا عمداً — بتتحدد ديناميكياً جوه
+// cmLoadData() وقت ما الشاشة تُفتح فعلاً (نفس سبب accApplyTbFilter
+// في accounting.js — الإشارة لها هنا كمعرّف عادي وقت تحميل السكريبت
+// هتفشل بـ ReferenceError).
+Object.assign(window, { renderCashMovement, cmLoadData });

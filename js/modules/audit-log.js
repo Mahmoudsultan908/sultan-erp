@@ -149,4 +149,7 @@ window.alViewDetails = async function(eventId) {
     document.body.appendChild(modal);
 };
 
-Object.assign(window, { renderAuditLog, alLoadData, alApplyFilter, alResetFilter, alViewDetails });
+// ملاحظة: alApplyFilter وalResetFilter مش موجودين هنا عمداً — بيتحدّدوا
+// ديناميكياً جوه alLoadData() وقت ما الشاشة تُفتح فعلاً (نفس سبب
+// accApplyTbFilter في accounting.js).
+Object.assign(window, { renderAuditLog, alLoadData, alViewDetails });

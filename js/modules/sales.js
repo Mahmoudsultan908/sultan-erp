@@ -1010,15 +1010,33 @@ async function invSave(andNew) {
             await invReverseOldForEdit();
         }
 
-        // ★ تطبيع + تحقق من rep_id قبل الإرسال — بيمنع إرسال '' بدل null، وبيمنع إرسال
-        //   id مندوب اتحذف/اتعطّل بعد ما اتحمّلت قائمة INV_DB.reps (فاتورة فُتحت من زمان
-        //   في نفس الجلسة) عشان مايبقاش fk violation على sales_rep_id_fkey
-        const repIdToSend = invNormalizeRepId(invRepId);
-        if (repIdToSend && !INV_DB.reps.some(r => r.id === repIdToSend)) {
-            console.warn('[invSave] rep_id غير موجود في قائمة المندوبين المحمّلة حالياً — هيتبعت null بدل القيمة القديمة:', repIdToSend);
-            invRepId = null;
+        // ★ تطبيع + تحقق حي من rep_id قبل الإرسال.
+        //   ملاحظة مهمة: التحقق القديم كان بيقارن مع INV_DB.reps المحلية —
+        //   ده عديم الفائدة لأن invRepId أصلاً اتحدد من نفس القائمة دي
+        //   (مستحيل يختلفوا). المشكلة الحقيقية: INV_DB.reps بتتحمّل مرة
+        //   واحدة وقت فتح الفاتورة، فلو المندوب اتحذف من قاعدة البيانات
+        //   بعد كده (يدوياً من Supabase مثلاً) والفاتورة فضلت مفتوحة في
+        //   نفس الجلسة من غير إعادة تحميل، هيفضل موجود في القائمة المحلية
+        //   القديمة بس مش موجود فعلياً في sales_reps → fk violation عند
+        //   الحفظ. الحل: نتأكد حياً من القاعدة نفسها قبل الإرسال مباشرة.
+        let repIdToSend = invNormalizeRepId(invRepId);
+        if (repIdToSend) {
+            try {
+                const { data: repCheck, error: repCheckErr } = await sb.from('sales_reps').select('id').eq('id', repIdToSend).maybeSingle();
+                if (repCheckErr) throw repCheckErr;
+                if (!repCheck) {
+                    console.warn('[invSave] rep_id غير موجود فعلياً في sales_reps (تحقق حي من القاعدة) — هيتبعت null:', repIdToSend);
+                    invToast('⚠️ المندوب المختار لم يعد موجوداً — تم حفظ الفاتورة بدون مندوب', 'error');
+                    repIdToSend = null;
+                    invRepId = null;
+                    // حدّث القائمة المحلية في الخلفية عشان القائمة المنسدلة تتظبط لو المستخدم فتح فاتورة تانية
+                    sb.from('sales_reps').select('*').eq('is_active', true).order('name').then(({ data }) => { if (data) INV_DB.reps = data; });
+                }
+            } catch (e) {
+                console.warn('[invSave] تعذّر التحقق الحي من rep_id، هيتبعت زي ما هو:', e.message);
+            }
         }
-        console.log('[invSave] rep_id قبل الإرسال:', invNormalizeRepId(invRepId), '— typeof:', typeof invNormalizeRepId(invRepId));
+        console.log('[invSave] rep_id قبل الإرسال (بعد التحقق الحي):', repIdToSend, '— typeof:', typeof repIdToSend);
 
         // 1) INSERT في جدول sales
         const { data: saleRows, error: saleErr } = await sb.from('sales').insert({
@@ -1031,7 +1049,7 @@ async function invSave(andNew) {
             discount: extra,
             status: 'confirmed',
             warehouse_id: invWarehouseId,
-            rep_id: invNormalizeRepId(invRepId),
+            rep_id: repIdToSend,
             source_app: 'erp',
             created_by: currentUser?.id || null,
         }).select();
