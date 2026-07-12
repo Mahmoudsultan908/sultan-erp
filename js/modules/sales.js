@@ -130,9 +130,15 @@ function invOnWarehouseChange() {
     const wh = INV_DB.warehouses.find(w => w.id === invWarehouseId);
     if (wh) invToast(`🏭 تم التبديل للمخزن: ${wh.name}`, 'info');
 }
+// بيرجع null صراحة لأي قيمة فاضية/بيضاء (بدل ما يفضل '' يعدّي لحد الإرسال لقاعدة البيانات)
+function invNormalizeRepId(v) {
+    if (v == null) return null;
+    const s = String(v).trim();
+    return s ? s : null;
+}
 function invOnRepChange() {
     const sel = document.getElementById('invRep');
-    if (sel) invRepId = sel.value || null;
+    if (sel) invRepId = invNormalizeRepId(sel.value);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -184,7 +190,7 @@ async function renderSales(c) {
                 invItems.push({ id: Date.now() + Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', stock: 0 });
                 invCustId = oldSale.customer_id;
                 invPayType = oldSale.payment_type || 'cash';
-                invRepId = oldSale.rep_id || null;
+                invRepId = invNormalizeRepId(oldSale.rep_id);
                 if (oldSale.warehouse_id) invWarehouseId = oldSale.warehouse_id;
             }
         } catch (err) {
@@ -1004,6 +1010,16 @@ async function invSave(andNew) {
             await invReverseOldForEdit();
         }
 
+        // ★ تطبيع + تحقق من rep_id قبل الإرسال — بيمنع إرسال '' بدل null، وبيمنع إرسال
+        //   id مندوب اتحذف/اتعطّل بعد ما اتحمّلت قائمة INV_DB.reps (فاتورة فُتحت من زمان
+        //   في نفس الجلسة) عشان مايبقاش fk violation على sales_rep_id_fkey
+        const repIdToSend = invNormalizeRepId(invRepId);
+        if (repIdToSend && !INV_DB.reps.some(r => r.id === repIdToSend)) {
+            console.warn('[invSave] rep_id غير موجود في قائمة المندوبين المحمّلة حالياً — هيتبعت null بدل القيمة القديمة:', repIdToSend);
+            invRepId = null;
+        }
+        console.log('[invSave] rep_id قبل الإرسال:', invNormalizeRepId(invRepId), '— typeof:', typeof invNormalizeRepId(invRepId));
+
         // 1) INSERT في جدول sales
         const { data: saleRows, error: saleErr } = await sb.from('sales').insert({
             invoice_no: invoiceNo,
@@ -1015,7 +1031,7 @@ async function invSave(andNew) {
             discount: extra,
             status: 'confirmed',
             warehouse_id: invWarehouseId,
-            rep_id: invRepId || null,
+            rep_id: invNormalizeRepId(invRepId),
             source_app: 'erp',
             created_by: currentUser?.id || null,
         }).select();

@@ -14,28 +14,6 @@ function csRenderPage(c, icon, title, description) {
     </div>`;
 }
 
-// ── من مرجعة V16: أولوية متوسطة/منخفضة ──
-async function renderWarehouseReports(c) {
-    csRenderPage(c, '📊', 'تقارير المخازن التفصيلية',
-        'تقارير متقدمة عن حركة كل صنف في كل مخزن: الوارد، المنصرف، معدل الدوران، وتنبيهات الركود.');
-}
-async function renderGeneralImportExport(c) {
-    csRenderPage(c, '🔄', 'استيراد وتصدير عام',
-        'استيراد وتصدير شامل لبيانات النظام (غير الأصناف والعملاء والموردين) بصيغة Excel — نسخ احتياطي واستعادة سريعة.');
-}
-async function renderPerformanceReports(c) {
-    csRenderPage(c, '📈', 'تقارير الأداء المتقدمة',
-        'تحليلات متقدمة: أداء الأصناف، اتجاهات المبيعات، مقارنات الفترات، وتوقعات الطلب.');
-}
-async function renderAdvancedPermissions(c) {
-    csRenderPage(c, '🔐', 'الصلاحيات المتقدمة',
-        'تحكم دقيق في صلاحيات كل مستخدم على مستوى كل صفحة وزر على حدة، بدل الأدوار العامة الحالية.');
-}
-async function renderPrintCenter(c) {
-    csRenderPage(c, '🖨️', 'مركز الطباعة',
-        'تصاميم طباعة إضافية (A4، تصدير PDF، قوالب مخصصة) بجانب تصميم الكاشير الحالي.');
-}
-
 // ── موديولات V16 الكبيرة (لم تُبنَ إطلاقاً) ──
 async function renderCRM(c) {
     csRenderPage(c, '🤝', 'إدارة علاقات العملاء (CRM)',
@@ -69,7 +47,6 @@ async function renderRepAppLink(c) {
 }
 
 Object.assign(window, {
-    renderWarehouseReports, renderGeneralImportExport, renderPerformanceReports,
-    renderAdvancedPermissions, renderPrintCenter, renderCRM, renderArchive, renderWhatsAppIntegration,
+    renderCRM, renderArchive, renderWhatsAppIntegration,
     renderAIDashboard, renderEmployeeEvaluation, renderCustomerOrdersLink, renderRepAppLink,
 });
