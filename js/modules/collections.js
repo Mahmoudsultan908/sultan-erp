@@ -28,6 +28,8 @@ async function renderCollections(c) {
         }
         _colCustomers = customers || [];
         _colList = payments;
+        // كاش للمراجعة الأوفلاين (offline.js) — قراءة فقط، بيتحدّث تلقائياً كل ما الصفحة تفتح أونلاين
+        if (typeof dbSetCache === 'function') dbSetCache('customers', _colCustomers);
 
         const totalCollected = payments.reduce((s,p)=>s+(Number(p.amount)||0),0);
         const debtCustomers = _colCustomers.filter(c => (Number(c.balance)||0) > 0);

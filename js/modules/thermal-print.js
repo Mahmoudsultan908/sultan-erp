@@ -42,9 +42,18 @@ async function printThermalReceipt(type, data) {
 
 // ════════════════════════════════════════════════════════════
 // القالب المشترك (رأس + تذييل + CSS) — 80mm
+// customHeaderHTML اختياري: لو اتبعت، بيستبدل رأس الشركة الافتراضي
+// بالكامل (تستخدمه فاتورة المبيعات لشعارها المميز) — من غير ما يأثر
+// على شكل وصل القبض/الصرف والمرتجعات اللي بتفضل مستخدمة الرأس الافتراضي.
 // ════════════════════════════════════════════════════════════
-function tpWrapper(company, title, bodyHTML) {
+function tpWrapper(company, title, bodyHTML, customHeaderHTML) {
     const now = new Date().toLocaleString('ar-EG', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    const defaultHeader = `
+    <div class="tp-center">
+        <div class="tp-company-name">${company.name}</div>
+        ${company.phone ? `<div class="tp-company-info">📞 ${company.phone}</div>` : ''}
+        ${company.address ? `<div class="tp-company-info">${company.address}</div>` : ''}
+    </div>`;
     return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -70,14 +79,30 @@ function tpWrapper(company, title, bodyHTML) {
   .tp-grand { font-size: 15px; font-weight: 800; border-top: 1px solid #000; border-bottom: 3px double #000; padding: 6px 0; margin: 6px 0; }
   .tp-footer { text-align: center; font-size: 10px; color: #555; margin-top: 12px; }
   @media print { body { width: 80mm; } }
+
+  /* ── رأس + جدول إجماليات فاتورة المبيعات (تصميم الشعار المخصص) ── */
+  .tps-header { text-align: center; padding-bottom: 4px; }
+  .tps-crown { font-size: 22px; margin-bottom: 2px; }
+  .tps-brand { font-size: 19px; font-weight: 800; color: #8B5E34; letter-spacing: 0.5px; }
+  .tps-tagline { font-size: 10px; color: #555; margin-top: 1px; }
+  .tps-contact { text-align: center; font-size: 10.5px; color: #333; margin-top: 4px; direction: ltr; }
+  .tps-contact .lbl { font-weight: 700; direction: rtl; display: inline-block; margin-left: 6px; }
+  .tps-meta-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; font-weight: 700; }
+  .tps-cust { font-size: 11.5px; padding: 2px 0; }
+  .tps-cust .lbl { color: #555; display: inline-block; min-width: 44px; font-weight: 700; }
+  table.tps-items { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 10.5px; }
+  table.tps-items th { border-bottom: 1.5px solid #000; padding: 4px 2px; text-align: center; font-size: 9.5px; font-weight: 700; }
+  table.tps-items th small { display: block; font-size: 8px; color: #666; font-weight: 400; }
+  table.tps-items td { padding: 4px 2px; border-bottom: 1px dotted #ccc; text-align: center; }
+  table.tps-items td.name { text-align: right; }
+  table.tps-totals { width: 100%; border-collapse: collapse; margin-top: 8px; border: 1.5px solid #000; }
+  table.tps-totals td { border: 1px solid #000; text-align: center; padding: 6px 4px; width: 50%; }
+  table.tps-totals .lbl { font-size: 10px; color: #555; display: block; margin-bottom: 2px; }
+  table.tps-totals .val { font-size: 12.5px; font-weight: 800; }
 </style>
 </head>
 <body>
-  <div class="tp-center">
-    <div class="tp-company-name">${company.name}</div>
-    ${company.phone ? `<div class="tp-company-info">📞 ${company.phone}</div>` : ''}
-    ${company.address ? `<div class="tp-company-info">${company.address}</div>` : ''}
-  </div>
+  ${customHeaderHTML || defaultHeader}
   <div class="tp-divider"></div>
   ${bodyHTML}
   <div class="tp-footer">${now}<br>شكراً لتعاملكم معنا 🌟</div>
@@ -87,40 +112,64 @@ function tpWrapper(company, title, bodyHTML) {
 }
 
 // ════════════════════════════════════════════════════════════
-// فاتورة مبيعات
-// data = { invoiceNo, customerName, paymentType, items:[{name,qty,unit_price,line_total}],
+// فاتورة مبيعات — تصميم مخصص (شعار + رقم/تاريخ + بيانات عميل +
+// جدول أصناف مرقّم ثنائي اللغة + صندوق إجماليات 3×2)
+// data = { invoiceNo, customerName, customerPhone, paymentType,
+//          items:[{name,qty,unit_price,line_total}],
 //          subtotal, discount, total, previousBalance, paidAmount }
 // ════════════════════════════════════════════════════════════
+function tpBuildSaleHeaderHTML(company) {
+    return `
+    <div class="tp-title">مبيعات</div>
+    <div class="tps-header">
+        <div class="tps-crown">👑</div>
+        <div class="tps-brand">${company.name}</div>
+        ${company.address ? `<div class="tps-tagline">${company.address}</div>` : ''}
+    </div>
+    ${company.phone ? `<div class="tps-contact"><span class="lbl">للتواصل</span>${company.phone}</div>` : ''}`;
+}
+
 function tpBuildSaleHTML(company, data) {
     const newBalance = (data.previousBalance||0) + (data.paymentType==='credit' ? data.total : 0);
-    const remaining = (data.paidAmount!=null) ? Math.max(0, data.total - data.paidAmount) : 0;
+    const paid = data.paidAmount != null ? data.paidAmount : (data.paymentType === 'cash' ? data.total : 0);
+    const remaining = Math.max(0, data.total - paid);
+    const now = new Date().toLocaleString('ar-EG', { hour:'2-digit', minute:'2-digit', day:'numeric', month:'2-digit', year:'numeric' });
 
     const body = `
-    <div class="tp-title">فاتورة مبيعات</div>
-    <div class="tp-row"><span class="lbl">رقم الفاتورة</span><span class="val">${data.invoiceNo}</span></div>
-    <div class="tp-row"><span class="lbl">العميل</span><span class="val">${data.customerName || 'نقدي'}</span></div>
-    <div class="tp-row"><span class="lbl">نوع الدفع</span><span class="val">${data.paymentType==='cash'?'نقدي':'آجل'}</span></div>
+    <div class="tps-meta-row"><span>الرقم : ${data.invoiceNo}</span><span>التاريخ : ${now}</span></div>
+    <div class="tps-cust"><span class="lbl">الاسم</span>${data.customerName || 'نقدي'}</div>
+    ${data.customerPhone ? `<div class="tps-cust"><span class="lbl">التلفون</span><span dir="ltr">${data.customerPhone}</span></div>` : ''}
     <div class="tp-divider"></div>
-    <table class="tp-items">
-        <thead><tr><th>الصنف</th><th>كمية</th><th>سعر</th><th>إجمالي</th></tr></thead>
+    <table class="tps-items">
+        <thead><tr>
+            <th>م<small>IN</small></th>
+            <th style="text-align:right">الصنف<small>Item Name</small></th>
+            <th>الكمية<small>QTY</small></th>
+            <th>السعر<small>Price</small></th>
+            <th>الاجمالى<small>Total</small></th>
+        </tr></thead>
         <tbody>
-            ${(data.items||[]).map(it=>`<tr>
-                <td>${it.name}</td><td>${it.qty}</td><td>${tpFmt(it.unit_price)}</td><td>${tpFmt(it.line_total)}</td>
+            ${(data.items||[]).map((it,i)=>`<tr>
+                <td>${i+1}</td><td class="name">${it.name}</td><td>${it.qty}</td><td>${tpFmt(it.unit_price)}</td><td>${tpFmt(it.line_total)}</td>
             </tr>`).join('')}
         </tbody>
     </table>
-    <div class="tp-divider"></div>
-    <div class="tp-totals">
-        <div class="tp-row"><span class="lbl">إجمالي الأصناف</span><span class="val">${tpFmt(data.subtotal)}</span></div>
-        ${data.discount>0?`<div class="tp-row"><span class="lbl">الخصم</span><span class="val">-${tpFmt(data.discount)}</span></div>`:''}
-        ${data.previousBalance ? `<div class="tp-row"><span class="lbl">الرصيد السابق</span><span class="val">${tpFmt(data.previousBalance)}</span></div>` : ''}
-        <div class="tp-grand tp-row"><span>الإجمالي</span><span>${tpFmt(data.total)}</span></div>
-        ${data.paidAmount!=null ? `
-        <div class="tp-row"><span class="lbl">المدفوع</span><span class="val">${tpFmt(data.paidAmount)}</span></div>
-        <div class="tp-row"><span class="lbl">الباقي</span><span class="val">${tpFmt(remaining)}</span></div>` : ''}
-        ${data.paymentType==='credit' ? `<div class="tp-row"><span class="lbl">إجمالي رصيد العميل الآن</span><span class="val">${tpFmt(newBalance)}</span></div>` : ''}
-    </div>`;
-    return tpWrapper(company, 'فاتورة مبيعات ' + data.invoiceNo, body);
+    <table class="tps-totals">
+        <tr>
+            <td><span class="lbl">الفاتورة</span><span class="val">${tpFmt(data.total)} ج.م</span></td>
+            <td><span class="lbl">الرصيد الساري</span><span class="val">${tpFmt(newBalance)} ج.م</span></td>
+        </tr>
+        <tr>
+            <td><span class="lbl">المدفوع</span><span class="val">${tpFmt(paid)} ج.م</span></td>
+            <td><span class="lbl">الاجمالى</span><span class="val">${tpFmt(data.subtotal)} ج.م</span></td>
+        </tr>
+        <tr>
+            <td><span class="lbl">الباقي</span><span class="val">${tpFmt(remaining)} ج.م</span></td>
+            <td><span class="lbl">الخصم</span><span class="val">${tpFmt(data.discount)} ج.م</span></td>
+        </tr>
+    </table>
+    <div class="tp-center" style="font-size:10px;color:#777;margin-top:8px">‹‹‹‹‹‹ لطباعة الفاتورة ››››››</div>`;
+    return tpWrapper(company, 'فاتورة مبيعات ' + data.invoiceNo, body, tpBuildSaleHeaderHTML(company));
 }
 
 // ════════════════════════════════════════════════════════════

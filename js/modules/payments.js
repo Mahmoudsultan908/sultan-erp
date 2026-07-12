@@ -18,6 +18,8 @@ async function renderPayments(c) {
             .select('*, suppliers(name, phone, balance)').order('created_at', { ascending: false }).limit(50);
         _paySuppliers = suppliers || [];
         _payList = payments || [];
+        // كاش للمراجعة الأوفلاين (offline.js) — قراءة فقط، بيتحدّث تلقائياً كل ما الصفحة تفتح أونلاين
+        if (typeof dbSetCache === 'function') dbSetCache('suppliers', _paySuppliers);
 
         const totalPaid = (payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0);
         const debtSuppliers = _paySuppliers.filter(s => (Number(s.balance)||0) > 0);

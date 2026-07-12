@@ -132,6 +132,7 @@ function buildLayout() {
             <div class="topbar-title" id="topbarTitle">لوحة تحكم المصروفات</div>
           </div>
           <div class="topbar-actions">
+            <div class="badge-offline" id="topbarOffline" onclick="offlineOpenPanel()" title="حالة الاتصال والمزامنة">🟢 متصل</div>
             <div class="badge-cash" id="topbarCash">جاري التحميل...</div>
             <div class="user-profile">
                 <div class="user-avatar" id="userAvatar">م</div>
@@ -149,6 +150,7 @@ async function setupApp() {
     restoreSidebarState();
     document.getElementById('userAvatar').textContent = currentUser.email.charAt(0).toUpperCase();
     document.getElementById('userBadge').innerHTML = `${currentUser.email} <span>مدير النظام</span>`;
+    if (typeof refreshOnlineState === 'function') { await refreshOnlineState(); offlineUpdateBadge(); }
     try {
         const { data: cash } = await sb.rpc('get_cash_balance');
         document.getElementById('topbarCash').textContent = '💰 ' + (cash || 0).toFixed(2) + ' ج.م';

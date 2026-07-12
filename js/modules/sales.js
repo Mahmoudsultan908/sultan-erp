@@ -58,6 +58,12 @@ async function invLoadData() {
     INV_DB.warehouses = warehouses || [];
     INV_DB.priceLevels = priceLevels || [];
 
+    // كاش للمراجعة الأوفلاين (offline.js) — قراءة فقط، بيتحدّث تلقائياً كل ما شاشة المبيعات تفتح أونلاين
+    if (typeof dbSetCache === 'function') {
+        dbSetCache('products', INV_DB.products);
+        dbSetCache('customers', INV_DB.customers);
+    }
+
     // خريطة أسعار المنتجات: 'productId|LEVELCODE' => price
     INV_DB.priceMap = {};
     (productPrices || []).forEach(pp => {
@@ -1156,6 +1162,7 @@ async function invPrint() {
     await printThermalReceipt('sale', {
         invoiceNo: 'INV-' + String(INV_DB.invoiceNo).padStart(4,'0'),
         customerName: cust?.name || null,
+        customerPhone: cust?.phone || null,
         paymentType: invPayType,
         items: filled.map(it => ({ name: it.name, qty: it.qty, unit_price: it.price, line_total: (it.qty||0)*(it.price||0)*(1-(it.disc||0)/100) })),
         subtotal, discount: extra, total: net,
