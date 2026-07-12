@@ -84,13 +84,48 @@ async function idbStore(name, mode) {
 
 // ── كاش البيانات المرجعية ──
 async function dbSetCache(table, data) {
-    const store = await idbStore('cache', 'readwrite');
-    await idbReq(store.put({ table, data, updatedAt: Date.now() }));
+    try {
+        const store = await idbStore('cache', 'readwrite');
+        await idbReq(store.put({ table, data: data || [], updatedAt: Date.now() }));
+        console.log(`[offline] كاش "${table}" اتحدّث (${(data || []).length} صف)`);
+    } catch (err) {
+        console.error(`[offline] فشل حفظ كاش "${table}":`, err);
+    }
 }
 async function dbGetCache(table) {
-    const store = await idbStore('cache', 'readonly');
-    const row = await idbReq(store.get(table));
-    return row || null; // { table, data, updatedAt } أو null
+    try {
+        const store = await idbStore('cache', 'readonly');
+        const row = await idbReq(store.get(table));
+        return row || null; // { table, data, updatedAt } أو null
+    } catch (err) {
+        console.error(`[offline] فشل قراءة كاش "${table}":`, err);
+        return null;
+    }
+}
+
+// ── تسخين الكاش تلقائياً بعد تسجيل الدخول مباشرة (بدل الاعتماد على
+//    إن المستخدم يفتح صفحة مبيعات/تحصيل/دفع بالتحديد الأول) ──
+async function offlineWarmCache() {
+    if (typeof sb === 'undefined') return;
+    try {
+        const [{ data: products, error: e1 }, { data: customers, error: e2 }, { data: suppliers, error: e3 }] = await Promise.all([
+            sb.from('products').select('*').eq('is_active', true).order('name'),
+            sb.from('customers').select('*').eq('is_active', true).order('name'),
+            sb.from('suppliers').select('*').eq('is_active', true).order('name'),
+        ]);
+        console.log('[offline] نتيجة تسخين الكاش الأولي:', {
+            products: products?.length, productsErr: e1?.message,
+            customers: customers?.length, customersErr: e2?.message,
+            suppliers: suppliers?.length, suppliersErr: e3?.message,
+        });
+        await Promise.all([
+            dbSetCache('products', products || []),
+            dbSetCache('customers', customers || []),
+            dbSetCache('suppliers', suppliers || []),
+        ]);
+    } catch (err) {
+        console.error('[offline] فشل تسخين الكاش الأولي:', err);
+    }
 }
 
 // ── طابور العمليات المعلّقة ──
@@ -289,7 +324,7 @@ async function offlineUpdateBadge() {
 
 Object.assign(window, {
     isOnline, refreshOnlineState, offlineGetDeviceId,
-    dbGetCache, dbSetCache,
+    dbGetCache, dbSetCache, offlineWarmCache,
     queueWrite, getQueue, updateQueueEntry, removeQueueEntry,
     appendReconciliation, getReconciliation, resolveReconciliation,
     registerSyncHandler, trySync,

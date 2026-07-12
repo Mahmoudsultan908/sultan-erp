@@ -150,7 +150,11 @@ async function setupApp() {
     restoreSidebarState();
     document.getElementById('userAvatar').textContent = currentUser.email.charAt(0).toUpperCase();
     document.getElementById('userBadge').innerHTML = `${currentUser.email} <span>مدير النظام</span>`;
-    if (typeof refreshOnlineState === 'function') { await refreshOnlineState(); offlineUpdateBadge(); }
+    if (typeof refreshOnlineState === 'function') {
+        await refreshOnlineState();
+        offlineUpdateBadge();
+        if (isOnline() && typeof offlineWarmCache === 'function') offlineWarmCache(); // تسخين الكاش في الخلفية، مش بلوكينج
+    }
     try {
         const { data: cash } = await sb.rpc('get_cash_balance');
         document.getElementById('topbarCash').textContent = '💰 ' + (cash || 0).toFixed(2) + ' ج.م';
