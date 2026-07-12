@@ -30,6 +30,9 @@ async function invLoadData() {
         { data: stockRows },
         { data: lastSale },
         { data: invCounterRow },
+        { data: priceLevels },
+        { data: productPrices },
+        { data: customerGroups },
     ] = await Promise.all([
         sb.from('products').select('*').eq('is_active', true).order('name'),
         sb.from('customers').select('*').eq('is_active', true).order('name'),
@@ -37,11 +40,29 @@ async function invLoadData() {
         sb.from('inventory_stock').select('warehouse_id, product_id, qty'),
         sb.from('sales').select('invoice_no').order('created_at', { ascending: false }).limit(1),
         sb.from('app_settings').select('value').eq('key', 'invoice_counter').maybeSingle(),
+        sb.from('price_levels').select('*').order('sort_order'),
+        sb.from('product_prices').select('product_id, price, price_levels(code)'),
+        sb.from('customer_groups').select('id, price_levels(code)'),
     ]);
 
     INV_DB.products = products || [];
     INV_DB.customers = customers || [];
     INV_DB.warehouses = warehouses || [];
+    INV_DB.priceLevels = priceLevels || [];
+
+    // خريطة أسعار المنتجات: 'productId|LEVELCODE' => price
+    INV_DB.priceMap = {};
+    (productPrices || []).forEach(pp => {
+        const code = pp.price_levels?.code;
+        if (code) INV_DB.priceMap[pp.product_id + '|' + code] = Number(pp.price) || 0;
+    });
+
+    // خريطة مستوى السعر الافتراضي لكل مجموعة عملاء: groupId => LEVELCODE
+    INV_DB.groupLevelMap = {};
+    (customerGroups || []).forEach(g => {
+        const code = g.price_levels?.code;
+        if (code) INV_DB.groupLevelMap[g.id] = code;
+    });
 
     // بناء خريطة المخزون: 'warehouseId|productId' => qty
     INV_DB.stockMap = {};
@@ -65,8 +86,15 @@ async function invLoadData() {
 }
 
 // ── سعر بيع صنف حسب مستوى السعر ──
+let invPriceLevelCode = ''; // '' = استخدام الافتراضي (جملة/تجزئة القديم) — قابل للتغيير من القائمة أو من مجموعة العميل
+
 function invGetSellPrice(p) {
-    // نستخدم سعر الجملة افتراضياً، مع fallback للتجزئة
+    // لو فيه مستوى سعر مختار، وله سعر مسجّل لهذا الصنف تحديداً، استخدمه
+    if (invPriceLevelCode && p?.id) {
+        const levelPrice = INV_DB.priceMap?.[p.id + '|' + invPriceLevelCode];
+        if (levelPrice > 0) return levelPrice;
+    }
+    // fallback: نفس السلوك القديم (جملة ثم تجزئة)
     return Number(p?.wholesale_price) || Number(p?.retail_price) || 0;
 }
 function invGetBuyPrice(p) {
@@ -105,6 +133,7 @@ async function renderSales(c) {
     invItems = [{ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', stock: 0 }];
     invCustId = null;
     invPayType = 'cash';
+    invPriceLevelCode = '';
 
     // ★ استئناف من عرض سعر (لو جاي من صفحة quotations.js)
     if (window._pendingQuoteConversion) {
@@ -216,6 +245,10 @@ function invSearchBarHTML() {
             <div class="inv-ac" id="invFastAC" style="top:calc(100% + 4px)"></div>
         </div>
         <span class="inv-search-hint"><kbd>Alt+F</kbd> بحث</span>
+        <select id="invPriceLevelSelect" class="inv-date-input" title="مستوى السعر" onchange="invSetPriceLevel(this.value)" style="cursor:pointer">
+            <option value="">السعر الافتراضي</option>
+            ${(INV_DB.priceLevels||[]).map(l=>`<option value="${l.code}" ${invPriceLevelCode===l.code?'selected':''}>💰 ${l.name}</option>`).join('')}
+        </select>
         <div class="inv-density-btns" title="كثافة الأعمدة">
             <button onclick="invSetDensity('compact')" id="invDCompact" class="${cur==='compact'?'active':''}">مضغوط <kbd>1</kbd></button>
             <button onclick="invSetDensity('cozy')"    id="invDCozy"    class="${cur==='cozy'?'active':''}">عادي <kbd>2</kbd></button>
@@ -381,7 +414,7 @@ function invRenderItems() {
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.qty||1}" min="0.001" step="0.001"
-                    oninput="invItems[${idx}].qty=parseFloat(this.value)||0;invUpdateSummary()" onkeydown="invRowKey(event,${idx},'qty')">
+                    oninput="invItems[${idx}].qty=parseFloat(this.value)||0;invUpdateRowTotal(${idx});invUpdateSummary()" onkeydown="invRowKey(event,${idx},'qty')">
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num is-free" value="${it.free||0}" min="0" step="0.001"
@@ -389,13 +422,13 @@ function invRenderItems() {
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.price||0}" min="0" step="0.01"
-                    oninput="invItems[${idx}].price=parseFloat(this.value)||0;invUpdateSummary()" onkeydown="invRowKey(event,${idx},'price')">
+                    oninput="invItems[${idx}].price=parseFloat(this.value)||0;invUpdateRowTotal(${idx});invUpdateSummary()" onkeydown="invRowKey(event,${idx},'price')">
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.disc||0}" min="0" max="100" step="0.1"
-                    oninput="invItems[${idx}].disc=parseFloat(this.value)||0;invUpdateSummary()">
+                    oninput="invItems[${idx}].disc=parseFloat(this.value)||0;invUpdateRowTotal(${idx});invUpdateSummary()">
             </td>
-            <td class="inv-cell-total">${invFmt(lineTotal)}<div style="font-size:9px;color:${marginPct>=20?'var(--inv-green)':'var(--inv-red)'};font-weight:600">${prod && costPrice ? marginPct+'% ربح' : ''}</div></td>
+            <td class="inv-cell-total" id="invRowTotal-${idx}">${invFmt(lineTotal)}<div style="font-size:9px;color:${marginPct>=20?'var(--inv-green)':'var(--inv-red)'};font-weight:600">${prod && costPrice ? marginPct+'% ربح' : ''}</div></td>
             <td class="inv-cell-del">
                 <button class="inv-del-btn" onclick="invRemoveRow(${idx})">✕</button>
             </td>
@@ -408,6 +441,19 @@ function invCalcNet() {
     const rowsDisc = invItems.reduce((s,i)=>s+(i.qty||0)*(i.price||0)*(i.disc||0)/100,0);
     const extra = parseFloat(document.getElementById('invDiscExtra')?.value)||0;
     return { subtotal, rowsDisc, extra, net: subtotal - rowsDisc - extra };
+}
+
+// تحديث إجمالي سطر واحد فوراً (بدون إعادة رسم الصف كله، عشان التركيز يفضل شغال أثناء الكتابة)
+function invUpdateRowTotal(idx) {
+    const it = invItems[idx];
+    if (!it) return;
+    const el = document.getElementById('invRowTotal-'+idx);
+    if (!el) return;
+    const prod = it.pid ? INV_DB.products.find(p => p.id === it.pid) : null;
+    const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
+    const costPrice = prod ? invGetBuyPrice(prod) : 0;
+    const marginPct = (it.price && costPrice) ? Math.round(((it.price - costPrice) / it.price) * 100) : 0;
+    el.innerHTML = `${invFmt(lineTotal)}<div style="font-size:9px;color:${marginPct>=20?'var(--inv-green)':'var(--inv-red)'};font-weight:600">${prod && costPrice ? marginPct+'% ربح' : ''}</div>`;
 }
 
 function invUpdateSummary() {
@@ -459,7 +505,28 @@ function invCustACKey(e) {
 }
 function invCustACHover(i) {
     _custACIdx = i;
-    document.querySelectorAll('#invCustAC .inv-ac-item').forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    const items = document.querySelectorAll('#invCustAC .inv-ac-item');
+    items.forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    items[i]?.scrollIntoView({ block: 'nearest' });
+}
+// تغيير مستوى السعر (يدوياً من القائمة، أو تلقائياً عند اختيار عميل)
+// silent=true تمنع رسالة التنبيه (تُستخدم عند التطبيق التلقائي عشان ما نزعجش المستخدم برسالتين)
+function invSetPriceLevel(code, silent) {
+    invPriceLevelCode = code;
+    // إعادة حساب أسعار الأصناف الموجودة فعلاً في الفاتورة (لو لها سعر مسجَّل في المستوى الجديد)
+    invItems.forEach(it => {
+        if (!it.pid) return;
+        const newPrice = INV_DB.priceMap?.[it.pid + '|' + code];
+        if (newPrice > 0) it.price = newPrice;
+    });
+    invRenderItems();
+    invUpdateSummary();
+    const sel = document.getElementById('invPriceLevelSelect');
+    if (sel) sel.value = code;
+    if (!silent) {
+        const levelName = INV_DB.priceLevels.find(l=>l.code===code)?.name || code;
+        invToast(`💰 مستوى السعر: ${levelName}`, 'info');
+    }
 }
 function invSelectCustomer(id) {
     const c = INV_DB.customers.find(x=>x.id===id);
@@ -468,6 +535,9 @@ function invSelectCustomer(id) {
     document.getElementById('invCustSearch').value = '';
     document.getElementById('invCustAC').classList.remove('show');
     invUpdateCustomerChip();
+    // تطبيق مستوى السعر الافتراضي لمجموعة العميل تلقائياً (يبقى قابل للتغيير يدوياً بعدها بحرية)
+    const defaultLevel = c.group_id ? INV_DB.groupLevelMap?.[c.group_id] : null;
+    if (defaultLevel) invSetPriceLevel(defaultLevel, true);
     invToast(`👤 تم اختيار: ${c.name}`, 'success');
     setTimeout(()=>document.getElementById('invFastSearch')?.focus(), 50);
 }
@@ -516,7 +586,9 @@ function invFastKey(e) {
 }
 function invFastHover(i) {
     _fastIdx = i;
-    document.querySelectorAll('#invFastAC .inv-ac-item').forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    const items = document.querySelectorAll('#invFastAC .inv-ac-item');
+    items.forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    items[i]?.scrollIntoView({ block: 'nearest' });
 }
 function invPickProduct(pid) {
     const p = INV_DB.products.find(x=>x.id===pid);
@@ -577,7 +649,7 @@ function invOnNameKey(e, idx) {
     else if (e.key==='Enter'){e.preventDefault();const ci=_rowACIdx[idx]??-1;if(items[ci])items[ci].click();}
     else if (e.key==='Escape'){ac.classList.remove('show');_rowACIdx[idx]=-1;}
 }
-function invRowACHover(idx,i){_rowACIdx[idx]=i;document.querySelectorAll('#invAC-'+idx+' .inv-ac-item').forEach((el,x)=>el.classList.toggle('active',x===i));}
+function invRowACHover(idx,i){_rowACIdx[idx]=i;const items=document.querySelectorAll('#invAC-'+idx+' .inv-ac-item');items.forEach((el,x)=>el.classList.toggle('active',x===i));items[i]?.scrollIntoView({block:'nearest'});}
 function invPickInline(idx, pid) {
     const p = INV_DB.products.find(x=>x.id===pid);
     if (!p) return;
@@ -915,7 +987,23 @@ async function invSave(andNew) {
         saveBtns.forEach(b => { b.disabled = false; });
     }
 }
-function invPrint() { invToast('🖨️ سيتم ربط الطباعة بـ Supabase (SP_print) لاحقاً', 'info'); }
+async function invPrint() {
+    const filled = invItems.filter(i => i.pid && (i.qty||0) > 0);
+    if (!filled.length) { invToast('⚠️ لا توجد أصناف لطباعتها', 'error'); return; }
+    const { subtotal, extra, net } = invCalcNet();
+    const cust = invCustId ? INV_DB.customers.find(x=>x.id===invCustId) : null;
+    const paid = invPayType === 'cash' ? parseFloat(document.getElementById('invCashReceived')?.value) || net : null;
+
+    await printThermalReceipt('sale', {
+        invoiceNo: 'INV-' + String(INV_DB.invoiceNo).padStart(4,'0'),
+        customerName: cust?.name || null,
+        paymentType: invPayType,
+        items: filled.map(it => ({ name: it.name, qty: it.qty, unit_price: it.price, line_total: (it.qty||0)*(it.price||0)*(1-(it.disc||0)/100) })),
+        subtotal, discount: extra, total: net,
+        previousBalance: cust?.balance || 0,
+        paidAmount: paid,
+    });
+}
 function invClose() {
     if (confirm('إغلاق الفاتورة؟ سيتم فقدان التغييرات غير المحفوظة.')) {
         invStopAutoSave();
@@ -1137,7 +1225,7 @@ Object.assign(window, {
     invSave, invPrint, invDraft, invClose, invAddRow, invRemoveRow, invFocusRow,
     invSetPayType, invSetCash, invSetExactCash, invCalcChange, invTogglePayType,
     invSelectCustomer, invClearCustomer, invPickProduct, invPickInline,
-    invOnName, invOnNameKey, invOnCode, invRowKey, invUpdateSummary,
+    invOnName, invOnNameKey, invOnCode, invRowKey, invUpdateSummary, invUpdateRowTotal, invSetPriceLevel,
     invRowACHover, invCustACHover, invFastHover,
     invGetDensity, invSetDensity,
     invShowShortcuts, invCloseShortcuts,

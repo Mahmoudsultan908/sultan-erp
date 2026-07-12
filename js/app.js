@@ -67,7 +67,9 @@ function buildLayout() {
         <div class="nav-item" data-mod="products" onclick="loadMod(this, 'products')">🏷️ الأصناف</div>
         <div class="nav-item" data-mod="product-import" onclick="loadMod(this, 'product-import')">📥 استيراد أصناف Excel</div>
         <div class="nav-item" data-mod="customers-manage" onclick="loadMod(this, 'customers-manage')">👤 إدارة العملاء</div>
+        <div class="nav-item" data-mod="customer-import" onclick="loadMod(this, 'customer-import')">📥 استيراد عملاء Excel</div>
         <div class="nav-item" data-mod="suppliers-manage" onclick="loadMod(this, 'suppliers-manage')">🏭 إدارة الموردين</div>
+        <div class="nav-item" data-mod="supplier-import" onclick="loadMod(this, 'supplier-import')">📥 استيراد موردين Excel</div>
 
         <div class="nav-group">المبيعات والعملاء</div>
         <div class="nav-item" data-mod="sales" onclick="loadMod(this, 'sales')">🧾 فاتورة المبيعات</div>
@@ -95,6 +97,21 @@ function buildLayout() {
         <div class="nav-item" data-mod="audit-log" onclick="loadMod(this, 'audit-log')">🔐 سجل التدقيق</div>
         <div class="nav-item" data-mod="trialbalance" onclick="loadMod(this, 'trialbalance')">⚖️ ميزان المراجعة</div>
         <div class="nav-item" data-mod="balancesheet" onclick="loadMod(this, 'balancesheet')">🏦 الميزانية العمومية</div>
+
+        <div class="nav-group">🔜 قريباً</div>
+        <div class="nav-item" data-mod="warehouse-reports" onclick="loadMod(this, 'warehouse-reports')">📊 تقارير المخازن</div>
+        <div class="nav-item" data-mod="general-import-export" onclick="loadMod(this, 'general-import-export')">🔄 استيراد/تصدير عام</div>
+        <div class="nav-item" data-mod="sales-reps" onclick="loadMod(this, 'sales-reps')">🚗 المندوبون</div>
+        <div class="nav-item" data-mod="performance-reports" onclick="loadMod(this, 'performance-reports')">📈 تقارير الأداء المتقدمة</div>
+        <div class="nav-item" data-mod="advanced-permissions" onclick="loadMod(this, 'advanced-permissions')">🔐 الصلاحيات المتقدمة</div>
+        <div class="nav-item" data-mod="print-center" onclick="loadMod(this, 'print-center')">🖨️ مركز الطباعة</div>
+        <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء</div>
+        <div class="nav-item" data-mod="archive" onclick="loadMod(this, 'archive')">🗄️ الأرشيف</div>
+        <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب</div>
+        <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي</div>
+        <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
+        <div class="nav-item" data-mod="customer-orders-link" onclick="loadMod(this, 'customer-orders-link')">🔗 ربط برنامج طلبات العملاء</div>
+        <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">📱 ربط برنامج المندوب</div>
 
         <div class="nav-group">التقارير والإعدادات</div>
         <div class="nav-item" data-mod="reports" onclick="loadMod(this, 'reports')">📈 التقارير</div>
@@ -154,7 +171,9 @@ window.loadMod = async function(el, modName) {
         'products': 'إدارة الأصناف',
         'product-import': 'استيراد الأصناف من Excel',
         'customers-manage': 'إدارة العملاء',
+        'customer-import': 'استيراد العملاء من Excel',
         'suppliers-manage': 'إدارة الموردين',
+        'supplier-import': 'استيراد الموردين من Excel',
         'expenses': 'لوحة تحكم المصروفات',
         'stock-transfer': 'تحويل مخزون',
         'sales': 'فاتورة مبيعات جديدة',
@@ -174,6 +193,19 @@ window.loadMod = async function(el, modName) {
         'audit-log': 'سجل التدقيق',
         'trialbalance': 'ميزان المراجعة',
         'balancesheet': 'الميزانية العمومية',
+        'warehouse-reports': 'تقارير المخازن',
+        'general-import-export': 'استيراد وتصدير عام',
+        'sales-reps': 'المندوبون',
+        'performance-reports': 'تقارير الأداء المتقدمة',
+        'advanced-permissions': 'الصلاحيات المتقدمة',
+        'print-center': 'مركز الطباعة',
+        'crm': 'إدارة علاقات العملاء',
+        'archive': 'الأرشيف',
+        'whatsapp': 'تكامل واتساب',
+        'ai-dashboard': 'لوحة الذكاء الاصطناعي',
+        'employee-evaluation': 'تقييم الموظفين',
+        'customer-orders-link': 'ربط برنامج طلبات العملاء',
+        'rep-app-link': 'ربط برنامج المندوب',
         'reports': 'التقارير المالية',
         'opening-balances': 'الأرصدة الافتتاحية',
         'settings': 'الإعدادات العامة',
@@ -185,7 +217,9 @@ window.loadMod = async function(el, modName) {
     if (modName === 'products' && typeof renderProducts === 'function') await renderProducts(c);
     if (modName === 'product-import' && typeof renderProductImport === 'function') await renderProductImport(c);
     if (modName === 'customers-manage' && typeof renderCustomersManage === 'function') await renderCustomersManage(c);
+    if (modName === 'customer-import' && typeof renderCustomerImport === 'function') await renderCustomerImport(c);
     if (modName === 'suppliers-manage' && typeof renderSuppliersManage === 'function') await renderSuppliersManage(c);
+    if (modName === 'supplier-import' && typeof renderSupplierImport === 'function') await renderSupplierImport(c);
     if (modName === 'expenses' && typeof renderExpenses === 'function') await renderExpenses(c);
     if (modName === 'stock-transfer' && typeof renderStockTransfer === 'function') await renderStockTransfer(c);
     if (modName === 'sales' && typeof renderSales === 'function') await renderSales(c);
@@ -205,6 +239,19 @@ window.loadMod = async function(el, modName) {
     if (modName === 'audit-log' && typeof renderAuditLog === 'function') await renderAuditLog(c);
     if (modName === 'trialbalance' && typeof renderTrialBalance === 'function') await renderTrialBalance(c);
     if (modName === 'balancesheet' && typeof renderBalanceSheet === 'function') await renderBalanceSheet(c);
+    if (modName === 'warehouse-reports' && typeof renderWarehouseReports === 'function') await renderWarehouseReports(c);
+    if (modName === 'general-import-export' && typeof renderGeneralImportExport === 'function') await renderGeneralImportExport(c);
+    if (modName === 'sales-reps' && typeof renderSalesReps === 'function') await renderSalesReps(c);
+    if (modName === 'performance-reports' && typeof renderPerformanceReports === 'function') await renderPerformanceReports(c);
+    if (modName === 'advanced-permissions' && typeof renderAdvancedPermissions === 'function') await renderAdvancedPermissions(c);
+    if (modName === 'print-center' && typeof renderPrintCenter === 'function') await renderPrintCenter(c);
+    if (modName === 'crm' && typeof renderCRM === 'function') await renderCRM(c);
+    if (modName === 'archive' && typeof renderArchive === 'function') await renderArchive(c);
+    if (modName === 'whatsapp' && typeof renderWhatsAppIntegration === 'function') await renderWhatsAppIntegration(c);
+    if (modName === 'ai-dashboard' && typeof renderAIDashboard === 'function') await renderAIDashboard(c);
+    if (modName === 'employee-evaluation' && typeof renderEmployeeEvaluation === 'function') await renderEmployeeEvaluation(c);
+    if (modName === 'customer-orders-link' && typeof renderCustomerOrdersLink === 'function') await renderCustomerOrdersLink(c);
+    if (modName === 'rep-app-link' && typeof renderRepAppLink === 'function') await renderRepAppLink(c);
     if (modName === 'reports' && typeof renderReports === 'function') await renderReports(c);
     if (modName === 'opening-balances' && typeof renderOpeningBalances === 'function') await renderOpeningBalances(c);
     if (modName === 'settings' && typeof renderSettings === 'function') await renderSettings(c);

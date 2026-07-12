@@ -9,6 +9,7 @@
 
 let _colCustomers = [];
 let _colSelectedId = null;
+let _colList = [];
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -20,12 +21,13 @@ async function renderCollections(c) {
         let payments = [];
         try {
             const r = await sb.from('customer_payments')
-                .select('*, customers(name)').order('created_at', { ascending: false }).limit(50);
+                .select('*, customers(name, phone, balance)').order('created_at', { ascending: false }).limit(50);
             payments = r.data || [];
         } catch (e) {
             // الجدول ممكن ما يكنش اتخلق لسه → نعرض تحذير للمستخدم
         }
         _colCustomers = customers || [];
+        _colList = payments;
 
         const totalCollected = payments.reduce((s,p)=>s+(Number(p.amount)||0),0);
         const debtCustomers = _colCustomers.filter(c => (Number(c.balance)||0) > 0);
@@ -53,16 +55,17 @@ async function renderCollections(c) {
 
             <div class="mod-table-wrap" style="margin-top:16px">
                 <table class="mod-table"><thead><tr>
-                    <th>الرقم</th><th>العميل</th><th>التاريخ</th><th style="text-align:left">المبلغ</th><th>الحالة</th>
+                    <th>الرقم</th><th>العميل</th><th>التاريخ</th><th style="text-align:left">المبلغ</th><th>الحالة</th><th></th>
                 </tr></thead>
                 <tbody>
-                    ${payments.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>💵</span>لا توجد تحصيلات.</td></tr>` :
+                    ${payments.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>💵</span>لا توجد تحصيلات.</td></tr>` :
                     payments.map(p => `<tr>
                         <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
                         <td><strong>${p.customers?.name || '—'}</strong></td>
                         <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
                         <td style="text-align:left;font-weight:700;color:#059669">${colFmt(p.amount)}</td>
                         <td>${p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':`<span style="color:#D97706">${p.status}</span>`}</td>
+                        <td><button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button></td>
                     </tr>`).join('')}
                 </tbody></table>
             </div>
@@ -195,4 +198,15 @@ window.colSave = async function() {
 // ════════════════════════════════════════════════════════════
 // 4) أدوات مساعدة
 // ════════════════════════════════════════════════════════════
+window.colPrintVoucher = async function(id) {
+    const p = _colList.find(x=>x.id===id);
+    if (!p) return;
+    const balanceAfter = (Number(p.customers?.balance)||0);
+    const balanceBefore = balanceAfter + Number(p.amount);
+    await printThermalReceipt('collection', {
+        ref: p.ref, entityName: p.customers?.name || '—', amount: p.amount,
+        entityBalanceBefore: balanceBefore, entityBalanceAfter: balanceAfter,
+    });
+};
+
 function colFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }

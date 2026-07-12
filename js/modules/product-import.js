@@ -10,8 +10,10 @@ let _piParsedRows = [];
 let _piPriceLevels = [];
 let _piCategories = [];
 let _piCompanies = [];
+let _piMainWarehouseId = null;
+let _piExistingBalanceProductIds = new Set();
 
-const PI_HEADERS = ['الكود','اسم الصنف','المجموعة','الشركة','الوحدة','سعر الشراء','جملة','نص جملة','قطاعي','مميز','خاص','حد الطلب','الباركود'];
+const PI_HEADERS = ['الكود','اسم الصنف','المجموعة','الشركة','الوحدة','سعر الشراء','جملة','نص جملة','قطاعي','مميز','خاص','حد الطلب','الباركود','الرصيد الافتتاحي'];
 const PI_LEVEL_CODES = { 'جملة':'WHOLESALE', 'نص جملة':'HALF', 'قطاعي':'RETAIL', 'مميز':'SPECIAL', 'خاص':'VIP' };
 
 function piFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -46,10 +48,10 @@ window.piDownloadTemplate = function() {
     const wb = XLSX.utils.book_new();
     const wsData = [
         PI_HEADERS,
-        ['P-001', 'بسكويت تايجر', 'سناكس', 'شركة الوطنية للأغذية', 'قطعة', 5, 6, 6.5, 7, 7.5, 8, 50, '6221031012345']
+        ['P-001', 'بسكويت تايجر', 'سناكس', 'شركة الوطنية للأغذية', 'قطعة', 5, 6, 6.5, 7, 7.5, 8, 50, '6221031012345', 100]
     ];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols'] = [{wch:10},{wch:26},{wch:16},{wch:22},{wch:10},{wch:11},{wch:9},{wch:10},{wch:9},{wch:9},{wch:9},{wch:11},{wch:16}];
+    ws['!cols'] = [{wch:10},{wch:26},{wch:16},{wch:22},{wch:10},{wch:11},{wch:9},{wch:10},{wch:9},{wch:9},{wch:9},{wch:11},{wch:16},{wch:14}];
     XLSX.utils.book_append_sheet(wb, ws, 'استيراد الأصناف');
     XLSX.writeFile(wb, 'قالب_استيراد_الأصناف.xlsx');
 };
@@ -69,15 +71,19 @@ window.piHandleFile = async function(file) {
 
         if (!rows.length) { alert('⚠️ الملف فارغ'); return; }
 
-        // تحميل المجموعات/الشركات/مستويات الأسعار الحالية للمطابقة
-        const [{ data: cats }, { data: comps }, { data: levels }] = await Promise.all([
+        // تحميل المجموعات/الشركات/مستويات الأسعار/المخزن الرئيسي/الأرصدة الموجودة (للحماية من التكرار)
+        const [{ data: cats }, { data: comps }, { data: levels }, { data: warehouses }, { data: existingBalances }] = await Promise.all([
             sb.from('product_categories').select('*'),
             sb.from('product_companies').select('*'),
             sb.from('price_levels').select('*'),
+            sb.from('warehouses').select('*'),
+            sb.from('opening_balances').select('product_id').eq('balance_type','inventory').eq('status','confirmed'),
         ]);
         _piCategories = cats || [];
         _piCompanies = comps || [];
         _piPriceLevels = levels || [];
+        _piMainWarehouseId = (warehouses||[]).find(w=>w.is_main)?.id || warehouses?.[0]?.id || null;
+        _piExistingBalanceProductIds = new Set((existingBalances||[]).map(b=>b.product_id));
 
         _piParsedRows = rows.map((r, idx) => {
             const code = String(r['الكود'] || '').trim();
@@ -104,6 +110,7 @@ window.piHandleFile = async function(file) {
                 },
                 reorder_point: parseFloat(r['حد الطلب']) || 0,
                 barcode: String(r['الباركود'] || '').trim(),
+                opening_qty: parseFloat(r['الرصيد الافتتاحي']) || 0,
                 errors,
             };
         });
@@ -203,7 +210,7 @@ window.piExecuteImport = async function() {
         });
 
         // 4) UPSERT الأصناف واحداً تلو الآخر (مع تحديث progress)
-        let done = 0, failed = 0;
+        let done = 0, failed = 0, balancesCreated = 0;
         for (const r of validRows) {
             progress.textContent = `⏳ جاري الاستيراد... ${done + failed}/${validRows.length}`;
             try {
@@ -235,12 +242,29 @@ window.piExecuteImport = async function() {
                     retail_price: r.prices['قطاعي'] || 0,
                 }).eq('id', prod.id);
 
+                // رصيد افتتاحي للمخزون (لو الصنف بيه رصيد بداية ومفيش رصيد افتتاحي مسجّل له من قبل)
+                if (r.opening_qty > 0 && _piMainWarehouseId && !_piExistingBalanceProductIds.has(prod.id)) {
+                    await sb.from('opening_balances').insert({
+                        balance_type: 'inventory',
+                        product_id: prod.id,
+                        warehouse_id: _piMainWarehouseId,
+                        qty: r.opening_qty,
+                        unit_cost: r.purchase_price,
+                        amount: r.opening_qty * r.purchase_price,
+                        as_of_date: new Date().toISOString().slice(0,10),
+                        status: 'confirmed',
+                        created_by: currentUser?.id || null,
+                    });
+                    _piExistingBalanceProductIds.add(prod.id); // منع تكرار في نفس عملية الاستيراد لو تكرر الكود بالخطأ
+                    balancesCreated++;
+                }
+
                 done++;
             } catch (e) { failed++; }
         }
 
         progress.textContent = '';
-        alert(`✅ اكتمل الاستيراد\nنجح: ${done}\nفشل: ${failed}`);
+        alert(`✅ اكتمل الاستيراد\nنجح: ${done}\nفشل: ${failed}\nأرصدة افتتاحية جديدة: ${balancesCreated}`);
         renderProductImport(document.getElementById('app-content'));
     } catch (err) {
         alert('❌ خطأ عام أثناء الاستيراد: ' + err.message);

@@ -5,6 +5,7 @@
 
 let _paySuppliers = [];
 let _paySelectedId = null;
+let _payList = [];
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -14,8 +15,9 @@ async function renderPayments(c) {
     try {
         const { data: suppliers } = await sb.from('suppliers').select('*').eq('is_active', true).order('name');
         const { data: payments } = await sb.from('supplier_payments')
-            .select('*, suppliers(name)').order('created_at', { ascending: false }).limit(50);
+            .select('*, suppliers(name, phone, balance)').order('created_at', { ascending: false }).limit(50);
         _paySuppliers = suppliers || [];
+        _payList = payments || [];
 
         const totalPaid = (payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0);
         const debtSuppliers = _paySuppliers.filter(s => (Number(s.balance)||0) > 0);
@@ -38,16 +40,17 @@ async function renderPayments(c) {
 
             <div class="mod-table-wrap" style="margin-top:16px">
                 <table class="mod-table"><thead><tr>
-                    <th>الرقم</th><th>المورد</th><th>التاريخ</th><th style="text-align:left">المبلغ</th><th>الحالة</th>
+                    <th>الرقم</th><th>المورد</th><th>التاريخ</th><th style="text-align:left">المبلغ</th><th>الحالة</th><th></th>
                 </tr></thead>
                 <tbody>
-                    ${(payments||[]).length === 0 ? `<tr><td colspan="5" class="empty-state"><span>💸</span>لا توجد مدفوعات.</td></tr>` :
+                    ${(payments||[]).length === 0 ? `<tr><td colspan="6" class="empty-state"><span>💸</span>لا توجد مدفوعات.</td></tr>` :
                     payments.map(p => `<tr>
                         <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
                         <td><strong>${p.suppliers?.name || '—'}</strong></td>
                         <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
                         <td style="text-align:left;font-weight:700;color:#059669">${payFmt(p.amount)}</td>
                         <td>${p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':`<span style="color:#D97706">${p.status}</span>`}</td>
+                        <td><button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button></td>
                     </tr>`).join('')}
                 </tbody></table>
             </div>
@@ -181,4 +184,15 @@ window.paySave = async function() {
 // ════════════════════════════════════════════════════════════
 // 4) أدوات مساعدة
 // ════════════════════════════════════════════════════════════
+window.payPrintVoucher = async function(id) {
+    const p = _payList.find(x=>x.id===id);
+    if (!p) return;
+    const balanceAfter = (Number(p.suppliers?.balance)||0);
+    const balanceBefore = balanceAfter + Number(p.amount);
+    await printThermalReceipt('payment', {
+        ref: p.ref, entityName: p.suppliers?.name || '—', amount: p.amount,
+        entityBalanceBefore: balanceBefore, entityBalanceAfter: balanceAfter,
+    });
+};
+
 function payFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }

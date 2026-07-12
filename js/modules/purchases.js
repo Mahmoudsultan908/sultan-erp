@@ -292,7 +292,7 @@ function purRenderItems() {
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.qty||1}" min="0.001" step="0.001"
-                    oninput="purItems[${idx}].qty=parseFloat(this.value)||0;purUpdateSummary()" onkeydown="purRowKey(event,${idx},'qty')">
+                    oninput="purItems[${idx}].qty=parseFloat(this.value)||0;purUpdateRowTotal(${idx});purUpdateSummary()" onkeydown="purRowKey(event,${idx},'qty')">
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num is-free" value="${it.free||0}" min="0" step="0.001"
@@ -300,22 +300,32 @@ function purRenderItems() {
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.price||0}" min="0" step="0.01"
-                    oninput="purItems[${idx}].price=parseFloat(this.value)||0;purUpdateSummary()" onkeydown="purRowKey(event,${idx},'price')">
+                    oninput="purItems[${idx}].price=parseFloat(this.value)||0;purUpdateRowTotal(${idx});purUpdateSummary()" onkeydown="purRowKey(event,${idx},'price')">
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.disc||0}" min="0" max="100" step="0.1"
-                    oninput="purItems[${idx}].disc=parseFloat(this.value)||0;purUpdateSummary()">
+                    oninput="purItems[${idx}].disc=parseFloat(this.value)||0;purUpdateRowTotal(${idx});purUpdateSummary()">
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.deferredRate||0}" min="0" max="100" step="0.1" title="نسبة المؤجل %"
                     style="background:#F5F3FF;color:#7C3AED" oninput="purItems[${idx}].deferredRate=parseFloat(this.value)||0;purUpdateSummary()">
             </td>
-            <td class="inv-cell-total">${purFmt(lineTotal)}</td>
+            <td class="inv-cell-total" id="purRowTotal-${idx}">${purFmt(lineTotal)}</td>
             <td class="inv-cell-del">
                 <button class="inv-del-btn" onclick="purRemoveRow(${idx})">✕</button>
             </td>
         </tr>`;
     }).join('');
+}
+
+// تحديث إجمالي سطر واحد فوراً (بدون إعادة رسم الصف كله)
+function purUpdateRowTotal(idx) {
+    const it = purItems[idx];
+    if (!it) return;
+    const el = document.getElementById('purRowTotal-'+idx);
+    if (!el) return;
+    const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
+    el.innerHTML = purFmt(lineTotal);
 }
 
 function purCalcNet() {
@@ -373,7 +383,9 @@ function purSuppACKey(e) {
 }
 function purSuppACHover(i) {
     _purSuppACIdx = i;
-    document.querySelectorAll('#purSuppAC .inv-ac-item').forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    const items = document.querySelectorAll('#purSuppAC .inv-ac-item');
+    items.forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    items[i]?.scrollIntoView({ block: 'nearest' });
 }
 function purSelectSupplier(id) {
     const s = PUR_DB.suppliers.find(x=>x.id===id);
@@ -425,7 +437,9 @@ function purFastKey(e) {
 }
 function purFastHover(i) {
     _purFastIdx = i;
-    document.querySelectorAll('#purFastAC .inv-ac-item').forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    const items = document.querySelectorAll('#purFastAC .inv-ac-item');
+    items.forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    items[i]?.scrollIntoView({ block: 'nearest' });
 }
 function purPickProduct(pid) {
     const p = PUR_DB.products.find(x=>x.id===pid);
@@ -484,7 +498,7 @@ function purOnNameKey(e, idx) {
     else if (e.key==='Enter'){e.preventDefault();const ci=_purRowACIdx[idx]??-1;if(items[ci])items[ci].click();}
     else if (e.key==='Escape'){ac.classList.remove('show');_purRowACIdx[idx]=-1;}
 }
-function purRowACHover(idx,i){_purRowACIdx[idx]=i;document.querySelectorAll('#purAC-'+idx+' .inv-ac-item').forEach((el,x)=>el.classList.toggle('active',x===i));}
+function purRowACHover(idx,i){_purRowACIdx[idx]=i;const items=document.querySelectorAll('#purAC-'+idx+' .inv-ac-item');items.forEach((el,x)=>el.classList.toggle('active',x===i));items[i]?.scrollIntoView({block:'nearest'});}
 function purPickInline(idx, pid) {
     const p = PUR_DB.products.find(x=>x.id===pid);
     if (!p) return;
@@ -685,7 +699,7 @@ Object.assign(window, {
     renderPurchases, purSave, purClose, purAddRow, purRemoveRow, purFocusRow,
     purSetPayType, purSetExactCash, purCalcChange,
     purSelectSupplier, purClearSupplier, purPickProduct, purPickInline,
-    purOnName, purOnNameKey, purOnCode, purRowKey, purUpdateSummary,
+    purOnName, purOnNameKey, purOnCode, purRowKey, purUpdateSummary, purUpdateRowTotal,
     purRowACHover, purSuppACHover, purFastHover,
     purOnWarehouseChange,
 });
