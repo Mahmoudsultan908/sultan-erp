@@ -49,8 +49,8 @@ async function renderReturns(c) {
                 <p class="dash-sub">تسجيل مرتجعات المبيعات والمشتريات — مرتبطة بفاتورة أو مستقلة</p></div>
             </div>
             <div class="ob-tabs">
-                <button class="ob-tab ${retType==='sales'?'active':''}" onclick="retSwitchType('sales')">↩️ مرتجع مبيعات</button>
-                <button class="ob-tab ${retType==='purchase'?'active':''}" onclick="retSwitchType('purchase')">↩️ مرتجع مشتريات</button>
+                <button class="ob-tab ${retType==='sales'?'active':''}" onclick="retSwitchType('sales', this)">↩️ مرتجع مبيعات</button>
+                <button class="ob-tab ${retType==='purchase'?'active':''}" onclick="retSwitchType('purchase', this)">↩️ مرتجع مشتريات</button>
             </div>
             <div id="ret-content" style="margin-top:16px"></div>
         </div>`;
@@ -61,11 +61,12 @@ async function renderReturns(c) {
     }
 }
 
-window.retSwitchType = function (type) {
+window.retSwitchType = function (type, btn) {
     retType = type;
     retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retItems = [];
-    document.querySelectorAll('.ob-tabs .ob-tab').forEach(b => b.classList.remove('active'));
-    document.querySelector(`.ob-tabs .ob-tab:nth-child(${type === 'sales' ? 1 : 2})`)?.classList.add('active');
+    const container = (btn && btn.closest('.ob-tabs')) || document.querySelectorAll('.ob-wrap > .ob-tabs')[0];
+    container?.querySelectorAll('.ob-tab').forEach(b => b.classList.remove('active'));
+    (btn || container?.querySelector(`.ob-tab:nth-child(${type === 'sales' ? 1 : 2})`))?.classList.add('active');
     retRenderBody();
 };
 
@@ -98,8 +99,8 @@ async function retRenderBody() {
 
         <div class="dash-card" style="padding:20px;margin-bottom:16px">
             <div class="ob-tabs" style="border-bottom:none;margin-bottom:12px">
-                <button class="ob-tab ${retMode==='linked'?'active':''}" onclick="retSwitchMode('linked')">🔗 مرتبط بفاتورة (افتراضي)</button>
-                <button class="ob-tab ${retMode==='manual'?'active':''}" onclick="retSwitchMode('manual')">✍️ مستقل (بدون فاتورة)</button>
+                <button class="ob-tab ${retMode==='linked'?'active':''}" onclick="retSwitchMode('linked', this)">🔗 مرتبط بفاتورة (افتراضي)</button>
+                <button class="ob-tab ${retMode==='manual'?'active':''}" onclick="retSwitchMode('manual', this)">✍️ مستقل (بدون فاتورة)</button>
             </div>
             <div id="ret-form"></div>
         </div>
@@ -123,11 +124,12 @@ async function retRenderBody() {
     retRenderForm();
 }
 
-window.retSwitchMode = function (mode) {
+window.retSwitchMode = function (mode, btn) {
     retMode = mode;
     retLinkedDoc = null; retEntityId = null; retItems = [];
-    document.querySelectorAll('#ret-content .ob-tabs')[1].querySelectorAll('.ob-tab').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('#ret-content .ob-tabs')[1].querySelector(`.ob-tab:nth-child(${mode === 'linked' ? 1 : 2})`)?.classList.add('active');
+    const container = (btn && btn.closest('.ob-tabs')) || document.querySelector('#ret-content .ob-tabs');
+    container?.querySelectorAll('.ob-tab').forEach(b => b.classList.remove('active'));
+    (btn || container?.querySelector(`.ob-tab:nth-child(${mode === 'linked' ? 1 : 2})`))?.classList.add('active');
     retRenderForm();
 };
 

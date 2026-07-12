@@ -87,7 +87,8 @@ CREATE POLICY "auth_all_purchase_return_items" ON purchase_return_items FOR ALL 
 --    مرتجع بيع  → يرجّع الكمية للمخزن (زيادة)
 --    مرتجع شراء → يخصم الكمية من المخزن (نقصان، لأنها راجعة للمورد)
 -- ════════════════════════════════════════════════════════════
-CREATE OR REPLACE FUNCTION fn_sale_return_item_stock() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION fn_sale_return_item_stock() RETURNS trigger
+SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_wh uuid;
 BEGIN
     SELECT warehouse_id INTO v_wh FROM sales_returns WHERE id = NEW.return_id;
@@ -105,7 +106,8 @@ CREATE TRIGGER trg_sale_return_item_stock
     AFTER INSERT ON sale_return_items
     FOR EACH ROW EXECUTE FUNCTION fn_sale_return_item_stock();
 
-CREATE OR REPLACE FUNCTION fn_purchase_return_item_stock() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION fn_purchase_return_item_stock() RETURNS trigger
+SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_wh uuid;
 BEGIN
     SELECT warehouse_id INTO v_wh FROM purchase_returns WHERE id = NEW.return_id;
@@ -124,7 +126,8 @@ CREATE TRIGGER trg_purchase_return_item_stock
 -- ── 5) Triggers: تحديث رصيد العميل/المورد عند تأكيد المرتجع ──
 --    مرتجع بيع آجل  → رصيد العميل ينقص (مديونيته أقل)
 --    مرتجع شراء     → رصيد المورد ينقص (مديونيتنا له أقل)
-CREATE OR REPLACE FUNCTION fn_sales_return_balance() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION fn_sales_return_balance() RETURNS trigger
+SECURITY DEFINER SET search_path = public AS $$
 BEGIN
     IF NEW.status = 'confirmed' AND NEW.customer_id IS NOT NULL AND NEW.payment_type = 'credit' THEN
         UPDATE customers SET balance = balance - NEW.total WHERE id = NEW.customer_id;
@@ -137,7 +140,8 @@ CREATE TRIGGER trg_sales_return_balance
     AFTER INSERT ON sales_returns
     FOR EACH ROW EXECUTE FUNCTION fn_sales_return_balance();
 
-CREATE OR REPLACE FUNCTION fn_purchase_return_balance() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION fn_purchase_return_balance() RETURNS trigger
+SECURITY DEFINER SET search_path = public AS $$
 BEGIN
     IF NEW.status = 'confirmed' AND NEW.supplier_id IS NOT NULL THEN
         UPDATE suppliers SET balance = balance - NEW.total WHERE id = NEW.supplier_id;
@@ -149,6 +153,13 @@ DROP TRIGGER IF EXISTS trg_purchase_return_balance ON purchase_returns;
 CREATE TRIGGER trg_purchase_return_balance
     AFTER INSERT ON purchase_returns
     FOR EACH ROW EXECUTE FUNCTION fn_purchase_return_balance();
+
+-- ملاحظة: SECURITY DEFINER بيخلي المشغلات تشتغل بصلاحية مالك الدالة
+-- (عادة postgres في Supabase) بدل صلاحية المستخدم المسجّل دخوله،
+-- وده اللي بيحل خطأ "new row violates row-level security policy"
+-- اللي بيظهر لأن جدول inventory_stock عنده RLS مفعّل بدون سياسة INSERT/UPDATE للمستخدم العادي.
+-- الملف بالكامل آمن لإعادة التشغيل (idempotent) — لو شغّلته قبل كده، شغّله تاني زي ما هو
+-- وهيحدّث الدوال بالنسخة الجديدة دي تلقائياً (CREATE OR REPLACE).
 
 -- ملاحظة: لو عندك جدول journal_entries وقيود تلقائية على sales/purchases،
 -- يفضل تضيف نفس منطق القيد هنا (عكس قيد البيع/الشراء الأصلي).
