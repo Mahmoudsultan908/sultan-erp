@@ -1023,6 +1023,7 @@ async function invSave(andNew) {
         if (repIdToSend) {
             try {
                 const { data: repCheck, error: repCheckErr } = await sb.from('sales_reps').select('id').eq('id', repIdToSend).maybeSingle();
+                console.log('[invSave] نتيجة التحقق الحي من sales_reps:', { queriedId: repIdToSend, repCheck, repCheckErr });
                 if (repCheckErr) throw repCheckErr;
                 if (!repCheck) {
                     console.warn('[invSave] rep_id غير موجود فعلياً في sales_reps (تحقق حي من القاعدة) — هيتبعت null:', repIdToSend);
@@ -1037,6 +1038,16 @@ async function invSave(andNew) {
             }
         }
         console.log('[invSave] rep_id قبل الإرسال (بعد التحقق الحي):', repIdToSend, '— typeof:', typeof repIdToSend);
+
+        // ★ تشخيص إضافي: لو الخطأ مش من rep_id فعلياً، ده أكتر سبب محتمل تاني
+        //   للـ 409 — invoice_no مكرر (لو المستخدم عمل محاولات حفظ فاشلة
+        //   متكررة، عداد app_settings.invoice_counter مبيتزودش إلا بعد نجاح
+        //   الإدراج، فأي رقم اتحسب سابقاً ولسه موجود كصف حقيقي هيفشل هنا).
+        const { data: dupCheck } = await sb.from('sales').select('id').eq('invoice_no', invoiceNo).maybeSingle();
+        console.log('[invSave] فحص تكرار رقم الفاتورة:', { invoiceNo, dupCheck });
+        if (dupCheck) {
+            console.warn('[invSave] رقم الفاتورة ده موجود فعلاً في قاعدة البيانات — مش مشكلة rep_id، المشكلة في invoice_no المكرر:', invoiceNo);
+        }
 
         // 1) INSERT في جدول sales
         const { data: saleRows, error: saleErr } = await sb.from('sales').insert({
@@ -1124,7 +1135,13 @@ async function invSave(andNew) {
             document.querySelector('.inv-no-badge').textContent = 'INV-' + String(INV_DB.invoiceNo).padStart(4, '0');
         }
     } catch (err) {
-        alert('❌ خطأ أثناء حفظ الفاتورة: ' + err.message);
+        // ★ نطبع تفاصيل الخطأ كاملة (message/details/hint/code) بدل الاكتفاء بـ message —
+        //   عشان نعرف بالظبط أي constraint اتكسر (ممكن يكون invoice_no مكرر
+        //   مثلاً، مش بالضرورة rep_id، حتى لو ظهر في اللوج قبله).
+        console.error('[invSave] فشل حفظ الفاتورة — تفاصيل الخطأ كاملة:', {
+            message: err.message, details: err.details, hint: err.hint, code: err.code, raw: err,
+        });
+        alert('❌ خطأ أثناء حفظ الفاتورة: ' + err.message + (err.details ? '\n\nتفاصيل: ' + err.details : '') + (err.hint ? '\nاقتراح: ' + err.hint : ''));
     } finally {
         saveBtns.forEach(b => { b.disabled = false; });
     }
