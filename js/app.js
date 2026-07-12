@@ -83,6 +83,10 @@ function buildLayout() {
         <div class="nav-item" data-mod="payments" onclick="loadMod(this, 'payments')">💸 دفع الموردين</div>
         <div class="nav-item" data-mod="suppliers" onclick="loadMod(this, 'suppliers')">📇 كشف حساب مورد</div>
 
+        <div class="nav-group">المراجعة والمرتجعات</div>
+        <div class="nav-item" data-mod="invoice-review" onclick="loadMod(this, 'invoice-review')">🔍 مراجعة الفواتير</div>
+        <div class="nav-item" data-mod="returns" onclick="loadMod(this, 'returns')">↩️ المرتجعات</div>
+
         <div class="nav-group">المالية والمخزن</div>
         <div class="nav-item" data-mod="expenses" onclick="loadMod(this, 'expenses')">💸 المصروفات</div>
         <div class="nav-item" data-mod="stock-transfer" onclick="loadMod(this, 'stock-transfer')">🔄 تحويل مخزون</div>
@@ -184,6 +188,8 @@ window.loadMod = async function(el, modName) {
         'collections': 'تحصيل العملاء (سندات قبض)',
         'customers': 'كشف حساب عميل',
         'suppliers': 'كشف حساب مورد',
+        'invoice-review': 'مراجعة الفواتير وتعديلها',
+        'returns': 'المرتجعات',
         'inventory': 'المخزون',
         'warehouses': 'إدارة المخازن',
         'coa': 'شجرة الحسابات',
@@ -230,6 +236,8 @@ window.loadMod = async function(el, modName) {
     if (modName === 'collections' && typeof renderCollections === 'function') await renderCollections(c);
     if (modName === 'customers' && typeof renderCustomers === 'function') await renderCustomers(c);
     if (modName === 'suppliers' && typeof renderSuppliers === 'function') await renderSuppliers(c);
+    if (modName === 'invoice-review' && typeof renderInvoiceReview === 'function') await renderInvoiceReview(c);
+    if (modName === 'returns' && typeof renderReturns === 'function') await renderReturns(c);
     if (modName === 'inventory' && typeof renderInventory === 'function') await renderInventory(c);
     if (modName === 'warehouses' && typeof renderWarehouses === 'function') await renderWarehouses(c);
     if (modName === 'coa' && typeof renderChartOfAccounts === 'function') await renderChartOfAccounts(c);

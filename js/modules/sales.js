@@ -18,6 +18,12 @@ let invItems = [];          // سطور الفاتورة
 let invCustId = null;       // العميل المختار
 let invPayType = 'cash';    // cash | credit
 let invEditingId = null;    // تعديل فاتورة قديمة
+let invEditingOldItems = [];       // بنود الفاتورة القديمة (لإرجاع المخزون عند الإلغاء)
+let invEditingOldWarehouse = null;
+let invEditingOldTotal = 0;
+let invEditingOldPayType = null;
+let invEditingOldCustId = null;
+let invEditingOldInvoiceNo = null;
 
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات الحية من Supabase
@@ -134,6 +140,41 @@ async function renderSales(c) {
     invCustId = null;
     invPayType = 'cash';
     invPriceLevelCode = '';
+    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
+
+    // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
+    if (window._pendingSalesEdit) {
+        const pend = window._pendingSalesEdit;
+        window._pendingSalesEdit = null;
+        try {
+            const { data: oldSale, error } = await sb.from('sales')
+                .select('*, sale_items(*, products(name,code,unit))').eq('id', pend.id).maybeSingle();
+            if (error) throw error;
+            if (oldSale) {
+                invEditingId = oldSale.id;
+                invEditingOldItems = oldSale.sale_items || [];
+                invEditingOldWarehouse = oldSale.warehouse_id;
+                invEditingOldTotal = Number(oldSale.total) || 0;
+                invEditingOldPayType = oldSale.payment_type;
+                invEditingOldCustId = oldSale.customer_id;
+                invEditingOldInvoiceNo = oldSale.invoice_no;
+
+                invItems = (oldSale.sale_items || []).map(it => ({
+                    id: Date.now() + Math.random(), pid: it.product_id,
+                    name: it.products?.name || '', code: it.products?.code || '',
+                    qty: Number(it.qty) || 0, price: Number(it.unit_price) || 0,
+                    disc: Number(it.discount_pct) || 0, free: Number(it.free_qty) || 0,
+                    unit: it.products?.unit || it.unit_name || '', stock: 0,
+                }));
+                invItems.push({ id: Date.now() + Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', stock: 0 });
+                invCustId = oldSale.customer_id;
+                invPayType = oldSale.payment_type || 'cash';
+                if (oldSale.warehouse_id) invWarehouseId = oldSale.warehouse_id;
+            }
+        } catch (err) {
+            alert('⚠️ تعذّر تحميل الفاتورة للتعديل: ' + err.message);
+        }
+    }
 
     // ★ استئناف من عرض سعر (لو جاي من صفحة quotations.js)
     if (window._pendingQuoteConversion) {
@@ -148,6 +189,10 @@ async function renderSales(c) {
 
     c.innerHTML = `
     <div class="inv-root density-${invGetDensity()}">
+        ${invEditingId ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
+            <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على الفاتورة <strong>${invEditingOldInvoiceNo}</strong>. عند الحفظ: هتتلغي الفاتورة القديمة تلقائياً (مع إرجاع المخزون والرصيد) وتتسجّل فاتورة جديدة بالتعديلات.</span>
+            <button class="inv-top-btn" style="padding:4px 10px" onclick="invEditingId=null;invEditingOldInvoiceNo=null;renderSales(document.getElementById('app-content'))">إلغاء التعديل</button>
+        </div>` : ''}
         ${invHeaderHTML()}
         <div class="inv-main">
             <div class="inv-table-col">
@@ -211,7 +256,7 @@ function invHeaderHTML() {
             <div class="ic">🧾</div>
             <div class="ttl">فاتورة مبيعات<small> Sultan ERP</small></div>
         </div>
-        <span class="inv-no-badge">INV-${String(INV_DB.invoiceNo).padStart(4,'0')}</span>
+        <span class="inv-no-badge">${invEditingId ? '✏️ ' + invEditingOldInvoiceNo : 'INV-' + String(INV_DB.invoiceNo).padStart(4,'0')}</span>
         <select class="inv-date-input" id="invWarehouse" title="المخزن" onchange="invOnWarehouseChange()" style="cursor:pointer">
             ${(INV_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===invWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
         </select>
@@ -863,6 +908,38 @@ function invCheckAutoSaveRestore() {
     } catch {}
 }
 
+async function invReverseOldForEdit() {
+    // 1) علّم الفاتورة القديمة كملغاة
+    await sb.from('sales').update({ status: 'cancelled' }).eq('id', invEditingId);
+
+    // 2) ارجع الكمية المخصومة من المخزون وقت الفاتورة القديمة
+    if (invEditingOldWarehouse) {
+        for (const it of invEditingOldItems) {
+            const need = (Number(it.qty) || 0) + (Number(it.free_qty) || 0);
+            if (!it.product_id || !need) continue;
+            const { data: stockRow } = await sb.from('inventory_stock')
+                .select('id, qty').eq('warehouse_id', invEditingOldWarehouse).eq('product_id', it.product_id).maybeSingle();
+            if (stockRow) {
+                await sb.from('inventory_stock').update({ qty: (Number(stockRow.qty) || 0) + need }).eq('id', stockRow.id);
+            } else {
+                await sb.from('inventory_stock').insert({ warehouse_id: invEditingOldWarehouse, product_id: it.product_id, qty: need });
+            }
+            const key = invEditingOldWarehouse + '|' + it.product_id;
+            INV_DB.stockMap[key] = (INV_DB.stockMap[key] || 0) + need;
+        }
+    }
+
+    // 3) ارجع رصيد العميل لو كانت الفاتورة القديمة آجلة
+    if (invEditingOldPayType === 'credit' && invEditingOldCustId) {
+        const { data: custRow } = await sb.from('customers').select('balance').eq('id', invEditingOldCustId).maybeSingle();
+        if (custRow) {
+            await sb.from('customers').update({ balance: (Number(custRow.balance) || 0) - invEditingOldTotal }).eq('id', invEditingOldCustId);
+            const c = INV_DB.customers.find(x => x.id === invEditingOldCustId);
+            if (c) c.balance = (Number(c.balance) || 0) - invEditingOldTotal;
+        }
+    }
+}
+
 async function invSave(andNew) {
     const filled = invItems.filter(i => i.pid && (i.qty||0) > 0);
     if (!filled.length) { invToast('⚠️ الفاتورة فارغة — أضف أصنافاً أولاً', 'error'); return; }
@@ -901,6 +978,11 @@ async function invSave(andNew) {
     saveBtns.forEach(b => { b.innerText = '⏳ جاري الحفظ...'; b.disabled = true; });
 
     try {
+        // ★ لو في وضع تعديل: ألغِ الفاتورة القديمة وارجع المخزون والرصيد قبل إنشاء النسخة الجديدة
+        if (invEditingId) {
+            await invReverseOldForEdit();
+        }
+
         // 1) INSERT في جدول sales
         const { data: saleRows, error: saleErr } = await sb.from('sales').insert({
             invoice_no: invoiceNo,
@@ -967,7 +1049,12 @@ async function invSave(andNew) {
         }
 
         localStorage.removeItem(INV_AUTOSAVE_KEY);
-        invToast(`✅ تم حفظ الفاتورة ${invoiceNo} — ${invFmt(net)} ج.م`, 'success');
+        if (invEditingId) {
+            invToast(`✅ تم إلغاء الفاتورة ${invEditingOldInvoiceNo} وتسجيل الفاتورة المعدّلة ${invoiceNo} — ${invFmt(net)} ج.م`, 'success');
+            invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
+        } else {
+            invToast(`✅ تم حفظ الفاتورة ${invoiceNo} — ${invFmt(net)} ج.م`, 'success');
+        }
 
         // حدّث الخزنة في الشريط العلوي
         try {

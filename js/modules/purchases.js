@@ -19,6 +19,12 @@ let purPayType = 'cash'; // cash | credit
 // ── حالة الفاتورة ──
 let purItems = [];
 let purEditingId = null;
+let purEditingOldItems = [];
+let purEditingOldWarehouse = null;
+let purEditingOldTotal = 0;
+let purEditingOldSupplierId = null;
+let purEditingOldPayType = null;
+let purEditingOldInvoiceNo = null;
 
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات من Supabase
@@ -79,6 +85,41 @@ async function renderPurchases(c) {
     purItems = [{ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' }];
     purSupplierId = null;
     purPayType = 'cash';
+    purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null;
+
+    // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
+    if (window._pendingPurchaseEdit) {
+        const pend = window._pendingPurchaseEdit;
+        window._pendingPurchaseEdit = null;
+        try {
+            const { data: oldPur, error } = await sb.from('purchases')
+                .select('*, purchase_items(*, products(name,code,unit))').eq('id', pend.id).maybeSingle();
+            if (error) throw error;
+            if (oldPur) {
+                purEditingId = oldPur.id;
+                purEditingOldItems = oldPur.purchase_items || [];
+                purEditingOldWarehouse = oldPur.warehouse_id;
+                purEditingOldTotal = Number(oldPur.total) || 0;
+                purEditingOldSupplierId = oldPur.supplier_id;
+                purEditingOldPayType = oldPur.payment_type;
+                purEditingOldInvoiceNo = oldPur.invoice_no;
+
+                purItems = (oldPur.purchase_items || []).map(it => ({
+                    id: Date.now() + Math.random(), pid: it.product_id,
+                    name: it.products?.name || '', code: it.products?.code || '',
+                    qty: Number(it.qty) || 0, price: Number(it.unit_price) || 0,
+                    disc: 0, free: 0, unit: it.products?.unit || '', upc: 1,
+                    deferredRate: Number(it.deferred_rate) || 0, deferredDate: it.deferred_due_date || '',
+                }));
+                purItems.push({ id: Date.now() + Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' });
+                purSupplierId = oldPur.supplier_id;
+                purPayType = oldPur.payment_type || 'cash';
+                if (oldPur.warehouse_id) purWarehouseId = oldPur.warehouse_id;
+            }
+        } catch (err) {
+            alert('⚠️ تعذّر تحميل فاتورة الشراء للتعديل: ' + err.message);
+        }
+    }
 
     // ★ استئناف من أمر شراء (لو جاي من صفحة purchase-orders.js)
     if (window._pendingPOConversion) {
@@ -93,6 +134,10 @@ async function renderPurchases(c) {
 
     c.innerHTML = `
     <div class="inv-root density-${localStorage.getItem('inv_density') || 'cozy'}">
+        ${purEditingId ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
+            <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على فاتورة الشراء <strong>${purEditingOldInvoiceNo}</strong>. عند الحفظ: هتتلغي الفاتورة القديمة تلقائياً (مع إرجاع المخزون والرصيد) وتتسجّل فاتورة جديدة بالتعديلات.</span>
+            <button class="inv-top-btn" style="padding:4px 10px" onclick="purEditingId=null;purEditingOldInvoiceNo=null;renderPurchases(document.getElementById('app-content'))">إلغاء التعديل</button>
+        </div>` : ''}
         ${purHeaderHTML()}
         <div class="inv-main">
             <div class="inv-table-col">
@@ -143,7 +188,7 @@ function purHeaderHTML() {
             <div class="ic" style="background:linear-gradient(135deg,#16A34A,#22C55E);box-shadow:0 4px 12px rgba(22,163,74,0.4)">📥</div>
             <div class="ttl">فاتورة مشتريات<small> Sultan ERP</small></div>
         </div>
-        <span class="inv-no-badge" style="background:rgba(22,163,74,0.18);color:#4ADE80;border-color:rgba(22,163,74,0.35)">PUR-${String(PUR_DB.purchaseNo).padStart(4,'0')}</span>
+        <span class="inv-no-badge" style="background:rgba(22,163,74,0.18);color:#4ADE80;border-color:rgba(22,163,74,0.35)">${purEditingId ? '✏️ ' + purEditingOldInvoiceNo : 'PUR-' + String(PUR_DB.purchaseNo).padStart(4,'0')}</span>
         <select class="inv-date-input" id="purWarehouse" title="المخزن" onchange="purOnWarehouseChange()" style="cursor:pointer">
             ${(PUR_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===purWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
         </select>
@@ -570,6 +615,36 @@ function purCalcChange() {
 }
 
 // ═══════════════ INSERT فقط — الـ Triggers تتولى الباقي ═══════════════
+async function purReverseOldForEdit() {
+    // 1) علّم فاتورة الشراء القديمة كملغاة
+    await sb.from('purchases').update({ status: 'cancelled' }).eq('id', purEditingId);
+
+    // 2) اخصم الكمية اللي كانت اتضافت للمخزون وقت فاتورة الشراء القديمة
+    if (purEditingOldWarehouse) {
+        for (const it of purEditingOldItems) {
+            const need = Number(it.qty) || 0;
+            if (!it.product_id || !need) continue;
+            const { data: stockRow } = await sb.from('inventory_stock')
+                .select('id, qty').eq('warehouse_id', purEditingOldWarehouse).eq('product_id', it.product_id).maybeSingle();
+            if (stockRow) {
+                await sb.from('inventory_stock').update({ qty: (Number(stockRow.qty) || 0) - need }).eq('id', stockRow.id);
+            }
+            const key = purEditingOldWarehouse + '|' + it.product_id;
+            PUR_DB.stockMap[key] = (PUR_DB.stockMap[key] || 0) - need;
+        }
+    }
+
+    // 3) ارجع رصيد المورد لو كانت الفاتورة القديمة آجلة
+    if (purEditingOldPayType === 'credit' && purEditingOldSupplierId) {
+        const { data: supRow } = await sb.from('suppliers').select('balance').eq('id', purEditingOldSupplierId).maybeSingle();
+        if (supRow) {
+            await sb.from('suppliers').update({ balance: (Number(supRow.balance) || 0) - purEditingOldTotal }).eq('id', purEditingOldSupplierId);
+            const s = PUR_DB.suppliers.find(x => x.id === purEditingOldSupplierId);
+            if (s) s.balance = (Number(s.balance) || 0) - purEditingOldTotal;
+        }
+    }
+}
+
 async function purSave(andNew) {
     const filled = purItems.filter(i => i.pid && (i.qty||0) > 0);
     if (!filled.length) { purToast('⚠️ الفاتورة فارغة — أضف أصنافاً أولاً', 'error'); return; }
@@ -585,6 +660,11 @@ async function purSave(andNew) {
     saveBtns.forEach(b => { b.innerText = '⏳ جاري الحفظ...'; b.disabled = true; });
 
     try {
+        // ★ لو في وضع تعديل: ألغِ فاتورة الشراء القديمة وارجع المخزون والرصيد قبل إنشاء النسخة الجديدة
+        if (purEditingId) {
+            await purReverseOldForEdit();
+        }
+
         // 1) INSERT في purchases
         const { data: purRows, error: purErr } = await sb.from('purchases').insert({
             invoice_no: invoiceNo,
@@ -622,7 +702,12 @@ async function purSave(andNew) {
         await sb.from('app_settings').upsert({ key: 'purchase_counter', value: String(PUR_DB.purchaseNo + 1), updated_at: new Date().toISOString() });
         PUR_DB.purchaseNo++;
 
-        purToast(`✅ تم حفظ فاتورة المشتريات ${invoiceNo} — ${purFmt(net)} ج.م`, 'success');
+        if (purEditingId) {
+            purToast(`✅ تم إلغاء فاتورة الشراء ${purEditingOldInvoiceNo} وتسجيل الفاتورة المعدّلة ${invoiceNo} — ${purFmt(net)} ج.م`, 'success');
+            purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null;
+        } else {
+            purToast(`✅ تم حفظ فاتورة المشتريات ${invoiceNo} — ${purFmt(net)} ج.م`, 'success');
+        }
 
         try {
             const { data: cash } = await sb.rpc('get_cash_balance');
