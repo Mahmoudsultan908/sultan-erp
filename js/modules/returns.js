@@ -242,12 +242,12 @@ window.retAddManualRow = function () {
 };
 
 window.retRemoveRow = function (id) {
-    retItems = retItems.filter(i => i.id !== id);
+    retItems = retItems.filter(i => i.id != id);
     retRenderItemsWrap();
 };
 
 window.retPickProduct = function (rowId, pid) {
-    const row = retItems.find(i => i.id === rowId);
+    const row = retItems.find(i => i.id == rowId);
     const p = RET_DB.products.find(x => x.id === pid);
     if (!row || !p) return;
     row.pid = p.id; row.name = p.name; row.code = p.code; row.unit = p.unit || 'قطعة';
@@ -256,7 +256,7 @@ window.retPickProduct = function (rowId, pid) {
 };
 
 window.retUpdateRow = function (id, field, value) {
-    const row = retItems.find(i => i.id === id);
+    const row = retItems.find(i => i.id == id);
     if (!row) return;
     if (field === 'qty' || field === 'price' || field === 'disc') {
         let v = parseFloat(value) || 0;
