@@ -87,13 +87,25 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // بيانات Supabase الحية: شبكة فقط، صفر تخزين مؤقت — عمداً
+    // بيانات Supabase الحية: شبكة فقط، صفر تخزين مؤقت — عمداً.
+    // لو النت مقطوع، fetch() هيرفض بشكل طبيعي ومتوقّع — بنرجّع Response
+    // صريح (503) بدل ما نسيب الـ promise من غير catch (كان بيطلع
+    // "Uncaught (in promise)" في الـ console لكل طلب وإحنا أوفلاين،
+    // وده كان بيبان وكأنه خطأ حقيقي رغم إنه سلوك متوقّع 100%).
     if (url.hostname === SUPABASE_HOST) {
-        event.respondWith(fetch(event.request));
+        event.respondWith(
+            fetch(event.request).catch(() => new Response(
+                JSON.stringify({ error: 'offline', message: 'لا يوجد اتصال بالإنترنت حالياً' }),
+                { status: 503, headers: { 'Content-Type': 'application/json' } }
+            ))
+        );
         return;
     }
 
-    // قشرة التطبيق + مكتبات CDN: cache-first + تحديث في الخلفية
+    // قشرة التطبيق + مكتبات CDN: cache-first + تحديث في الخلفية.
+    // لو المصدر ده مش متخزّن أصلاً (أول زيارة أوفلاين قبل ما install
+    // يخلّص) والشبكة فشلت كمان، نرجّع Response حقيقي بدل undefined
+    // (تسبيب "Failed to convert value to Response" لو سابناها للـ catch بس).
     event.respondWith(
         caches.match(event.request).then((cached) => {
             const network = fetch(event.request)
@@ -104,7 +116,7 @@ self.addEventListener('fetch', (event) => {
                     }
                     return resp;
                 })
-                .catch(() => cached);
+                .catch(() => cached || new Response('غير متاح أوفلاين', { status: 503 }));
             return cached || network;
         })
     );
