@@ -8,10 +8,12 @@ let INV_DB = {
     products: [],      // products table
     customers: [],     // customers table
     warehouses: [],    // warehouses table
+    reps: [],          // sales_reps table (تفضل فاضية لو الجدول لسه ما اتعملش — راجع sales_reps_migration.sql)
     stockMap: {},      // { 'warehouseId|productId': qty }
     invoiceNo: 1,      // رقم الفاتورة التالي
 };
 let invWarehouseId = null; // المخزن المختار حالياً
+let invRepId = null;       // المندوب المختار (اختياري)
 
 // ── حالة الفاتورة الحالية ──
 let invItems = [];          // سطور الفاتورة
@@ -89,6 +91,14 @@ async function invLoadData() {
     // المخزن الافتراضي: الرئيسي أو الأول
     const mainWh = (INV_DB.warehouses).find(w => w.is_main) || INV_DB.warehouses[0];
     invWarehouseId = mainWh?.id || null;
+
+    // مندوبو المبيعات (اختياري — لو جدول sales_reps لسه ما اتعملش في Supabase، نتجاهل الخطأ بهدوء
+    // والقائمة المنسدلة بتختفي من الرأس تلقائياً بدل ما توقف تحميل الفاتورة كلها)
+    try {
+        const { data: reps, error: repsErr } = await sb.from('sales_reps').select('*').eq('is_active', true).order('name');
+        if (repsErr) throw repsErr;
+        INV_DB.reps = reps || [];
+    } catch { INV_DB.reps = []; }
 }
 
 // ── سعر بيع صنف حسب مستوى السعر ──
@@ -120,6 +130,10 @@ function invOnWarehouseChange() {
     const wh = INV_DB.warehouses.find(w => w.id === invWarehouseId);
     if (wh) invToast(`🏭 تم التبديل للمخزن: ${wh.name}`, 'info');
 }
+function invOnRepChange() {
+    const sel = document.getElementById('invRep');
+    if (sel) invRepId = sel.value || null;
+}
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -140,6 +154,7 @@ async function renderSales(c) {
     invCustId = null;
     invPayType = 'cash';
     invPriceLevelCode = '';
+    invRepId = null;
     invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
 
     // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
@@ -169,6 +184,7 @@ async function renderSales(c) {
                 invItems.push({ id: Date.now() + Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', stock: 0 });
                 invCustId = oldSale.customer_id;
                 invPayType = oldSale.payment_type || 'cash';
+                invRepId = oldSale.rep_id || null;
                 if (oldSale.warehouse_id) invWarehouseId = oldSale.warehouse_id;
             }
         } catch (err) {
@@ -261,6 +277,11 @@ function invHeaderHTML() {
             ${(INV_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===invWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
         </select>
         <input type="date" class="inv-date-input" id="invDate" value="${invToday()}">
+        ${(INV_DB.reps || []).length ? `
+        <select class="inv-date-input" id="invRep" title="المندوب" onchange="invOnRepChange()" style="cursor:pointer">
+            <option value="">🚗 بدون مندوب</option>
+            ${INV_DB.reps.map(r => `<option value="${r.id}" ${r.id === invRepId ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
+        </select>` : ''}
         <div class="inv-cust-pick">
             <span class="inv-cust-input-icon">👤</span>
             <input class="inv-cust-input" id="invCustSearch" placeholder="بحث عميل: اسم / هاتف..." autocomplete="off">
@@ -994,7 +1015,7 @@ async function invSave(andNew) {
             discount: extra,
             status: 'confirmed',
             warehouse_id: invWarehouseId,
-            rep_id: null,
+            rep_id: invRepId || null,
             source_app: 'erp',
             created_by: currentUser?.id || null,
         }).select();
@@ -1318,5 +1339,5 @@ Object.assign(window, {
     invShowShortcuts, invCloseShortcuts,
     invRestoreDraft, invDeleteDraft, invRenderDrafts,
     invExportXls, invImportXls,
-    invOnWarehouseChange,
+    invOnWarehouseChange, invOnRepChange,
 });

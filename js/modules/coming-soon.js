@@ -23,10 +23,6 @@ async function renderGeneralImportExport(c) {
     csRenderPage(c, '🔄', 'استيراد وتصدير عام',
         'استيراد وتصدير شامل لبيانات النظام (غير الأصناف والعملاء والموردين) بصيغة Excel — نسخ احتياطي واستعادة سريعة.');
 }
-async function renderSalesReps(c) {
-    csRenderPage(c, '🚗', 'المندوبون',
-        'إدارة مندوبي المبيعات، ربطهم بالعملاء والمناطق، ومتابعة أداء كل مندوب وعمولاته.');
-}
 async function renderPerformanceReports(c) {
     csRenderPage(c, '📈', 'تقارير الأداء المتقدمة',
         'تحليلات متقدمة: أداء الأصناف، اتجاهات المبيعات، مقارنات الفترات، وتوقعات الطلب.');
@@ -73,7 +69,7 @@ async function renderRepAppLink(c) {
 }
 
 Object.assign(window, {
-    renderWarehouseReports, renderGeneralImportExport, renderSalesReps, renderPerformanceReports,
+    renderWarehouseReports, renderGeneralImportExport, renderPerformanceReports,
     renderAdvancedPermissions, renderPrintCenter, renderCRM, renderArchive, renderWhatsAppIntegration,
     renderAIDashboard, renderEmployeeEvaluation, renderCustomerOrdersLink, renderRepAppLink,
 });

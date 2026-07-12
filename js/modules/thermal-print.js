@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    محرك طباعة كاشير (حراري 80mm) — thermal-print.js
-   يخدم: فاتورة المبيعات، وصل استلام نقدي، وصل دفع نقدي
+   يخدم: فاتورة المبيعات، وصل استلام نقدي، وصل دفع نقدي، مرتجعات
    يصدّر: printThermalReceipt(type, data)
-   type: 'sale' | 'collection' | 'payment'
+   type: 'sale' | 'collection' | 'payment' | 'return'
    بيانات الشركة (الاسم/الهاتف/العنوان) تُقرأ من app_settings
    (قابلة للتعديل من صفحة الإعدادات الموجودة أصلاً)
    ════════════════════════════════════════════════════════════ */
@@ -29,6 +29,7 @@ async function printThermalReceipt(type, data) {
     if (type === 'sale') html = tpBuildSaleHTML(company, data);
     else if (type === 'collection') html = tpBuildVoucherHTML(company, data, 'collection');
     else if (type === 'payment') html = tpBuildVoucherHTML(company, data, 'payment');
+    else if (type === 'return') html = tpBuildReturnHTML(company, data);
     else return;
 
     const win = window.open('', '_blank', 'width=380,height=600');
@@ -141,6 +142,34 @@ function tpBuildVoucherHTML(company, data, kind) {
     ${data.entityBalanceBefore!=null ? `<div class="tp-row"><span class="lbl">الرصيد قبل السند</span><span class="val">${tpFmt(data.entityBalanceBefore)}</span></div>` : ''}
     ${data.entityBalanceAfter!=null ? `<div class="tp-row"><span class="lbl">الرصيد بعد السند</span><span class="val">${tpFmt(data.entityBalanceAfter)}</span></div>` : ''}`;
     return tpWrapper(company, title + ' ' + data.ref, body);
+}
+
+// ════════════════════════════════════════════════════════════
+// مرتجع مبيعات / مشتريات
+// data = { returnNo, returnType:'sales'|'purchase', entityName, linkedInvoiceNo,
+//          items:[{name,qty,unit_price,line_total}], total }
+// ════════════════════════════════════════════════════════════
+function tpBuildReturnHTML(company, data) {
+    const title = data.returnType === 'sales' ? 'مرتجع مبيعات' : 'مرتجع مشتريات';
+    const entityLabel = data.returnType === 'sales' ? 'العميل' : 'المورد';
+
+    const body = `
+    <div class="tp-title">${title}</div>
+    <div class="tp-row"><span class="lbl">رقم المرتجع</span><span class="val">${data.returnNo}</span></div>
+    <div class="tp-row"><span class="lbl">${entityLabel}</span><span class="val">${data.entityName || 'نقدي'}</span></div>
+    ${data.linkedInvoiceNo ? `<div class="tp-row"><span class="lbl">مرتبط بفاتورة</span><span class="val">${data.linkedInvoiceNo}</span></div>` : ''}
+    <div class="tp-divider"></div>
+    <table class="tp-items">
+        <thead><tr><th>الصنف</th><th>كمية</th><th>سعر</th><th>إجمالي</th></tr></thead>
+        <tbody>
+            ${(data.items||[]).map(it=>`<tr>
+                <td>${it.name}</td><td>${it.qty}</td><td>${tpFmt(it.unit_price)}</td><td>${tpFmt(it.line_total)}</td>
+            </tr>`).join('')}
+        </tbody>
+    </table>
+    <div class="tp-divider"></div>
+    <div class="tp-grand tp-row"><span>إجمالي المرتجع</span><span>${tpFmt(data.total)}</span></div>`;
+    return tpWrapper(company, title + ' ' + data.returnNo, body);
 }
 
 Object.assign(window, { printThermalReceipt });
