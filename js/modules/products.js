@@ -9,6 +9,7 @@ let _prodList = [];
 let _prodCategories = [];
 let _prodCompanies = [];
 let _prodPriceLevels = [];
+let _prodPricesMap = {};
 let _prodSearch = '';
 let _prodFilterCat = '';
 let _prodEditingId = null;
@@ -21,12 +22,16 @@ function prodFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFra
 async function renderProducts(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل الأصناف...</div>';
     try {
-        const [{ data: products }, { data: categories }, { data: companies }, { data: levels }, { data: stock }] = await Promise.all([
+        const [{ data: products }, { data: categories }, { data: companies }, { data: levels }, { data: stock }, { data: allPrices }] = await Promise.all([
             sb.from('products').select('*').order('name'),
             sb.from('product_categories').select('*').order('name'),
             sb.from('product_companies').select('*').order('name'),
             sb.from('price_levels').select('*').order('sort_order'),
             sb.from('inventory_stock').select('product_id, qty'),
+            // ★ كل أسعار كل المستويات لكل الأصناف مرة واحدة — عشان تظهر
+            //   الأسعار الباقية (مش سعر البيع الأساسي بس) في قائمة الأصناف
+            //   نفسها، بدل ما يحتاج المستخدم يفتح تعديل كل صنف لوحده.
+            sb.from('product_prices').select('product_id, price_level_id, price'),
         ]);
         _prodList = products || [];
         _prodCategories = categories || [];
@@ -37,6 +42,13 @@ async function renderProducts(c) {
         const stockTotals = {};
         (stock||[]).forEach(s => { stockTotals[s.product_id] = (stockTotals[s.product_id]||0) + Number(s.qty||0); });
         _prodList.forEach(p => p._totalStock = stockTotals[p.id] || 0);
+
+        // خريطة أسعار كل مستوى لكل صنف: productId -> { levelId: price }
+        _prodPricesMap = {};
+        (allPrices||[]).forEach(r => {
+            if (!_prodPricesMap[r.product_id]) _prodPricesMap[r.product_id] = {};
+            _prodPricesMap[r.product_id][r.price_level_id] = r.price;
+        });
 
         prodRenderPage(c);
     } catch (err) {
@@ -73,12 +85,27 @@ function prodRenderPage(c) {
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
                 <th>الصنف</th><th>الكود</th><th>المجموعة</th><th>الوحدة</th>
-                <th style="text-align:left">سعر الشراء</th><th style="text-align:left">سعر البيع الأساسي</th>
+                <th style="text-align:left">سعر الشراء</th><th style="text-align:left">أسعار البيع (كل المستويات)</th>
                 <th style="text-align:center">المخزون</th><th></th>
             </tr></thead>
             <tbody id="prodTbody"></tbody></table>
         </div>`;
     prodRenderRows();
+}
+
+// كل أسعار البيع المُسجّلة لصنف معيّن (كل مستويات الأسعار المفعّلة)، سطر
+// لكل مستوى — الأول Bold والباقي أصغر. لو مفيش مستويات مسجّلة أصلاً
+// (صنف قديم قبل نظام المستويات)، بيرجع للعمودين القدامى wholesale/retail.
+function prodAllPricesHTML(p) {
+    const prices = _prodPricesMap[p.id] || {};
+    const rows = _prodPriceLevels
+        .map(lvl => ({ name: lvl.name, price: prices[lvl.id] }))
+        .filter(r => r.price != null && Number(r.price) > 0);
+
+    if (!rows.length) {
+        return prodFmt(p.wholesale_price || p.retail_price || 0);
+    }
+    return rows.map((r, i) => `<div style="${i===0 ? 'font-weight:700' : 'font-size:11.5px;color:#64748B'}">${r.name}: ${prodFmt(r.price)}</div>`).join('');
 }
 
 function prodRenderRows() {
@@ -101,7 +128,7 @@ function prodRenderRows() {
             <td>${cat?.name || '—'}</td>
             <td>${p.unit || p.sale_unit || '—'}</td>
             <td style="text-align:left">${prodFmt(p.purchase_price)}</td>
-            <td style="text-align:left">${prodFmt(p.wholesale_price || p.retail_price || 0)}</td>
+            <td style="text-align:left">${prodAllPricesHTML(p)}</td>
             <td style="text-align:center;font-weight:700;color:${stockColor}">${prodFmt(p._totalStock)}</td>
             <td style="display:flex;gap:4px;justify-content:center">
                 <button class="cc-edit" onclick="prodOpenEdit('${p.id}')">✏️</button>

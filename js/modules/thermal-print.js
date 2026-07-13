@@ -44,6 +44,7 @@ async function printThermalReceipt(type, data) {
     else if (type === 'collection') html = tpBuildVoucherHTML(company, data, 'collection');
     else if (type === 'payment') html = tpBuildVoucherHTML(company, data, 'payment');
     else if (type === 'return') html = tpBuildReturnHTML(company, data);
+    else if (type === 'expense') html = tpBuildExpenseHTML(company, data);
     else return;
 
     // ★ نافذة أطول من الأول (700 مش 600) + إعادة تحجيم فعلية على طول
@@ -206,7 +207,7 @@ function tpBuildSaleHTML(company, data) {
             <td><span class="lbl">الخصم</span><span class="val">${tpFmt(data.discount)} ج.م</span></td>
         </tr>
     </table>
-    <div class="tp-center" style="font-size:10px;color:#777;margin-top:8px">‹‹‹‹‹‹ لطباعة الفاتورة ››››››</div>`;
+    <div class="tp-center" style="font-size:11px;color:#000;margin-top:8px">‹‹‹‹‹‹ لطباعة الفاتورة ››››››</div>`;
     return tpWrapper(company, 'فاتورة مبيعات ' + data.invoiceNo, body, tpBuildSaleHeaderHTML(company));
 }
 
@@ -229,6 +230,23 @@ function tpBuildVoucherHTML(company, data, kind) {
     ${data.entityBalanceBefore!=null ? `<div class="tp-row"><span class="lbl">الرصيد قبل السند</span><span class="val">${tpFmt(data.entityBalanceBefore)}</span></div>` : ''}
     ${data.entityBalanceAfter!=null ? `<div class="tp-row"><span class="lbl">الرصيد بعد السند</span><span class="val">${tpFmt(data.entityBalanceAfter)}</span></div>` : ''}`;
     return tpWrapper(company, title + ' ' + data.ref, body);
+}
+
+// ════════════════════════════════════════════════════════════
+// سند صرف مصروف
+// data = { ref, categoryName, description, amount, date }
+// ════════════════════════════════════════════════════════════
+function tpBuildExpenseHTML(company, data) {
+    const dateStr = data.date ? tpDateStr(new Date(data.date)) : tpDateStr(new Date());
+    const body = `
+    <div class="tp-title">سند صرف مصروف</div>
+    <div class="tp-row"><span class="lbl">رقم السند</span><span class="val">${data.ref}</span></div>
+    <div class="tp-row"><span class="lbl">البند</span><span class="val">${data.categoryName || '—'}</span></div>
+    <div class="tp-row"><span class="lbl">التاريخ</span><span class="val">${dateStr}</span></div>
+    ${data.description ? `<div class="tp-row"><span class="lbl">البيان</span><span class="val">${data.description}</span></div>` : ''}
+    <div class="tp-divider"></div>
+    <div class="tp-grand tp-row"><span>المبلغ</span><span>${tpFmt(data.amount)}</span></div>`;
+    return tpWrapper(company, 'سند صرف مصروف ' + data.ref, body);
 }
 
 // ════════════════════════════════════════════════════════════

@@ -171,7 +171,11 @@ window.loadMod = async function(el, modName) {
         el.classList.add('active');
     }
     if (window.innerWidth <= 1100) document.body.classList.remove('sidebar-open');
-    
+    // ★ وضع ملء الشاشة (فاتورة المبيعات) بيتصفّر مع أي تنقّل لصفحة تانية —
+    //   عشان المستخدم ميتقفلش على شاشة من غير سايد بار/توب بار لو خرج
+    //   من صفحة المبيعات وهو لسه في وضع ملء الشاشة.
+    document.body.classList.remove('inv-fullscreen');
+
     const c = document.getElementById('app-content');
     if (!c) return;
     c.innerHTML = '<p style="text-align:center;padding:40px;">جاري تحميل الواجهة...</p>';
@@ -311,7 +315,12 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
     // Alt+H → طي/إظهار الشريط الجانبي (Ctrl+H كانت بتتصادم مع سجل التصفح في كروم)
-    if (e.altKey && (e.key === 'h' || e.key === 'H' || e.key === 'ة')) {
+    // ★ e.code بدل e.key: e.key بيرجّع الحرف اللي اتكتب فعلياً حسب لغة
+    //   لوحة المفاتيح النشطة (عربي/إنجليزي)، فلو المستخدم شغّال بلوحة
+    //   مفاتيح عربية، Alt+H ممكن يرجّع حرف غير 'h' أو 'ة' خالص ويفشل
+    //   الشرط. e.code بيرجّع موضع المفتاح الفعلي على الكيبورد
+    //   (KeyH) بغض النظر عن اللغة النشطة، فبيشتغل مهما كانت اللغة.
+    if (e.altKey && e.code === 'KeyH') {
         e.preventDefault();
         window.toggleSidebar();
     }

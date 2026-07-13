@@ -5,6 +5,7 @@
 
 let _expGlobalLimit = 0;   // الحد الإجمالي الشهري لكل المصروفات
 let _expUserRole = 'admin'; // افتراضياً admin (هيحدد من session)
+let _expList = [];         // آخر قائمة مصروفات محمّلة — للطباعة (expPrintVoucher)
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -66,6 +67,7 @@ async function renderExpenses(container) {
     const monthTotal = monthExpenses.reduce((s, e) => s + (e.amount || 0), 0);
 
     const total = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+    _expList = expenses;
 
     // مصروفات اتسجّلت محلياً ولسه ماتزامنتش
     const pendingEntries = typeof getQueue === 'function'
@@ -122,10 +124,10 @@ function _expMonthExpTableHTML(expenses) {
     return `
     <div class="mod-table-wrap" style="margin-top:16px">
         <table class="mod-table"><thead><tr>
-            <th>التاريخ</th><th>البند</th><th>البيان</th><th style="text-align:left">المبلغ</th><th>الحالة</th>
+            <th>التاريخ</th><th>البند</th><th>البيان</th><th style="text-align:left">المبلغ</th><th>الحالة</th><th></th>
         </tr></thead>
         <tbody>
-            ${expenses.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مصروفات.</td></tr>` :
+            ${expenses.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد مصروفات.</td></tr>` :
             expenses.map(e => `<tr>
                 <td>${new Date(e.expense_date).toLocaleDateString('ar-EG')}</td>
                 <td><span style="background:#F1F5F9;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600">${e.expense_categories?.name || '—'}</span></td>
@@ -134,6 +136,7 @@ function _expMonthExpTableHTML(expenses) {
                 <td>${e._queue
                     ? (e.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
                     : '<span style="color:#059669;font-weight:600">✅ مؤكد</span>'}</td>
+                <td>${e._queue ? '' : `<button class="cc-edit" onclick="expPrintVoucher('${e.id}')">🖨️</button>`}</td>
             </tr>`).join('')}
         </tbody></table>
     </div>`;
@@ -273,6 +276,18 @@ window.expOpenAdd = async function() {
 window.expCloseModal = function(id) {
     const m = document.getElementById(id);
     if (m) m.remove();
+};
+
+window.expPrintVoucher = async function(id) {
+    const e = _expList.find(x => x.id === id);
+    if (!e) return;
+    await printThermalReceipt('expense', {
+        ref: e.ref || ('EXP-' + id.slice(0, 8)),
+        categoryName: e.expense_categories?.name || null,
+        description: e.description || null,
+        amount: e.amount,
+        date: e.expense_date,
+    });
 };
 
 // ════════════════════════════════════════════════════════════

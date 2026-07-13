@@ -66,6 +66,13 @@ body { font-family: 'Cairo', sans-serif; background: #F1F5F9; color: #0F172A; ov
 .content { flex: 1; padding: 24px 28px; overflow-y: auto; animation: fadeIn 0.3s ease-in-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+/* وضع ملء الشاشة (فاتورة المبيعات) — بيخفي القائمة الجانبية والشريط
+   العلوي عشان الفاتورة تاخد المساحة كلها. بيتصفّر تلقائياً عند أي
+   تنقّل لصفحة تانية (راجع loadMod في app.js). */
+body.inv-fullscreen .sidebar { width: 0 !important; overflow: hidden !important; box-shadow: none !important; }
+body.inv-fullscreen .topbar { display: none !important; }
+body.inv-fullscreen .content { padding: 12px !important; }
+
 /* تصميمات الموديولات الموحدة */
 .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .mod-card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #E2E8F0; transition: transform 0.2s; }

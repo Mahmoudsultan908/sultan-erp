@@ -398,12 +398,23 @@ function invHeaderHTML() {
         </div>
         <div class="inv-header-spacer"></div>
         <button class="inv-top-btn inv-top-help"   onclick="invShowShortcuts()" title="الاختصارات (F1)">⌨️</button>
+        <button class="inv-top-btn" id="invFullscreenBtn" onclick="invToggleFullscreen()" title="إخفاء القائمة والشريط العلوي">${document.body.classList.contains('inv-fullscreen') ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة'}</button>
         <button class="inv-top-btn inv-top-save"   onclick="invSave(false)">💾 حفظ <kbd>F4</kbd></button>
         <button class="inv-top-btn inv-top-new"    onclick="invSave(true)">➕ جديدة <kbd>Alt+N</kbd></button>
         <button class="inv-top-btn inv-top-print"  onclick="invPrint()">🖨️ طباعة</button>
         <button class="inv-top-btn inv-top-close"  onclick="invClose()">✕</button>
     </div>`;
 }
+
+// وضع ملء الشاشة: بيخفي القائمة الجانبية والشريط العلوي عشان الفاتورة
+// تاخد المساحة كلها — حل بديل لحد ما مشكلة اختصار طي القائمة (Alt+H)
+// تتأكد إنها اتصلحت عند المستخدم، وكمان مفيد لوحده (بيخفي الشريط
+// العلوي كمان، مش بس القائمة الجانبية).
+window.invToggleFullscreen = function() {
+    const on = document.body.classList.toggle('inv-fullscreen');
+    const btn = document.getElementById('invFullscreenBtn');
+    if (btn) btn.textContent = on ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة';
+};
 
 function invSearchBarHTML() {
     const cur = invGetDensity();
