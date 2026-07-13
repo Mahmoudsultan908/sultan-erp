@@ -10,16 +10,14 @@ let _expUserRole = 'admin'; // افتراضياً admin (هيحدد من session
 // 1) التقديم الرئيسي
 // ════════════════════════════════════════════════════════════
 async function renderExpenses(container) {
-    try {
-        // تحديد دور المستخدم
-        _expUserRole = currentUser?.role || 'admin';
+    container.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل بيانات المصروفات...</div>';
+    // تحديد دور المستخدم
+    _expUserRole = currentUser?.role || 'admin';
 
-        const [
-            { data: expenses },
-            { data: categories },
-            { data: monthExpenses },
-            { data: globalLimitRow },
-        ] = await Promise.all([
+    let expenses = [], categories = [], monthExpenses = [], globalLimitRow = null;
+    let isOfflineData = false, offlineDataAge = null;
+    try {
+        const [r1, r2, r3, r4] = await Promise.all([
             sb.from('expenses').select('*, expense_categories(name, monthly_limit)').order('expense_date', { ascending: false }).limit(50),
             sb.from('expense_categories').select('*').order('name'),
             // كل مصروفات الشهر الحالي
@@ -29,52 +27,92 @@ async function renderExpenses(container) {
                 .eq('status', 'confirmed'),
             sb.from('app_settings').select('value').eq('key', 'expense_global_monthly_limit').single(),
         ]);
-
-        // الحد الإجمالي
-        _expGlobalLimit = parseFloat(globalLimitRow?.value) || 0;
-
-        // خريطة استهلاك كل بند في الشهر
-        const catUsage = {};
-        monthExpenses.forEach(e => {
-            catUsage[e.category_id] = (catUsage[e.category_id] || 0) + (e.amount || 0);
-        });
-        const monthTotal = monthExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-
-        const total = expenses.reduce((s, e) => s + (e.amount || 0), 0);
-
-        container.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-                <div><h2 style="font-size:22px;font-weight:800">المصروفات المالية</h2>
-                <p style="font-size:13px;color:#64748B;margin-top:4px">متابعة وتسجيل المصروفات برقابة الحد الأقصى الشهري</p></div>
-                <button class="mod-btn mod-btn-primary" onclick="expOpenAdd()">+ تسجيل مصروف جديد</button>
-            </div>
-
-            <!-- تبويبات -->
-            <div class="exp-tabs">
-                <button class="exp-tab active" id="expTabTransactions" onclick="expSwitchTab('transactions')">📋 المصروفات</button>
-                <button class="exp-tab" id="expTabCats" onclick="expSwitchTab('cats')">🗂️ إدارة البنود والحدود</button>
-            </div>
-
-            <!-- ===== تبويب المصروفات ===== -->
-            <div id="expPanelTransactions">
-                <div class="mod-grid">
-                    <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">💸</div><div class="mod-card-val">${_expFmt(total)}</div><div class="mod-card-lbl">إجمالي المصروفات</div></div>
-                    <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">📅</div><div class="mod-card-val">${_expFmt(monthTotal)}</div><div class="mod-card-lbl">مصروفات هذا الشهر</div></div>
-                    <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">📊</div><div class="mod-card-val">${expenses.length}</div><div class="mod-card-lbl">عملية منفذة</div></div>
-                </div>
-
-                ${_expGlobalLimitCardHTML(monthTotal)}
-                ${_expMonthExpTableHTML(expenses)}
-            </div>
-
-            <!-- ===== تبويب إدارة البنود ===== -->
-            <div id="expPanelCats" style="display:none">
-                ${_expCatsPanelHTML(categories, catUsage)}
-            </div>
-        `;
+        if (r1.error || !r1.data || r2.error || !r2.data) throw (r1.error || r2.error || new Error('no data'));
+        expenses = r1.data;
+        categories = r2.data;
+        monthExpenses = r3.data || [];
+        globalLimitRow = r4.data;
+        if (typeof dbSetCache === 'function') {
+            dbSetCache('expenses', expenses);
+            dbSetCache('expense_categories', categories);
+        }
     } catch (err) {
-        container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        // فشل التحميل الحي (أوفلاين أو خطأ شبكة) → ارجع لآخر نسخة محفوظة في الكاش
+        if (typeof dbGetCache === 'function') {
+            const [ce, cc] = await Promise.all([dbGetCache('expenses'), dbGetCache('expense_categories')]);
+            if (cc?.data?.length) {
+                categories = cc.data;
+                expenses = ce?.data || [];
+                isOfflineData = true;
+                offlineDataAge = Math.min(cc.updatedAt || Date.now(), ce?.updatedAt || cc.updatedAt || Date.now());
+            } else {
+                container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message || 'تعذر تحميل البيانات'}</div>`;
+                return;
+            }
+        } else {
+            container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message || 'تعذر تحميل البيانات'}</div>`;
+            return;
+        }
     }
+
+    // الحد الإجمالي
+    _expGlobalLimit = parseFloat(globalLimitRow?.value) || 0;
+
+    // خريطة استهلاك كل بند في الشهر
+    const catUsage = {};
+    monthExpenses.forEach(e => {
+        catUsage[e.category_id] = (catUsage[e.category_id] || 0) + (e.amount || 0);
+    });
+    const monthTotal = monthExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+
+    const total = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+
+    // مصروفات اتسجّلت محلياً ولسه ماتزامنتش
+    const pendingEntries = typeof getQueue === 'function'
+        ? await getQueue(e => e.module === 'expenses' && (e.status === 'pending' || e.status === 'failed' || e.status === 'syncing'))
+        : [];
+    const pendingRows = pendingEntries.map(e => ({
+        _queue: true, status: e.status,
+        expense_date: e.payload.expense_date,
+        expense_categories: { name: categories.find(c => c.id === e.payload.category_id)?.name || '—' },
+        description: e.payload.description, amount: e.payload.amount,
+    }));
+    const displayExpenses = [...pendingRows, ...expenses];
+
+    container.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <div><h2 style="font-size:22px;font-weight:800">المصروفات المالية</h2>
+            <p style="font-size:13px;color:#64748B;margin-top:4px">متابعة وتسجيل المصروفات برقابة الحد الأقصى الشهري</p></div>
+            <button class="mod-btn mod-btn-primary" onclick="expOpenAdd()">+ تسجيل مصروف جديد</button>
+        </div>
+
+        ${isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
+            📴 <strong>غير متصل بالإنترنت</strong> — بيانات البنود المعروضة من آخر نسخة محفوظة (${offlineDataAge ? new Date(offlineDataAge).toLocaleString('ar-EG') : '—'}). المصروف هيتسجّل محلياً ويتزامن تلقائياً لما الاتصال يرجع (بدون فحص الحد لحد ما يتزامن).
+        </div>` : ''}
+
+        <!-- تبويبات -->
+        <div class="exp-tabs">
+            <button class="exp-tab active" id="expTabTransactions" onclick="expSwitchTab('transactions')">📋 المصروفات</button>
+            <button class="exp-tab" id="expTabCats" onclick="expSwitchTab('cats')">🗂️ إدارة البنود والحدود</button>
+        </div>
+
+        <!-- ===== تبويب المصروفات ===== -->
+        <div id="expPanelTransactions">
+            <div class="mod-grid">
+                <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">💸</div><div class="mod-card-val">${_expFmt(total)}</div><div class="mod-card-lbl">إجمالي المصروفات</div></div>
+                <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">📅</div><div class="mod-card-val">${_expFmt(monthTotal)}</div><div class="mod-card-lbl">مصروفات هذا الشهر</div></div>
+                <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">📊</div><div class="mod-card-val">${expenses.length}</div><div class="mod-card-lbl">عملية منفذة</div></div>
+            </div>
+
+            ${_expGlobalLimitCardHTML(monthTotal)}
+            ${_expMonthExpTableHTML(displayExpenses)}
+        </div>
+
+        <!-- ===== تبويب إدارة البنود ===== -->
+        <div id="expPanelCats" style="display:none">
+            ${_expCatsPanelHTML(categories, catUsage)}
+        </div>
+    `;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -84,15 +122,18 @@ function _expMonthExpTableHTML(expenses) {
     return `
     <div class="mod-table-wrap" style="margin-top:16px">
         <table class="mod-table"><thead><tr>
-            <th>التاريخ</th><th>البند</th><th>البيان</th><th style="text-align:left">المبلغ</th>
+            <th>التاريخ</th><th>البند</th><th>البيان</th><th style="text-align:left">المبلغ</th><th>الحالة</th>
         </tr></thead>
         <tbody>
-            ${expenses.length === 0 ? `<tr><td colspan="4" class="empty-state"><span>📭</span>لا توجد مصروفات.</td></tr>` :
+            ${expenses.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مصروفات.</td></tr>` :
             expenses.map(e => `<tr>
                 <td>${new Date(e.expense_date).toLocaleDateString('ar-EG')}</td>
                 <td><span style="background:#F1F5F9;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600">${e.expense_categories?.name || '—'}</span></td>
                 <td style="color:#475569">${e.description || '—'}</td>
                 <td style="text-align:left;font-weight:700;color:#DC2626">${_expFmt(e.amount)}</td>
+                <td>${e._queue
+                    ? (e.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
+                    : '<span style="color:#059669;font-weight:600">✅ مؤكد</span>'}</td>
             </tr>`).join('')}
         </tbody></table>
     </div>`;
@@ -174,8 +215,18 @@ window.expSwitchTab = function(tab) {
 // 4) نافذة إضافة مصروف + شريط الحد اللحظي
 // ════════════════════════════════════════════════════════════
 window.expOpenAdd = async function() {
-    // جلب البنود
-    const { data: categories } = await sb.from('expense_categories').select('*').order('name');
+    // جلب البنود (مع رجوع للكاش لو أوفلاين)
+    let categories = [];
+    try {
+        const { data, error } = await sb.from('expense_categories').select('*').order('name');
+        if (error || !data) throw error || new Error('no categories');
+        categories = data;
+    } catch {
+        if (typeof dbGetCache === 'function') {
+            const cached = await dbGetCache('expense_categories');
+            categories = cached?.data || [];
+        }
+    }
 
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
@@ -238,6 +289,15 @@ window.expCheckLimit = async function() {
 
     if (!catId || amount <= 0) {
         area.innerHTML = '';
+        document.getElementById('expOverrideBox').classList.remove('show');
+        _expLimitExceeded = false;
+        return;
+    }
+
+    if (typeof isOnline === 'function' && !isOnline()) {
+        area.innerHTML = `<div class="limit-box" style="border-color:#FCD34D;background:#FFFBEB">
+            <div style="font-size:12px;color:#92400E">📴 غير متصل — تعذر فحص الحد الشهري الآن. المصروف هيتسجّل محلياً وهيتفحص تلقائياً بعد المزامنة (وهيظهر تنبيه لو طلع متجاوز الحد).</div>
+        </div>`;
         document.getElementById('expOverrideBox').classList.remove('show');
         _expLimitExceeded = false;
         return;
@@ -318,8 +378,10 @@ async function saveExpense() {
 
     if (!catId || !amount || !desc) return alert('يرجى ملء جميع الحقول المطلوبة');
 
-    // فحص التجاوز
-    if (_expLimitExceeded) {
+    const offline = typeof isOnline === 'function' && !isOnline();
+
+    // فحص التجاوز (بيانات لحظية غير متاحة أوفلاين — بيتفحص تاني وقت المزامنة)
+    if (!offline && _expLimitExceeded) {
         const reason = document.getElementById('expOverrideReason').value.trim();
         const isAdmin = _expUserRole === 'admin';
         if (!isAdmin && !reason) {
@@ -338,6 +400,28 @@ async function saveExpense() {
 
     const btn = document.querySelector('#expModal .mod-btn-primary');
     btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
+
+    if (offline) {
+        try {
+            await queueWrite({
+                module: 'expenses', kind: 'expense',
+                payload: {
+                    ref: 'EXP-' + Date.now(),
+                    category_id: catId, amount, description: desc,
+                    expense_date: date, status: 'confirmed', created_by: currentUser?.id || null,
+                },
+            });
+            expCloseModal('expModal');
+            if (typeof offlineToast === 'function') offlineToast('⏳ اتسجّل محلياً — هيتزامن تلقائياً لما الاتصال يرجع', 'info');
+            renderExpenses(document.getElementById('app-content'));
+        } catch (err) {
+            alert('خطأ أثناء الحفظ المحلي: ' + err.message);
+        } finally {
+            btn.innerText = 'حفظ المصروف'; btn.disabled = false;
+        }
+        return;
+    }
+
     try {
         const { error } = await sb.from('expenses').insert({
             ref: 'EXP-' + Date.now(),
@@ -360,6 +444,38 @@ async function saveExpense() {
         renderExpenses(document.getElementById('app-content'));
     } catch (err) { alert('خطأ أثناء الحفظ: ' + err.message); }
     finally { btn.innerText = 'حفظ المصروف'; btn.disabled = false; }
+}
+
+// ════════════════════════════════════════════════════════════
+// 6ب) مزامنة المصروفات المعلّقة (Phase 2 — دعم الأوفلاين)
+// ════════════════════════════════════════════════════════════
+if (typeof registerSyncHandler === 'function') {
+    registerSyncHandler('expense', async (entry) => {
+        const payload = entry.payload;
+        try {
+            const { error } = await sb.from('expenses').insert(payload);
+            if (error) return { ok: false, error: error.message, summary: `مصروف ${payload.ref}` };
+
+            // الحد ما كانش اتفحص وقت التسجيل (أوفلاين) — نفحصه دلوقتي ونبلّغ لو اتجاوز
+            const flags = [];
+            try {
+                const { data: catRow } = await sb.from('expense_categories').select('name, monthly_limit').eq('id', payload.category_id).maybeSingle();
+                if (catRow && Number(catRow.monthly_limit) > 0) {
+                    const { data: monthExp } = await sb.from('expenses').select('amount')
+                        .eq('category_id', payload.category_id).eq('status', 'confirmed')
+                        .gte('expense_date', _expMonthStart()).lt('expense_date', _expMonthEnd());
+                    const used = (monthExp || []).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+                    if (used > Number(catRow.monthly_limit)) {
+                        flags.push(`تجاوز حد بند "${catRow.name}" الشهري (${_expFmt(used)} / ${_expFmt(catRow.monthly_limit)} ج.م) — اتسجّل أوفلاين بدون فحص الحد وقتها`);
+                    }
+                }
+            } catch {}
+
+            return { ok: true, summary: `مصروف ${payload.ref} — ${_expFmt(payload.amount)} ج.م`, flags };
+        } catch (err) {
+            return { ok: false, error: err.message || String(err), summary: `مصروف ${payload.ref}` };
+        }
+    });
 }
 
 // ════════════════════════════════════════════════════════════
