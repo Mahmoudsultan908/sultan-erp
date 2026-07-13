@@ -107,6 +107,12 @@ async function invLoadData() {
         INV_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0;
     });
 
+    // فواتير مبيعات اتسجّلت أوفلاين ولسه في طابور المزامنة — لازم تُطرح
+    // من المخزون المعروض ومن رصيد العميل المعروض دلوقتي، عشان لو فتحت
+    // فاتورة جديدة (لسه أوفلاين) على نفس الصنف/العميل تشوف أثر الفاتورة
+    // السابقة في التقدير (تقدير تراكمي، مش بس آخر فاتورة).
+    await invApplyPendingEstimates();
+
     // رقم الفاتورة: من app_settings أو آخر فاتورة + 1
     let counter = parseInt(invCounterRow?.value);
     if (!counter || isNaN(counter)) {
@@ -128,6 +134,57 @@ async function invLoadData() {
         if (repsErr) throw repsErr;
         INV_DB.reps = reps || [];
     } catch { INV_DB.reps = []; }
+}
+
+// تقدير محلي تراكمي: يطرح أثر كل فواتير المبيعات المعلّقة (لسه ماتزامنتش)
+// من خريطة المخزون ومن رصيد العميل المعروضين، بنفس فكرة colApplyPendingEstimates.
+async function invApplyPendingEstimates() {
+    if (typeof getQueue !== 'function') return;
+    try {
+        const pending = await getQueue(e => e.module === 'sales' && e.kind === 'sale' && (e.status === 'pending' || e.status === 'failed' || e.status === 'syncing'));
+        const custDelta = {};
+        for (const entry of pending) {
+            for (const d of (entry.payload?._stockDeltas || [])) {
+                const key = d.warehouseId + '|' + d.productId;
+                INV_DB.stockMap[key] = (INV_DB.stockMap[key] || 0) - (Number(d.qty) || 0);
+            }
+            const custId = entry.payload?._custId;
+            if (custId) custDelta[custId] = (custDelta[custId] || 0) + (Number(entry.payload?.saleRow?.total) || 0);
+        }
+        INV_DB.customers.forEach(c => { if (custDelta[c.id]) c.balance = (Number(c.balance) || 0) + custDelta[c.id]; });
+    } catch {}
+}
+
+// رقم فاتورة مؤقت وقت الأوفلاين — بادئ بمعرّف الجهاز عشان يفضل فريد حتى
+// لو أكتر من جهاز شغال أوفلاين في نفس الوقت. بيتستبدل برقم رسمي حقيقي
+// (INV-XXXX) وقت نجاح المزامنة — راجع invAllocateRealInvoiceNo.
+function invNextOfflineInvoiceNo() {
+    const key = 'inv_offline_seq';
+    let seq = (parseInt(localStorage.getItem(key) || '0', 10) || 0) + 1;
+    localStorage.setItem(key, String(seq));
+    const deviceId = typeof offlineGetDeviceId === 'function' ? offlineGetDeviceId() : 'DEV';
+    return `OFFLINE-${deviceId}-${seq}`;
+}
+
+// تخصيص رقم فاتورة رسمي حي وقت المزامنة (نفس منطق invLoadData/invSave
+// الأونلاين) + حماية من تصادم الرقم لو أكتر من جهاز زامن في نفس اللحظة تقريباً.
+async function invAllocateRealInvoiceNo() {
+    let counter;
+    const { data: invCounterRow } = await sb.from('app_settings').select('value').eq('key', 'invoice_counter').maybeSingle();
+    counter = parseInt(invCounterRow?.value);
+    if (!counter || isNaN(counter)) {
+        const { data: lastSale } = await sb.from('sales').select('invoice_no').order('created_at', { ascending: false }).limit(1);
+        const last = lastSale?.[0]?.invoice_no || 'INV-0001';
+        const m = String(last).match(/(\d+)/);
+        counter = m ? parseInt(m[1]) + 1 : 1;
+    }
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const invoiceNo = 'INV-' + String(counter).padStart(4, '0');
+        const { data: dupCheck } = await sb.from('sales').select('id').eq('invoice_no', invoiceNo).maybeSingle();
+        if (!dupCheck) return { invoiceNo, counter };
+        counter++;
+    }
+    return { invoiceNo: 'INV-' + String(counter).padStart(4, '0') + '-' + Date.now().toString().slice(-4), counter };
 }
 
 // ── سعر بيع صنف حسب مستوى السعر ──
@@ -244,8 +301,8 @@ async function renderSales(c) {
             <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على الفاتورة <strong>${invEditingOldInvoiceNo}</strong>. عند الحفظ: هتتلغي الفاتورة القديمة تلقائياً (مع إرجاع المخزون والرصيد) وتتسجّل فاتورة جديدة بالتعديلات.</span>
             <button class="inv-top-btn" style="padding:4px 10px" onclick="invEditingId=null;invEditingOldInvoiceNo=null;renderSales(document.getElementById('app-content'))">إلغاء التعديل</button>
         </div>` : ''}
-        ${INV_DB.isOfflineData ? `<div style="background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
-            📴 <strong>غير متصل بالإنترنت</strong> — الأصناف والعملاء المعروضة من آخر نسخة محفوظة (${INV_DB.offlineDataAge ? new Date(INV_DB.offlineDataAge).toLocaleString('ar-EG') : '—'})، وممكن ماتكونش محدّثة. <strong>حفظ الفاتورة مش متاح لحد ما الاتصال يرجع.</strong>
+        ${INV_DB.isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
+            📴 <strong>غير متصل بالإنترنت</strong> — الأصناف والعملاء المعروضة من آخر نسخة محفوظة (${INV_DB.offlineDataAge ? new Date(INV_DB.offlineDataAge).toLocaleString('ar-EG') : '—'})، وممكن ماتكونش محدّثة. الفاتورة هتتسجّل محلياً برقم مؤقت وتتزامن تلقائياً برقم رسمي لما الاتصال يرجع. <strong>تعديل فاتورة موجودة مش متاح أوفلاين.</strong>
         </div>` : ''}
         ${invHeaderHTML()}
         <div class="inv-main">
@@ -1000,13 +1057,16 @@ async function invReverseOldForEdit() {
 }
 
 async function invSave(andNew) {
-    // ★ حفظ فاتورة مبيعات وإحنا أوفلاين لسه مش مدعوم (خطة الأوفلاين
-    //   بتوصل لشاشة المبيعات في المرحلة 3، بعد التحصيل/الدفع/المصروفات) —
-    //   نمنع بوضوح بدل ما نسيب المحاولة تفشل بأخطاء Supabase مربكة.
-    if (typeof isOnline === 'function' && !isOnline()) {
-        invToast('📴 لا يوجد اتصال بالإنترنت — حفظ الفواتير أوفلاين لسه مش متاح، حاول تاني لما الاتصال يرجع', 'error');
+    const offline = typeof isOnline === 'function' && !isOnline();
+
+    // ★ تعديل فاتورة موجودة محتاج يلغي القديمة ويرجع المخزون/الرصيد أونلاين
+    //   (invReverseOldForEdit) — ده معقّد وخطير يتنفّذ بتقدير محلي، فبيفضل
+    //   محتاج اتصال. الحفظ العادي (فاتورة جديدة) هو المدعوم أوفلاين.
+    if (invEditingId && offline) {
+        invToast('📴 تعديل فاتورة موجودة محتاج اتصال بالإنترنت — التعديل هيتاح تاني لما الاتصال يرجع', 'error');
         return;
     }
+
     const filled = invItems.filter(i => i.pid && (i.qty||0) > 0);
     if (!filled.length) { invToast('⚠️ الفاتورة فارغة — أضف أصنافاً أولاً', 'error'); return; }
 
@@ -1044,6 +1104,72 @@ async function invSave(andNew) {
     saveBtns.forEach(b => { b.innerText = '⏳ جاري الحفظ...'; b.disabled = true; });
 
     try {
+        // ★ أوفلاين: بدل الحفظ الحي، سجّل الفاتورة في طابور المزامنة برقم
+        //   مؤقت + تقدير محلي (مخزون/رصيد عميل) — الحقيقة الفعلية بتتحدد
+        //   وقت المزامنة (invAllocateRealInvoiceNo + sync handler تحت).
+        if (offline) {
+            const stockDeltas = filled.map(it => {
+                const key = invWarehouseId + '|' + it.pid;
+                const need = (it.qty||0) + (it.free||0);
+                return { warehouseId: invWarehouseId, productId: it.pid, qty: need, name: it.name, _estAfter: (INV_DB.stockMap[key] || 0) - need };
+            });
+            const payload = {
+                tempInvoiceNo: invNextOfflineInvoiceNo(),
+                saleRow: {
+                    customer_id: invCustId || null,
+                    payment_type: invPayType,
+                    subtotal, vat_amount: 0, total: net, discount: extra,
+                    status: 'confirmed', warehouse_id: invWarehouseId,
+                    rep_id: invNormalizeRepId(invRepId),
+                    source_app: 'erp', created_by: currentUser?.id || null,
+                },
+                items: filled.map(it => {
+                    const prod = INV_DB.products.find(p=>p.id===it.pid);
+                    const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
+                    return {
+                        product_id: it.pid, qty: it.qty, unit_price: it.price, line_total: lineTotal,
+                        unit_type: 'sale_unit', units_per_carton_snapshot: prod?.units_per_carton || 1,
+                        discount_pct: it.disc || 0, free_qty: it.free || 0,
+                        cost_price_snapshot: prod ? invGetBuyPrice(prod) : 0,
+                        unit_name: prod?.unit || it.unit || 'قطعة',
+                    };
+                }),
+                _stockDeltas: stockDeltas,
+                _custId: (invPayType === 'credit' && invCustId) ? invCustId : null,
+                _custEstBalanceAfter: null,
+            };
+            if (payload._custId) {
+                const c = INV_DB.customers.find(x => x.id === invCustId);
+                payload._custEstBalanceAfter = (Number(c?.balance) || 0) + net;
+            }
+
+            await queueWrite({ module: 'sales', kind: 'sale', payload, tempRef: payload.tempInvoiceNo });
+
+            // تحديث محلي متفائل (تقدير للعرض بس — نفس منطق الأونلاين تحت)
+            if (invWarehouseId) {
+                for (const it of filled) {
+                    const need = (it.qty||0) + (it.free||0);
+                    const key = invWarehouseId + '|' + it.pid;
+                    INV_DB.stockMap[key] = (INV_DB.stockMap[key] || 0) - need;
+                }
+            }
+            if (invPayType === 'credit' && invCustId) {
+                const c = INV_DB.customers.find(x=>x.id===invCustId);
+                if (c) c.balance = (Number(c.balance)||0) + net;
+            }
+
+            localStorage.removeItem(INV_AUTOSAVE_KEY);
+            invToast(`⏳ اتسجّلت الفاتورة محلياً (${payload.tempInvoiceNo}) — هتاخد رقم رسمي وتتزامن تلقائياً لما الاتصال يرجع — ${invFmt(net)} ج.م`, 'info');
+
+            if (andNew) {
+                renderSales(document.getElementById('app-content'));
+            } else {
+                const badge = document.querySelector('.inv-no-badge');
+                if (badge) badge.textContent = payload.tempInvoiceNo;
+            }
+            return;
+        }
+
         // ★ لو في وضع تعديل: ألغِ الفاتورة القديمة وارجع المخزون والرصيد قبل إنشاء النسخة الجديدة
         if (invEditingId) {
             await invReverseOldForEdit();
@@ -1191,9 +1317,13 @@ async function invPrint() {
     const { subtotal, extra, net } = invCalcNet();
     const cust = invCustId ? INV_DB.customers.find(x=>x.id===invCustId) : null;
     const paid = invPayType === 'cash' ? parseFloat(document.getElementById('invCashReceived')?.value) || net : null;
+    // نقرأ رقم الفاتورة من البادج المعروض فعلياً (بيتحدّث في invSave لرقم
+    // حقيقي أونلاين أو رقم مؤقت OFFLINE-... أوفلاين) بدل ما نعيد حسابه من
+    // INV_DB.invoiceNo، اللي ممكن يفضل زي ما هو أوفلاين (لسه ما اتخصصش رقم حقيقي).
+    const badgeText = document.querySelector('.inv-no-badge')?.textContent?.trim();
 
     await printThermalReceipt('sale', {
-        invoiceNo: 'INV-' + String(INV_DB.invoiceNo).padStart(4,'0'),
+        invoiceNo: badgeText || ('INV-' + String(INV_DB.invoiceNo).padStart(4,'0')),
         customerName: cust?.name || null,
         customerPhone: cust?.phone || null,
         paymentType: invPayType,
@@ -1432,3 +1562,72 @@ Object.assign(window, {
     invExportXls, invImportXls,
     invOnWarehouseChange, invOnRepChange,
 });
+
+// ════════════════════════════════════════════════════════════
+// 12) مزامنة فواتير المبيعات المعلّقة (Phase 3 — دعم الأوفلاين)
+//     ★ 'sale' مسجّلة في OFFLINE_STRICT_ORDER_KINDS (js/offline.js) —
+//     المزامنة بترتيب صارم وتوقف عند أول فشل، لأن كل فاتورة أوفلاين
+//     مبنية على افتراض إن اللي قبلها في الطابور نجحت (تقدير المخزون تراكمي).
+// ════════════════════════════════════════════════════════════
+if (typeof registerSyncHandler === 'function') {
+    registerSyncHandler('sale', async (entry) => {
+        const { tempInvoiceNo, saleRow, items, _custId, _custEstBalanceAfter, _stockDeltas } = entry.payload;
+        try {
+            // تحقق حي من rep_id (نفس منطق invSave الأونلاين) — لو اتحذف
+            // المندوب بعد ما الفاتورة اتسجّلت أوفلاين، ابعتها بدون مندوب.
+            let repId = saleRow.rep_id;
+            if (repId) {
+                try {
+                    const { data: repCheck } = await sb.from('sales_reps').select('id').eq('id', repId).maybeSingle();
+                    if (!repCheck) repId = null;
+                } catch {}
+            }
+
+            const { invoiceNo, counter } = await invAllocateRealInvoiceNo();
+
+            const { data: saleRows, error: saleErr } = await sb.from('sales').insert({
+                ...saleRow, rep_id: repId, invoice_no: invoiceNo,
+            }).select();
+            if (saleErr) return { ok: false, error: saleErr.message, summary: `فاتورة ${tempInvoiceNo}` };
+            const saleId = saleRows[0].id;
+
+            const itemsToInsert = items.map(it => ({ ...it, sale_id: saleId }));
+            const { error: itemsErr } = await sb.from('sale_items').insert(itemsToInsert);
+            if (itemsErr) {
+                // فشل إدراج البنود بعد نجاح رأس الفاتورة — نلغي الرأس عشان ما تفضلش فاتورة فاضية معلّقة في القاعدة
+                await sb.from('sales').delete().eq('id', saleId);
+                return { ok: false, error: itemsErr.message, summary: `فاتورة ${tempInvoiceNo}` };
+            }
+
+            await sb.from('app_settings').upsert({
+                key: 'invoice_counter', value: String(counter + 1), updated_at: new Date().toISOString(),
+            });
+
+            // مطابقة: قارن المخزون/رصيد العميل الفعليين (بعد الـ triggers) بالتقدير المحلي وقت الأوفلاين
+            const flags = [];
+            for (const d of (_stockDeltas || [])) {
+                try {
+                    const { data: stockRow } = await sb.from('inventory_stock').select('qty')
+                        .eq('warehouse_id', d.warehouseId).eq('product_id', d.productId).maybeSingle();
+                    if (stockRow && d._estAfter != null) {
+                        const diff = Math.abs((Number(stockRow.qty) || 0) - Number(d._estAfter));
+                        if (diff > 0.001) flags.push(`مخزون صنف "${d.name}" الفعلي (${stockRow.qty}) يختلف عن التقدير وقت الأوفلاين (${d._estAfter})`);
+                    }
+                } catch {}
+            }
+            if (_custId && _custEstBalanceAfter != null) {
+                try {
+                    const { data: freshCust } = await sb.from('customers').select('balance').eq('id', _custId).maybeSingle();
+                    if (freshCust) {
+                        const diff = Math.abs((Number(freshCust.balance) || 0) - Number(_custEstBalanceAfter));
+                        if (diff > 0.01) flags.push(`رصيد العميل الفعلي بعد المزامنة (${invFmt(freshCust.balance)}) يختلف عن التقدير وقت الأوفلاين (${invFmt(_custEstBalanceAfter)})`);
+                    }
+                } catch {}
+            }
+
+            return { ok: true, summary: `فاتورة ${tempInvoiceNo} → ${invoiceNo} — ${invFmt(saleRow.total)} ج.م`, flags };
+        } catch (err) {
+            return { ok: false, error: err.message || String(err), summary: `فاتورة ${tempInvoiceNo}` };
+        }
+    });
+}
