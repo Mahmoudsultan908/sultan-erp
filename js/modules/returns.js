@@ -31,36 +31,87 @@ let retTableMissing = false;
 // ════════════════════════════════════════════════════════════
 async function renderReturns(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل بيانات المرتجعات...</div>';
+    RET_DB.isOfflineData = false;
+    RET_DB.offlineDataAge = null;
     try {
-        const [{ data: customers }, { data: suppliers }, { data: products }, { data: warehouses }, { data: stockRows }] = await Promise.all([
+        const [r1, r2, r3, r4, r5] = await Promise.all([
             sb.from('customers').select('id,name,phone,balance').eq('is_active', true).order('name'),
             sb.from('suppliers').select('id,name,phone,balance').eq('is_active', true).order('name'),
             sb.from('products').select('id,name,code,unit,wholesale_price,retail_price,purchase_price').eq('is_active', true).order('name'),
             sb.from('warehouses').select('id,name,is_main').order('name'),
             sb.from('inventory_stock').select('warehouse_id, product_id, qty'),
         ]);
-        RET_DB.customers = customers || [];
-        RET_DB.suppliers = suppliers || [];
-        RET_DB.products = products || [];
-        RET_DB.warehouses = warehouses || [];
+        if (r1.error || !r1.data || r3.error || !r3.data) throw (r1.error || r3.error || new Error('no data'));
+        RET_DB.customers = r1.data;
+        RET_DB.suppliers = r2.data || [];
+        RET_DB.products = r3.data;
+        RET_DB.warehouses = r4.data || [];
         RET_DB.stockMap = {};
-        (stockRows || []).forEach(r => { RET_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0; });
-
-        // إعادة ضبط الحالة
-        retType = 'sales'; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retItems = [];
-        const mainWh = RET_DB.warehouses.find(w => w.is_main) || RET_DB.warehouses[0];
-        retWarehouseId = mainWh?.id || null;
-
-        await Promise.all([retLoadRecent(), retLoadCounterPreview()]);
-
-        retRenderScreen(c);
-        // ★ اربط اختصارات الكيبورد مرة واحدة بس على العنصر الثابت #app-content
-        //   (removeEventListener قبل add يمنع تراكم أكتر من نسخة عند إعادة فتح الصفحة)
-        c.removeEventListener('keydown', retGlobalKeys);
-        c.addEventListener('keydown', retGlobalKeys);
+        (r5.data || []).forEach(r => { RET_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0; });
+        if (typeof dbSetCache === 'function') {
+            dbSetCache('customers', RET_DB.customers);
+            dbSetCache('suppliers', RET_DB.suppliers);
+        }
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message}</div>`;
+        // فشل التحميل الحي (أوفلاين أو خطأ شبكة) → ارجع لآخر نسخة محفوظة في الكاش
+        // (المخزون نفسه مش متاح أوفلاين — بيفضل فاضي وبيتقدّر بس من طابور المرتجعات المعلّقة)
+        if (typeof dbGetCache === 'function') {
+            const [cc, cs, cp, cw] = await Promise.all([dbGetCache('customers'), dbGetCache('suppliers'), dbGetCache('products'), dbGetCache('warehouses')]);
+            if (cc?.data?.length || cp?.data?.length) {
+                RET_DB.customers = cc?.data || [];
+                RET_DB.suppliers = cs?.data || [];
+                RET_DB.products = cp?.data || [];
+                RET_DB.warehouses = cw?.data || [];
+                RET_DB.stockMap = {};
+                RET_DB.isOfflineData = true;
+                RET_DB.offlineDataAge = Math.min(cc?.updatedAt || Date.now(), cp?.updatedAt || Date.now());
+            } else {
+                c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message || 'تعذر تحميل البيانات'}</div>`;
+                return;
+            }
+        } else {
+            c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message || 'تعذر تحميل البيانات'}</div>`;
+            return;
+        }
     }
+
+    // إعادة ضبط الحالة
+    retType = 'sales'; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retItems = [];
+    const mainWh = RET_DB.warehouses.find(w => w.is_main) || RET_DB.warehouses[0];
+    retWarehouseId = mainWh?.id || null;
+
+    // مرتجعات مبيعات اتسجّلت أوفلاين ولسه في الطابور — طرح أثرها من المخزون المعروض (تقدير تراكمي)
+    await retApplyPendingEstimates();
+
+    if (!RET_DB.isOfflineData) {
+        await Promise.all([retLoadRecent(), retLoadCounterPreview()]);
+    } else {
+        RET_DB.list = [];
+        retTableMissing = false;
+    }
+    await retLoadPendingList();
+
+    retRenderScreen(c);
+    // ★ اربط اختصارات الكيبورد مرة واحدة بس على العنصر الثابت #app-content
+    //   (removeEventListener قبل add يمنع تراكم أكتر من نسخة عند إعادة فتح الصفحة)
+    c.removeEventListener('keydown', retGlobalKeys);
+    c.addEventListener('keydown', retGlobalKeys);
+}
+
+// تقدير محلي تراكمي: يطرح فواتير مرتجع المبيعات المعلّقة (لسه ماتزامنتش)
+// من المخزون المعروض — نفس فكرة invApplyPendingEstimates في sales.js
+// (بس بالعكس: المرتجع بيرجّع كمية للمخزون بدل ما يخصمها).
+async function retApplyPendingEstimates() {
+    if (typeof getQueue !== 'function') return;
+    try {
+        const pending = await getQueue(e => e.module === 'returns' && e.kind === 'sale_return' && (e.status === 'pending' || e.status === 'failed' || e.status === 'syncing'));
+        for (const entry of pending) {
+            for (const d of (entry.payload?._stockDeltas || [])) {
+                const key = d.warehouseId + '|' + d.productId;
+                RET_DB.stockMap[key] = (RET_DB.stockMap[key] || 0) + (Number(d.qty) || 0);
+            }
+        }
+    } catch {}
 }
 
 async function retLoadRecent() {
@@ -90,7 +141,8 @@ window.retSwitchType = async function (type) {
     if (retType === type) return;
     if (retItems.filter(i => i.pid).length && !confirm('سيتم فقد البيانات غير المحفوظة. تبديل نوع المرتجع؟')) return;
     retType = type; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retItems = [];
-    await retLoadRecent();
+    if (!RET_DB.isOfflineData) await retLoadRecent();
+    await retLoadPendingList();
     retRenderScreen(document.getElementById('app-content'));
 };
 
@@ -101,6 +153,31 @@ window.retSwitchMode = function (mode) {
     retRenderScreen(document.getElementById('app-content'));
 };
 
+// رقم مرتجع مؤقت وقت الأوفلاين (مرتجع مبيعات بس — نفس فكرة
+// invNextOfflineInvoiceNo في sales.js) — بيتستبدل برقم رسمي RS-XXXX
+// وقت نجاح المزامنة.
+function retNextOfflineReturnNo() {
+    const key = 'ret_offline_seq';
+    let seq = (parseInt(localStorage.getItem(key) || '0', 10) || 0) + 1;
+    localStorage.setItem(key, String(seq));
+    const deviceId = typeof offlineGetDeviceId === 'function' ? offlineGetDeviceId() : 'DEV';
+    return `OFFLINE-${deviceId}-${seq}`;
+}
+
+// تخصيص رقم مرتجع رسمي حي وقت المزامنة + حماية من تصادم الرقم (نفس
+// منطق invAllocateRealInvoiceNo في sales.js).
+async function retAllocateRealReturnNo() {
+    const { data: counterRow } = await sb.from('app_settings').select('value').eq('key', 'sales_return_counter').maybeSingle();
+    let counter = parseInt(counterRow?.value) || 1;
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const returnNo = 'RS-' + String(counter).padStart(4, '0');
+        const { data: dupCheck } = await sb.from('sales_returns').select('id').eq('return_no', returnNo).maybeSingle();
+        if (!dupCheck) return { returnNo, counter };
+        counter++;
+    }
+    return { returnNo: 'RS-' + String(counter).padStart(4, '0') + '-' + Date.now().toString().slice(-4), counter };
+}
+
 // ════════════════════════════════════════════════════════════
 // 1) قوالب HTML للأقسام (نفس بنية inv-header/inv-main/inv-side بتاعة sales.js)
 // ════════════════════════════════════════════════════════════
@@ -110,6 +187,9 @@ function retRenderScreen(c) {
         ${retTableMissing ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12px">
             ⚠️ <strong>تنبيه:</strong> جدول <code>${retType === 'sales' ? 'sales_returns' : 'purchase_returns'}</code> أو جدول البنود المرتبط به غير مكتمل في قاعدة البيانات بعد.
             شغّل ملف <code>returns_migration.sql</code> في Supabase أولاً حتى تتحرّك المخازن والأرصدة تلقائياً.
+        </div>` : ''}
+        ${RET_DB.isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
+            📴 <strong>غير متصل بالإنترنت</strong> — البيانات من آخر نسخة محفوظة (${RET_DB.offlineDataAge ? new Date(RET_DB.offlineDataAge).toLocaleString('ar-EG') : '—'}). <strong>مرتجع المبيعات</strong> هيتسجّل محلياً ويتزامن تلقائياً برقم رسمي لما الاتصال يرجع. <strong>مرتجع المشتريات مش متاح أوفلاين.</strong>
         </div>` : ''}
         ${retHeaderHTML()}
         <div class="inv-main">
@@ -283,12 +363,12 @@ function retNotesCardHTML() {
 }
 
 function retRecentListHTML() {
-    const list = RET_DB.list || [];
+    const list = [...(RET_DB.pendingList || []), ...(RET_DB.list || [])];
     return `
     <div class="mod-table-wrap" style="margin-top:16px">
         <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر ${retType === 'sales' ? 'مرتجعات المبيعات' : 'مرتجعات المشتريات'}</div>
         <table class="mod-table"><thead><tr>
-            <th>الرقم</th><th>${retType === 'sales' ? 'العميل' : 'المورد'}</th><th>مرتبط بفاتورة</th><th>التاريخ</th><th style="text-align:left">الإجمالي</th>
+            <th>الرقم</th><th>${retType === 'sales' ? 'العميل' : 'المورد'}</th><th>مرتبط بفاتورة</th><th>التاريخ</th><th style="text-align:left">الإجمالي</th><th>الحالة</th>
         </tr></thead>
         <tbody>
             ${list.length ? list.map(r => `<tr>
@@ -297,10 +377,30 @@ function retRecentListHTML() {
                 <td>${r.sale_id || r.purchase_id ? '<span style="color:#2563EB">🔗 نعم</span>' : '<span style="color:#94A3B8">مستقل</span>'}</td>
                 <td class="dash-muted">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
                 <td style="text-align:left;font-weight:700;color:#DC2626">${retFmt(r.total)}</td>
-            </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مرتجعات بعد</td></tr>`}
+                <td>${r._queue
+                    ? (r.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
+                    : '<span style="color:#059669;font-weight:600">✅ مؤكد</span>'}</td>
+            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مرتجعات بعد</td></tr>`}
         </tbody>
         </table>
     </div>`;
+}
+
+// مرتجعات مبيعات اتسجّلت أوفلاين ولسه في طابور المزامنة — لعرضها في جدول "آخر المرتجعات"
+async function retLoadPendingList() {
+    RET_DB.pendingList = [];
+    if (retType !== 'sales' || typeof getQueue !== 'function') return;
+    try {
+        const pending = await getQueue(e => e.module === 'returns' && e.kind === 'sale_return' && (e.status === 'pending' || e.status === 'failed' || e.status === 'syncing'));
+        RET_DB.pendingList = pending.map(e => ({
+            _queue: true, status: e.status,
+            return_no: e.payload.tempReturnNo,
+            customers: { name: RET_DB.customers.find(c => c.id === e.payload.returnRow.customer_id)?.name || '—' },
+            sale_id: e.payload.returnRow.sale_id,
+            created_at: new Date(e.createdAt).toISOString(),
+            total: e.payload.returnRow.total,
+        }));
+    } catch {}
 }
 
 // ════════════════════════════════════════════════════════════
@@ -600,7 +700,38 @@ window.retSearchInvoice = async function () {
     const no = document.getElementById('retInvNo')?.value.trim();
     if (!no) { retToast('⚠️ أدخل رقم الفاتورة', 'error'); return; }
 
+    const offline = typeof isOnline === 'function' && !isOnline();
+    if (offline && retType === 'purchase') {
+        retToast('📴 مرتجع المشتريات محتاج اتصال بالإنترنت', 'error');
+        return;
+    }
+
     try {
+        if (offline && retType === 'sales') {
+            // أوفلاين: دوّر في آخر نسخة محفوظة من فواتير المبيعات (offline.js's offlineWarmCache)
+            const cached = typeof dbGetCache === 'function' ? await dbGetCache('recent_sales') : null;
+            const data = (cached?.data || []).find(s => s.invoice_no === no);
+            if (!data) { retToast('❌ الفاتورة دي مش موجودة في آخر نسخة محفوظة (📴 أوفلاين) — جرّب لما الاتصال يرجع', 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
+            retLinkedDoc = data;
+            retEntityId = data.customer_id;
+            retWarehouseId = data.warehouse_id || retWarehouseId;
+            retItems = (data.sale_items || []).map(it => ({
+                id: it.id, pid: it.product_id,
+                name: it.products?.name || '—', code: it.products?.code || '',
+                unit: it.products?.unit || it.unit_name || 'قطعة',
+                qty: Number(it.qty) || 0, maxQty: Number(it.qty) || 0,
+                price: Number(it.unit_price) || 0, disc: Number(it.discount_pct) || 0,
+            }));
+            const whSel = document.getElementById('retWarehouse');
+            if (whSel) whSel.value = retWarehouseId || '';
+            retRenderItems();
+            retUpdateSummary();
+            retUpdateEntityChip();
+            const docInfoEl = document.getElementById('retDocInfoCard');
+            if (docInfoEl) docInfoEl.outerHTML = retDocInfoCardHTML();
+            retToast(`📴 تم تحميل بنود الفاتورة ${no} من آخر نسخة محفوظة — عدّل الكمية المرتجعة لكل صنف`, 'info');
+            return;
+        }
         if (retType === 'sales') {
             const { data, error } = await sb.from('sales')
                 .select('*, sale_items(*, products(name,code,unit)), customers(name)')
@@ -655,11 +786,61 @@ window.retSave = async function () {
     const filled = retItems.filter(it => it.pid && (it.qty || 0) > 0);
     if (!filled.length) { retToast('⚠️ أضف صنفاً واحداً على الأقل بكمية أكبر من صفر', 'error'); return; }
 
+    const offline = typeof isOnline === 'function' && !isOnline();
+    if (offline && retType === 'purchase') {
+        retToast('📴 مرتجع المشتريات محتاج اتصال بالإنترنت — لسه غير مدعوم أوفلاين', 'error');
+        return;
+    }
+
     const notes = document.getElementById('ret-notes')?.value.trim() || null;
     const total = retCalcTotal();
     const subtotal = filled.reduce((s, it) => s + (it.qty || 0) * (it.price || 0), 0);
     const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-top-save');
     saveBtns.forEach(b => { b.dataset._label = b.dataset._label || b.innerHTML; b.innerHTML = '⏳ جاري الحفظ...'; b.disabled = true; });
+
+    if (offline && retType === 'sales') {
+        try {
+            const stockDeltas = filled.map(it => {
+                const key = retWarehouseId + '|' + it.pid;
+                return { warehouseId: retWarehouseId, productId: it.pid, qty: it.qty, name: it.name, _estAfter: (RET_DB.stockMap[key] || 0) + (it.qty || 0) };
+            });
+            const tempReturnNo = retNextOfflineReturnNo();
+            const payload = {
+                tempReturnNo,
+                returnRow: {
+                    customer_id: retEntityId || null,
+                    sale_id: retLinkedDoc?.id || null,
+                    warehouse_id: retWarehouseId,
+                    payment_type: retLinkedDoc?.payment_type || 'cash',
+                    subtotal, total, status: 'confirmed',
+                    reason: notes,
+                    created_by: currentUser?.id || null,
+                },
+                items: filled.map(it => ({
+                    product_id: it.pid, qty: it.qty,
+                    unit_price: it.price, discount_pct: it.disc || 0,
+                    line_total: (it.qty || 0) * (it.price || 0) * (1 - (it.disc || 0) / 100),
+                    unit_name: it.unit || 'قطعة',
+                })),
+                _stockDeltas: stockDeltas,
+            };
+
+            await queueWrite({ module: 'returns', kind: 'sale_return', payload, tempRef: tempReturnNo });
+
+            // تحديث محلي متفائل للمخزون (المرتجع بيرجّع كمية للمخزون)
+            for (const d of stockDeltas) {
+                const key = d.warehouseId + '|' + d.productId;
+                RET_DB.stockMap[key] = (RET_DB.stockMap[key] || 0) + d.qty;
+            }
+
+            retToast(`⏳ اتسجّل المرتجع محلياً (${tempReturnNo}) — هياخد رقم رسمي ويتزامن تلقائياً لما الاتصال يرجع`, 'info');
+            renderReturns(document.getElementById('app-content'));
+        } catch (err) {
+            retToast('❌ خطأ أثناء الحفظ المحلي: ' + err.message, 'error');
+            saveBtns.forEach(b => { b.innerHTML = b.dataset._label; b.disabled = false; });
+        }
+        return;
+    }
 
     try {
         const counterKey = retType === 'sales' ? 'sales_return_counter' : 'purchase_return_counter';
@@ -796,3 +977,52 @@ Object.assign(window, {
     retAddRow, retRemoveRow, retOnCode, retOnName, retOnNameKey, retPickInline, retRowACHover,
     retOnQtyInput, retRowKey, retPickProduct, retFastHover,
 });
+
+// ════════════════════════════════════════════════════════════
+// 9) مزامنة مرتجعات المبيعات المعلّقة (Phase 4 — دعم الأوفلاين)
+//    ★ 'sale_return' مسجّلة في OFFLINE_STRICT_ORDER_KINDS (js/offline.js) —
+//    نفس فلسفة 'sale' في sales.js: ترتيب صارم وتوقف عند أول فشل.
+//    مرتجع المشتريات خارج النطاق عمداً — يفضل أونلاين فقط.
+// ════════════════════════════════════════════════════════════
+if (typeof registerSyncHandler === 'function') {
+    registerSyncHandler('sale_return', async (entry) => {
+        const { tempReturnNo, returnRow, items, _stockDeltas } = entry.payload;
+        try {
+            const { returnNo, counter } = await retAllocateRealReturnNo();
+
+            const { data: retRows, error: retErr } = await sb.from('sales_returns').insert({
+                ...returnRow, return_no: returnNo,
+            }).select();
+            if (retErr) return { ok: false, error: retErr.message, summary: `مرتجع ${tempReturnNo}` };
+            const returnId = retRows[0].id;
+
+            const itemRows = items.map(it => ({ ...it, return_id: returnId }));
+            const { error: itemsErr } = await sb.from('sale_return_items').insert(itemRows);
+            if (itemsErr) {
+                await sb.from('sales_returns').delete().eq('id', returnId);
+                return { ok: false, error: itemsErr.message, summary: `مرتجع ${tempReturnNo}` };
+            }
+
+            await sb.from('app_settings').upsert({
+                key: 'sales_return_counter', value: String(counter + 1), updated_at: new Date().toISOString(),
+            });
+
+            // مطابقة: قارن المخزون الفعلي (بعد الـ trigger) بالتقدير المحلي وقت الأوفلاين
+            const flags = [];
+            for (const d of (_stockDeltas || [])) {
+                try {
+                    const { data: stockRow } = await sb.from('inventory_stock').select('qty')
+                        .eq('warehouse_id', d.warehouseId).eq('product_id', d.productId).maybeSingle();
+                    if (stockRow && d._estAfter != null) {
+                        const diff = Math.abs((Number(stockRow.qty) || 0) - Number(d._estAfter));
+                        if (diff > 0.001) flags.push(`مخزون صنف "${d.name}" الفعلي (${stockRow.qty}) يختلف عن التقدير وقت الأوفلاين (${d._estAfter})`);
+                    }
+                } catch {}
+            }
+
+            return { ok: true, summary: `مرتجع ${tempReturnNo} → ${returnNo} — ${retFmt(returnRow.total)} ج.م`, flags };
+        } catch (err) {
+            return { ok: false, error: err.message || String(err), summary: `مرتجع ${tempReturnNo}` };
+        }
+    });
+}

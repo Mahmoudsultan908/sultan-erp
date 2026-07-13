@@ -110,13 +110,17 @@ async function offlineWarmCache() {
     try {
         const [
             { data: products, error: e1 }, { data: customers, error: e2 }, { data: suppliers, error: e3 },
-            { data: warehouses, error: e4 }, { data: expenseCategories, error: e5 },
+            { data: warehouses, error: e4 }, { data: expenseCategories, error: e5 }, { data: recentSales, error: e6 },
         ] = await Promise.all([
             sb.from('products').select('*').eq('is_active', true).order('name'),
             sb.from('customers').select('*').eq('is_active', true).order('name'),
             sb.from('suppliers').select('*').eq('is_active', true).order('name'),
             sb.from('warehouses').select('*').order('name'),
             sb.from('expense_categories').select('*').order('name'),
+            // آخر فواتير مبيعات (مع بنودها) — عشان صفحة مرتجع المبيعات تقدر
+            // تلاقي الفاتورة الأصلية وإحنا أوفلاين (وضع "مرتبط بفاتورة")
+            sb.from('sales').select('*, sale_items(*, products(name,code,unit)), customers(name)')
+                .order('created_at', { ascending: false }).limit(150),
         ]);
         console.log('[offline] نتيجة تسخين الكاش الأولي:', {
             products: products?.length, productsErr: e1?.message,
@@ -124,6 +128,7 @@ async function offlineWarmCache() {
             suppliers: suppliers?.length, suppliersErr: e3?.message,
             warehouses: warehouses?.length, warehousesErr: e4?.message,
             expenseCategories: expenseCategories?.length, expenseCategoriesErr: e5?.message,
+            recentSales: recentSales?.length, recentSalesErr: e6?.message,
         });
         await Promise.all([
             dbSetCache('products', products || []),
@@ -131,6 +136,7 @@ async function offlineWarmCache() {
             dbSetCache('suppliers', suppliers || []),
             dbSetCache('warehouses', warehouses || []),
             dbSetCache('expense_categories', expenseCategories || []),
+            dbSetCache('recent_sales', recentSales || []),
         ]);
     } catch (err) {
         console.error('[offline] فشل تسخين الكاش الأولي:', err);
