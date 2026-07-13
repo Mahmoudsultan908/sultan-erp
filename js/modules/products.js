@@ -80,12 +80,16 @@ function prodRenderPage(c) {
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCategoryManager()">📁 إدارة المجموعات</button>
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCompanyManager()">🏢 إدارة الشركات</button>
             <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="loadMod(document.querySelector('[data-mod=&quot;product-import&quot;]'), 'product-import')">📥 استيراد Excel</button>
+            <button class="mod-btn" style="background:#EFF6FF;color:#2563EB" onclick="prodExportXls()">📤 تصدير Excel</button>
         </div>
 
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
                 <th>الصنف</th><th>الكود</th><th>المجموعة</th><th>الوحدة</th>
-                <th style="text-align:left">سعر الشراء</th><th style="text-align:left">أسعار البيع (كل المستويات)</th>
+                <th style="text-align:left">سعر الشراء</th>
+                ${_prodPriceLevels.length
+                    ? _prodPriceLevels.map(lvl => `<th style="text-align:left">${lvl.name}</th>`).join('')
+                    : `<th style="text-align:left">سعر البيع الأساسي</th>`}
                 <th style="text-align:center">المخزون</th><th></th>
             </tr></thead>
             <tbody id="prodTbody"></tbody></table>
@@ -93,19 +97,11 @@ function prodRenderPage(c) {
     prodRenderRows();
 }
 
-// كل أسعار البيع المُسجّلة لصنف معيّن (كل مستويات الأسعار المفعّلة)، سطر
-// لكل مستوى — الأول Bold والباقي أصغر. لو مفيش مستويات مسجّلة أصلاً
-// (صنف قديم قبل نظام المستويات)، بيرجع للعمودين القدامى wholesale/retail.
-function prodAllPricesHTML(p) {
-    const prices = _prodPricesMap[p.id] || {};
-    const rows = _prodPriceLevels
-        .map(lvl => ({ name: lvl.name, price: prices[lvl.id] }))
-        .filter(r => r.price != null && Number(r.price) > 0);
-
-    if (!rows.length) {
-        return prodFmt(p.wholesale_price || p.retail_price || 0);
-    }
-    return rows.map((r, i) => `<div style="${i===0 ? 'font-weight:700' : 'font-size:11.5px;color:#64748B'}">${r.name}: ${prodFmt(r.price)}</div>`).join('');
+// سعر مستوى معيّن لصنف معيّن — عمود منفصل لكل مستوى سعر (بدل ما كانوا
+// كل الأسعار مكدّسة في عمود واحد). لو الصنف مالوش سعر مسجّل للمستوى ده، بيظهر "—".
+function prodLevelPriceCell(p, levelId) {
+    const price = (_prodPricesMap[p.id] || {})[levelId];
+    return (price != null && Number(price) > 0) ? prodFmt(price) : '<span style="color:#CBD5E1">—</span>';
 }
 
 function prodRenderRows() {
@@ -117,7 +113,8 @@ function prodRenderRows() {
         const q = _prodSearch.toLowerCase();
         rows = rows.filter(p => (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q) || (p.barcode||'').toLowerCase().includes(q));
     }
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><span>🏷️</span>لا توجد أصناف مطابقة</td></tr>`; return; }
+    const totalCols = 7 + (_prodPriceLevels.length ? _prodPriceLevels.length - 1 : 0);
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="${totalCols}" class="empty-state"><span>🏷️</span>لا توجد أصناف مطابقة</td></tr>`; return; }
 
     tbody.innerHTML = rows.map(p => {
         const cat = _prodCategories.find(c=>c.id===p.category_id);
@@ -128,7 +125,9 @@ function prodRenderRows() {
             <td>${cat?.name || '—'}</td>
             <td>${p.unit || p.sale_unit || '—'}</td>
             <td style="text-align:left">${prodFmt(p.purchase_price)}</td>
-            <td style="text-align:left">${prodAllPricesHTML(p)}</td>
+            ${_prodPriceLevels.length
+                ? _prodPriceLevels.map(lvl => `<td style="text-align:left">${prodLevelPriceCell(p, lvl.id)}</td>`).join('')
+                : `<td style="text-align:left">${prodFmt(p.wholesale_price || p.retail_price || 0)}</td>`}
             <td style="text-align:center;font-weight:700;color:${stockColor}">${prodFmt(p._totalStock)}</td>
             <td style="display:flex;gap:4px;justify-content:center">
                 <button class="cc-edit" onclick="prodOpenEdit('${p.id}')">✏️</button>
@@ -137,6 +136,36 @@ function prodRenderRows() {
         </tr>`;
     }).join('');
 }
+
+// تصدير كل الأصناف لإكسيل — عمود منفصل لكل مستوى سعر (نفس تنظيم الجدول)
+window.prodExportXls = function() {
+    if (!_prodList.length) { alert('لا يوجد أصناف للتصدير'); return; }
+    const rows = _prodList.map(p => {
+        const cat = _prodCategories.find(c => c.id === p.category_id);
+        const row = {
+            'الكود': p.code || '',
+            'الصنف': p.name,
+            'الباركود': p.barcode || '',
+            'المجموعة': cat?.name || '',
+            'الوحدة': p.unit || p.sale_unit || '',
+            'سعر الشراء': Number(p.purchase_price) || 0,
+        };
+        if (_prodPriceLevels.length) {
+            _prodPriceLevels.forEach(lvl => {
+                const price = (_prodPricesMap[p.id] || {})[lvl.id];
+                row[lvl.name] = price != null ? Number(price) : '';
+            });
+        } else {
+            row['سعر البيع'] = Number(p.wholesale_price || p.retail_price || 0);
+        }
+        row['المخزون'] = Number(p._totalStock) || 0;
+        return row;
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'الأصناف');
+    XLSX.writeFile(wb, `أصناف_${new Date().toISOString().slice(0,10)}.xlsx`);
+};
 
 window.prodOnSearch = function(v) { _prodSearch = v; prodRenderRows(); };
 window.prodOnFilterCat = function(v) { _prodFilterCat = v; prodRenderRows(); };

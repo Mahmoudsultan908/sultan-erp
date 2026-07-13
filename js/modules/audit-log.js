@@ -33,8 +33,13 @@ async function renderAuditLog(c) {
 
 async function alLoadData(c) {
     try {
+        // ★ profiles(*) مش profiles(email, full_name) — تسمية عمود محدد
+        //   صراحة في join مضمّن بيتحقق منه PostgREST مباشرة، ولو مش موجود
+        //   بنفس الاسم في العلاقة المضمّنة بيرمي "column ... does not
+        //   exist" ويوقف الصفحة كلها. profiles(*) بيرجّع أي أعمدة موجودة
+        //   فعلاً من غير افتراض اسم بعينه (نفس نمط users-management.js).
         let query = sb.from('financial_events')
-            .select('*, profiles(email, full_name)')
+            .select('*, profiles(*)')
             .order('created_at', { ascending: false })
             .limit(300);
 
@@ -51,7 +56,7 @@ async function alLoadData(c) {
         const totalCancel = (events||[]).filter(e=>e.event_type==='cancel').length;
 
         const rows = (events||[]).map(ev => {
-            const userName = ev.profiles?.full_name || ev.profiles?.email || 'النظام';
+            const userName = ev.profiles?.full_name || ev.profiles?.name || ev.profiles?.email || 'النظام';
             const eventColor = AL_EVENT_COLORS[ev.event_type] || '#64748B';
             const eventIcon = AL_EVENT_ICONS[ev.event_type] || '📋';
             const refLabel = AL_REF_LABELS[ev.ref_type] || ev.ref_type;
