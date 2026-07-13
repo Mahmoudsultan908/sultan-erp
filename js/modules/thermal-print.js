@@ -85,10 +85,17 @@ function tpWrapper(company, title, bodyHTML, customHeaderHTML) {
 <meta charset="UTF-8">
 <title>${title}</title>
 <style>
+  /* ★ ورق 80mm، بس المساحة القابلة للطباعة فعلياً على أغلب طابعات
+     الكاشير الحرارية 80mm أقل من كده (عندك 72.1mm بالظبط) — لو الجسم
+     اتحط بعرض 80mm كامل، أي حاجة في آخر عمود (زي عمود "الاجمالى")
+     بتقع بره منطقة الطباعة الفعلية وتتقص. عرض الجسم بقى 72mm (تحت
+     الـ 72.1mm بأمان) بدل 80mm، والـ @page نفسها فضلت 80mm (مقاس
+     الورق الفعلي) — box-sizing: border-box بيضمن إن أي padding
+     محسوب جوه الـ 72mm دول مش زيادة عليهم. */
   @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 80mm; }
-  body { font-family: 'Cairo', 'Tahoma', sans-serif; padding: 8px 10px 16px; color: #000; font-size: 12px; }
+  html, body { width: 72mm; }
+  body { font-family: 'Cairo', 'Tahoma', sans-serif; margin: 0 auto; padding: 2mm 2mm 5mm; color: #000; font-size: 12px; }
   .tp-center { text-align: center; }
   .tp-company-name { font-size: 16px; font-weight: 800; margin-bottom: 2px; }
   /* ★ طابعة حرارية = أبيض/أسود بس — أي لون رمادي فاتح (#555/#333/...)
@@ -107,7 +114,7 @@ function tpWrapper(company, title, bodyHTML, customHeaderHTML) {
   .tp-totals .tp-row { font-size: 12px; }
   .tp-grand { font-size: 15px; font-weight: 800; border-top: 1px solid #000; border-bottom: 3px double #000; padding: 6px 0; margin: 6px 0; }
   .tp-footer { text-align: center; font-size: 10px; color: #000; margin-top: 12px; padding-bottom: 10px; }
-  @media print { html, body { width: 80mm; } }
+  @media print { html, body { width: 72mm; } }
 
   /* ── رأس + جدول إجماليات فاتورة المبيعات (تصميم الشعار المخصص) ── */
   .tps-header { text-align: center; padding-bottom: 4px; }
