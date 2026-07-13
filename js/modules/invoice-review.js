@@ -109,6 +109,7 @@ function revRenderTable(rows) {
                     <td>${r.status==='confirmed' ? '<span style="color:#059669;font-weight:600">✅ مؤكدة</span>' : r.status==='cancelled' ? '<span style="color:#94A3B8">🚫 ملغاة (معدّلة)</span>' : `<span style="color:#D97706">${r.status}</span>`}</td>
                     <td style="white-space:nowrap">
                         <button class="cc-edit" onclick="revViewDetails('${r.id}')">👁️ عرض</button>
+                        ${revType==='sales' ? `<button class="cc-edit" style="background:#ECFDF5;color:#059669" onclick="revPrintInvoice('${r.id}')">🖨️ طباعة</button>` : ''}
                         ${r.status==='confirmed' ? `<button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="revEditInvoice('${r.id}')">✏️ تعديل</button>` : ''}
                     </td>
                 </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:24px;color:#94A3B8">لا توجد نتائج</td></tr>`}
@@ -162,10 +163,42 @@ window.revViewDetails = async function (id) {
         </div>
         <div class="mod-modal-footer">
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('revModal').remove()">إغلاق</button>
+            ${revType==='sales' ? `<button class="mod-btn" style="background:#ECFDF5;color:#059669" onclick="revPrintInvoice('${data.id}')">🖨️ طباعة</button>` : ''}
             ${data.status==='confirmed' ? `<button class="mod-btn mod-btn-primary" onclick="document.getElementById('revModal').remove();revEditInvoice('${data.id}')">✏️ تعديل هذه الفاتورة</button>` : ''}
         </div>
     </div>`;
     document.body.appendChild(modal);
+};
+
+// ════════════════════════════════════════════════════════════
+// إعادة طباعة فاتورة مبيعات سابقة (نفس تصميم إيصال sales.js الحراري)
+// ★ مرتجع المشتريات مالوش قالب طباعة حرارية أصلاً (خارج نطاق العمل
+//   الحالي) — الزرار ده بيظهر لفواتير المبيعات بس.
+// ════════════════════════════════════════════════════════════
+window.revPrintInvoice = async function (id) {
+    const { data, error } = await sb.from('sales')
+        .select('*, customers(name,phone,balance), sale_items(*, products(name,code,unit))')
+        .eq('id', id).maybeSingle();
+    if (error || !data) { alert('تعذّر تحميل الفاتورة للطباعة'); return; }
+
+    const items = data.sale_items || [];
+    const cust = data.customers;
+    // "الرصيد الساري" في الإيصال معناه رصيد العميل *قبل* الفاتورة دي —
+    // بما إننا بنعيد الطباعة بعد وقت (مش لحظة الحفظ)، أقرب تقدير متاح هو
+    // الرصيد الحالي مطروح منه هذه الفاتورة لو كانت آجلة (مش دقيق 100%
+    // لفواتير قديمة جداً حصل عليها حركة كتير بعدها، بس أفضل تقدير ممكن
+    // من غير سجل تاريخي لرصيد العميل لحظة بلحظة).
+    const previousBalance = cust ? (Number(cust.balance) || 0) - (data.payment_type === 'credit' ? (Number(data.total) || 0) : 0) : 0;
+
+    await printThermalReceipt('sale', {
+        invoiceNo: data.invoice_no,
+        customerName: cust?.name || null,
+        customerPhone: cust?.phone || null,
+        paymentType: data.payment_type,
+        items: items.map(it => ({ name: it.products?.name || it.unit_name || '—', qty: it.qty, unit_price: it.unit_price, line_total: it.line_total })),
+        subtotal: data.subtotal, discount: data.discount, total: data.total,
+        previousBalance,
+    });
 };
 
 // ════════════════════════════════════════════════════════════
