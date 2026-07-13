@@ -12,54 +12,98 @@ let _payList = [];
 // ════════════════════════════════════════════════════════════
 async function renderPayments(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل بيانات دفع الموردين...</div>';
+    let suppliers = [], payments = [], isOfflineData = false, offlineDataAge = null;
     try {
-        const { data: suppliers } = await sb.from('suppliers').select('*').eq('is_active', true).order('name');
-        const { data: payments } = await sb.from('supplier_payments')
+        const { data: suppData, error: suppErr } = await sb.from('suppliers').select('*').eq('is_active', true).order('name');
+        if (suppErr || !suppData) throw suppErr || new Error('no suppliers');
+        suppliers = suppData;
+        const { data: payData } = await sb.from('supplier_payments')
             .select('*, suppliers(name, phone, balance)').order('created_at', { ascending: false }).limit(50);
-        _paySuppliers = suppliers || [];
-        _payList = payments || [];
+        payments = payData || [];
         // كاش للمراجعة الأوفلاين (offline.js) — قراءة فقط، بيتحدّث تلقائياً كل ما الصفحة تفتح أونلاين
-        if (typeof dbSetCache === 'function') dbSetCache('suppliers', _paySuppliers);
-
-        const totalPaid = (payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0);
-        const debtSuppliers = _paySuppliers.filter(s => (Number(s.balance)||0) > 0);
-        const totalDebt = debtSuppliers.reduce((s,s2)=>s+(Number(s2.balance)||0),0);
-
-        c.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-                <div><h2 style="font-size:22px;font-weight:800">💸 دفع الموردين (سندات صرف)</h2>
-                <p style="font-size:13px;color:#64748B;margin-top:4px">تسجيل المدفوعات للموردين — مرتبطة بالخزنة ورصيد المورد</p></div>
-                <button class="mod-btn mod-btn-primary" onclick="payOpenAdd()">+ صرف دفعة جديدة</button>
-            </div>
-
-            <div class="mod-grid">
-                <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💵</div><div class="mod-card-val">${payFmt(totalPaid)}</div><div class="mod-card-lbl">إجمالي المدفوع</div></div>
-                <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">📋</div><div class="mod-card-val">${(payments||[]).length}</div><div class="mod-card-lbl">سند صرف</div></div>
-                <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${payFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين (${debtSuppliers.length})</div></div>
-            </div>
-
-            ${paySuppliersDebtListHTML(debtSuppliers)}
-
-            <div class="mod-table-wrap" style="margin-top:16px">
-                <table class="mod-table"><thead><tr>
-                    <th>الرقم</th><th>المورد</th><th>التاريخ</th><th style="text-align:left">المبلغ</th><th>الحالة</th><th></th>
-                </tr></thead>
-                <tbody>
-                    ${(payments||[]).length === 0 ? `<tr><td colspan="6" class="empty-state"><span>💸</span>لا توجد مدفوعات.</td></tr>` :
-                    payments.map(p => `<tr>
-                        <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
-                        <td><strong>${p.suppliers?.name || '—'}</strong></td>
-                        <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
-                        <td style="text-align:left;font-weight:700;color:#059669">${payFmt(p.amount)}</td>
-                        <td>${p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':`<span style="color:#D97706">${p.status}</span>`}</td>
-                        <td><button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button></td>
-                    </tr>`).join('')}
-                </tbody></table>
-            </div>
-        `;
+        if (typeof dbSetCache === 'function') dbSetCache('suppliers', suppliers);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        // فشل التحميل الحي (أوفلاين أو خطأ شبكة) → ارجع لآخر نسخة محفوظة في الكاش
+        if (typeof dbGetCache === 'function') {
+            const cached = await dbGetCache('suppliers');
+            if (cached?.data?.length) {
+                suppliers = cached.data;
+                isOfflineData = true;
+                offlineDataAge = cached.updatedAt;
+            }
+        }
     }
+
+    _paySuppliers = typeof payApplyPendingEstimates === 'function' ? await payApplyPendingEstimates(suppliers) : suppliers;
+    _payList = payments;
+
+    // عمليات دفع اتسجّلت محلياً ولسه ماتزامنتش
+    const pendingEntries = typeof getQueue === 'function'
+        ? await getQueue(e => e.module === 'payments' && (e.status === 'pending' || e.status === 'failed' || e.status === 'syncing'))
+        : [];
+    const pendingRows = pendingEntries.map(e => ({
+        _queue: true, id: 'q' + e.id, _queueId: e.id,
+        ref: e.payload.ref, amount: e.payload.amount, created_at: new Date(e.createdAt).toISOString(), status: e.status,
+        suppliers: { name: _paySuppliers.find(x => x.id === e.payload.supplier_id)?.name || '—' },
+    }));
+    const displayRows = [...pendingRows, ...payments];
+
+    const totalPaid = payments.reduce((s,p)=>s+(Number(p.amount)||0),0);
+    const debtSuppliers = _paySuppliers.filter(s => (Number(s.balance)||0) > 0);
+    const totalDebt = debtSuppliers.reduce((s,s2)=>s+(Number(s2.balance)||0),0);
+
+    c.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <div><h2 style="font-size:22px;font-weight:800">💸 دفع الموردين (سندات صرف)</h2>
+            <p style="font-size:13px;color:#64748B;margin-top:4px">تسجيل المدفوعات للموردين — مرتبطة بالخزنة ورصيد المورد</p></div>
+            <button class="mod-btn mod-btn-primary" onclick="payOpenAdd()">+ صرف دفعة جديدة</button>
+        </div>
+
+        ${isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
+            📴 <strong>غير متصل بالإنترنت</strong> — بيانات الموردين المعروضة من آخر نسخة محفوظة (${offlineDataAge ? new Date(offlineDataAge).toLocaleString('ar-EG') : '—'}). الدفع هيتسجّل محلياً ويتزامن تلقائياً لما الاتصال يرجع.
+        </div>` : ''}
+
+        <div class="mod-grid">
+            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💵</div><div class="mod-card-val">${payFmt(totalPaid)}</div><div class="mod-card-lbl">إجمالي المدفوع</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">📋</div><div class="mod-card-val">${payments.length}</div><div class="mod-card-lbl">سند صرف</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${payFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين (${debtSuppliers.length})</div></div>
+        </div>
+
+        ${paySuppliersDebtListHTML(debtSuppliers)}
+
+        <div class="mod-table-wrap" style="margin-top:16px">
+            <table class="mod-table"><thead><tr>
+                <th>الرقم</th><th>المورد</th><th>التاريخ</th><th style="text-align:left">المبلغ</th><th>الحالة</th><th></th>
+            </tr></thead>
+            <tbody>
+                ${displayRows.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>💸</span>لا توجد مدفوعات.</td></tr>` :
+                displayRows.map(p => `<tr>
+                    <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
+                    <td><strong>${p.suppliers?.name || '—'}</strong></td>
+                    <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
+                    <td style="text-align:left;font-weight:700;color:#059669">${payFmt(p.amount)}</td>
+                    <td>${p._queue
+                        ? (p.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
+                        : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
+                    <td>${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>`}</td>
+                </tr>`).join('')}
+            </tbody></table>
+        </div>
+    `;
+}
+
+// تقدير محلي تراكمي لرصيد الموردين (نفس منطق colApplyPendingEstimates)
+async function payApplyPendingEstimates(suppliers) {
+    if (typeof getQueue !== 'function') return suppliers;
+    try {
+        const pending = await getQueue(e => e.module === 'payments' && (e.status === 'pending' || e.status === 'failed' || e.status === 'syncing'));
+        if (!pending.length) return suppliers;
+        const bySupp = {};
+        for (const e of pending) {
+            bySupp[e.payload.supplier_id] = (bySupp[e.payload.supplier_id] || 0) + (Number(e.payload.amount) || 0);
+        }
+        return suppliers.map(s => bySupp[s.id] ? { ...s, balance: (Number(s.balance) || 0) - bySupp[s.id] } : s);
+    } catch { return suppliers; }
 }
 
 function paySuppliersDebtListHTML(debtSuppliers) {
@@ -160,7 +204,32 @@ window.paySave = async function() {
     if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
 
     const btn = document.querySelector('#payModal .mod-btn-primary');
-    btn.innerText = 'جاري الصرف...'; btn.disabled = true;
+    btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
+
+    if (typeof isOnline === 'function' && !isOnline()) {
+        try {
+            const supp = _paySuppliers.find(x => x.id === suppId);
+            const estBalanceAfter = (Number(supp?.balance) || 0) - amount;
+            await queueWrite({
+                module: 'payments', kind: 'payment',
+                payload: {
+                    ref: ref || 'PAY-' + Date.now(),
+                    supplier_id: suppId, amount, status: 'confirmed',
+                    created_by: currentUser?.id || null,
+                    _estBalanceAfter: estBalanceAfter,
+                },
+            });
+            payCloseModal('payModal');
+            if (typeof offlineToast === 'function') offlineToast('⏳ اتسجّل محلياً — هيتزامن تلقائياً لما الاتصال يرجع', 'info');
+            renderPayments(document.getElementById('app-content'));
+        } catch (err) {
+            alert('خطأ أثناء الحفظ المحلي: ' + err.message);
+        } finally {
+            btn.innerText = '💾 صرف الدفعة'; btn.disabled = false;
+        }
+        return;
+    }
+
     try {
         // INSERT فقط — الـ trigger بيتكفّل بـ: خصم الخزنة + تقليل رصيد المورد + القيد المحاسبي
         const { error } = await sb.from('supplier_payments').insert({
@@ -182,6 +251,32 @@ window.paySave = async function() {
     } catch (err) { alert('خطأ أثناء الصرف: ' + err.message); }
     finally { btn.innerText = '💾 صرف الدفعة'; btn.disabled = false; }
 };
+
+// ════════════════════════════════════════════════════════════
+// 5) مزامنة عمليات الدفع المعلّقة (Phase 1 — دعم الأوفلاين)
+// ════════════════════════════════════════════════════════════
+if (typeof registerSyncHandler === 'function') {
+    registerSyncHandler('payment', async (entry) => {
+        const { _estBalanceAfter, ...payload } = entry.payload;
+        try {
+            const { error } = await sb.from('supplier_payments').insert(payload);
+            if (error) return { ok: false, error: error.message, summary: `دفعة ${payload.ref}` };
+
+            const flags = [];
+            try {
+                const { data: freshSupp } = await sb.from('suppliers').select('balance').eq('id', payload.supplier_id).maybeSingle();
+                if (freshSupp && _estBalanceAfter != null) {
+                    const diff = Math.abs((Number(freshSupp.balance) || 0) - Number(_estBalanceAfter));
+                    if (diff > 0.01) flags.push(`الرصيد الفعلي بعد المزامنة (${payFmt(freshSupp.balance)}) يختلف عن التقدير وقت الأوفلاين (${payFmt(_estBalanceAfter)})`);
+                }
+            } catch {}
+
+            return { ok: true, summary: `دفعة ${payload.ref} — ${payFmt(payload.amount)} ج.م`, flags };
+        } catch (err) {
+            return { ok: false, error: err.message || String(err), summary: `دفعة ${payload.ref}` };
+        }
+    });
+}
 
 // ════════════════════════════════════════════════════════════
 // 4) أدوات مساعدة

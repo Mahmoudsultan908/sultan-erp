@@ -303,7 +303,24 @@ async function _offlineDoSync() {
 }
 
 // ════════════════════════════════════════════════════════════
-// 5) شارة الاتصال في الشريط العلوي (يستدعيها app.js عند بناء الواجهة)
+// 5) إشعار خفيف عام (يستخدمه أي موديول بدل alert() لعمليات الأوفلاين)
+// ════════════════════════════════════════════════════════════
+function offlineToast(msg, type = 'info') {
+    let t = document.getElementById('offlineToastEl');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'offlineToastEl'; t.className = 'offline-toast';
+        document.body.appendChild(t);
+    }
+    t.className = 'offline-toast ' + type;
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(window._offlineToastT);
+    window._offlineToastT = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// ════════════════════════════════════════════════════════════
+// 6) شارة الاتصال في الشريط العلوي (يستدعيها app.js عند بناء الواجهة)
 // ════════════════════════════════════════════════════════════
 async function offlineUpdateBadge() {
     const el = document.getElementById('topbarOffline');
@@ -328,5 +345,5 @@ Object.assign(window, {
     queueWrite, getQueue, updateQueueEntry, removeQueueEntry,
     appendReconciliation, getReconciliation, resolveReconciliation,
     registerSyncHandler, trySync,
-    offlineUpdateBadge, offlineBroadcast,
+    offlineUpdateBadge, offlineBroadcast, offlineToast,
 });
