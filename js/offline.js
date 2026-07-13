@@ -108,20 +108,29 @@ async function dbGetCache(table) {
 async function offlineWarmCache() {
     if (typeof sb === 'undefined') return;
     try {
-        const [{ data: products, error: e1 }, { data: customers, error: e2 }, { data: suppliers, error: e3 }] = await Promise.all([
+        const [
+            { data: products, error: e1 }, { data: customers, error: e2 }, { data: suppliers, error: e3 },
+            { data: warehouses, error: e4 }, { data: expenseCategories, error: e5 },
+        ] = await Promise.all([
             sb.from('products').select('*').eq('is_active', true).order('name'),
             sb.from('customers').select('*').eq('is_active', true).order('name'),
             sb.from('suppliers').select('*').eq('is_active', true).order('name'),
+            sb.from('warehouses').select('*').order('name'),
+            sb.from('expense_categories').select('*').order('name'),
         ]);
         console.log('[offline] نتيجة تسخين الكاش الأولي:', {
             products: products?.length, productsErr: e1?.message,
             customers: customers?.length, customersErr: e2?.message,
             suppliers: suppliers?.length, suppliersErr: e3?.message,
+            warehouses: warehouses?.length, warehousesErr: e4?.message,
+            expenseCategories: expenseCategories?.length, expenseCategoriesErr: e5?.message,
         });
         await Promise.all([
             dbSetCache('products', products || []),
             dbSetCache('customers', customers || []),
             dbSetCache('suppliers', suppliers || []),
+            dbSetCache('warehouses', warehouses || []),
+            dbSetCache('expense_categories', expenseCategories || []),
         ]);
     } catch (err) {
         console.error('[offline] فشل تسخين الكاش الأولي:', err);
