@@ -31,27 +31,48 @@ let invEditingOldInvoiceNo = null;
 // 0) تحميل البيانات الحية من Supabase
 // ════════════════════════════════════════════════════════════
 async function invLoadData() {
-    const [
-        { data: products },
-        { data: customers },
-        { data: warehouses },
-        { data: stockRows },
-        { data: lastSale },
-        { data: invCounterRow },
-        { data: priceLevels },
-        { data: productPrices },
-        { data: customerGroups },
-    ] = await Promise.all([
-        sb.from('products').select('*').eq('is_active', true).order('name'),
-        sb.from('customers').select('*').eq('is_active', true).order('name'),
-        sb.from('warehouses').select('*').order('name'),
-        sb.from('inventory_stock').select('warehouse_id, product_id, qty'),
-        sb.from('sales').select('invoice_no').order('created_at', { ascending: false }).limit(1),
-        sb.from('app_settings').select('value').eq('key', 'invoice_counter').maybeSingle(),
-        sb.from('price_levels').select('*').order('sort_order'),
-        sb.from('product_prices').select('product_id, price, price_levels(code)'),
-        sb.from('customer_groups').select('id, price_levels(code)'),
-    ]);
+    let products, customers, warehouses, stockRows, lastSale, invCounterRow, priceLevels, productPrices, customerGroups;
+    let liveLoadFailed = false;
+
+    try {
+        const results = await Promise.all([
+            sb.from('products').select('*').eq('is_active', true).order('name'),
+            sb.from('customers').select('*').eq('is_active', true).order('name'),
+            sb.from('warehouses').select('*').order('name'),
+            sb.from('inventory_stock').select('warehouse_id, product_id, qty'),
+            sb.from('sales').select('invoice_no').order('created_at', { ascending: false }).limit(1),
+            sb.from('app_settings').select('value').eq('key', 'invoice_counter').maybeSingle(),
+            sb.from('price_levels').select('*').order('sort_order'),
+            sb.from('product_prices').select('product_id, price, price_levels(code)'),
+            sb.from('customer_groups').select('id, price_levels(code)'),
+        ]);
+        [
+            { data: products }, { data: customers }, { data: warehouses }, { data: stockRows },
+            { data: lastSale }, { data: invCounterRow }, { data: priceLevels }, { data: productPrices }, { data: customerGroups },
+        ] = results;
+        // فشل شبكي حقيقي (أوفلاين) بيرجّع صفوف كلها null بدل ما يرمي استثناء —
+        // لو الصنف الأساسي (products) فاضي تماماً، نعتبرها فشلة ونرجع للكاش
+        if (!products) liveLoadFailed = true;
+    } catch (err) {
+        liveLoadFailed = true;
+    }
+
+    // ★ فشل التحميل الحي (على الأغلب أوفلاين)؟ ارجع لآخر نسخة محفوظة في
+    //   الكاش (offline.js) — عشان المستخدم يقدر على الأقل يستعرض/يركّب
+    //   فاتورة بالأصناف اللي كانت متاحة آخر مرة، حتى لو الحفظ نفسه لسه
+    //   مش متاح أوفلاين (المرحلة دي جاية لاحقاً — راجع خطة الأوفلاين).
+    INV_DB.isOfflineData = false;
+    INV_DB.offlineDataAge = null;
+    if (liveLoadFailed && typeof dbGetCache === 'function') {
+        const [cp, cc, cw] = await Promise.all([dbGetCache('products'), dbGetCache('customers'), dbGetCache('warehouses')]);
+        if (cp?.data?.length || cc?.data?.length) {
+            products = cp?.data || [];
+            customers = cc?.data || [];
+            warehouses = cw?.data || [];
+            INV_DB.isOfflineData = true;
+            INV_DB.offlineDataAge = Math.min(cp?.updatedAt || Infinity, cc?.updatedAt || Infinity);
+        }
+    }
 
     INV_DB.products = products || [];
     INV_DB.customers = customers || [];
@@ -59,9 +80,11 @@ async function invLoadData() {
     INV_DB.priceLevels = priceLevels || [];
 
     // كاش للمراجعة الأوفلاين (offline.js) — قراءة فقط، بيتحدّث تلقائياً كل ما شاشة المبيعات تفتح أونلاين
-    if (typeof dbSetCache === 'function') {
+    // (بس لو البيانات دي جاية أونلاين فعلاً، مش رجّاعة من الكاش نفسه)
+    if (!INV_DB.isOfflineData && typeof dbSetCache === 'function') {
         dbSetCache('products', INV_DB.products);
         dbSetCache('customers', INV_DB.customers);
+        dbSetCache('warehouses', INV_DB.warehouses);
     }
 
     // خريطة أسعار المنتجات: 'productId|LEVELCODE' => price
@@ -220,6 +243,9 @@ async function renderSales(c) {
         ${invEditingId ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
             <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على الفاتورة <strong>${invEditingOldInvoiceNo}</strong>. عند الحفظ: هتتلغي الفاتورة القديمة تلقائياً (مع إرجاع المخزون والرصيد) وتتسجّل فاتورة جديدة بالتعديلات.</span>
             <button class="inv-top-btn" style="padding:4px 10px" onclick="invEditingId=null;invEditingOldInvoiceNo=null;renderSales(document.getElementById('app-content'))">إلغاء التعديل</button>
+        </div>` : ''}
+        ${INV_DB.isOfflineData ? `<div style="background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
+            📴 <strong>غير متصل بالإنترنت</strong> — الأصناف والعملاء المعروضة من آخر نسخة محفوظة (${INV_DB.offlineDataAge ? new Date(INV_DB.offlineDataAge).toLocaleString('ar-EG') : '—'})، وممكن ماتكونش محدّثة. <strong>حفظ الفاتورة مش متاح لحد ما الاتصال يرجع.</strong>
         </div>` : ''}
         ${invHeaderHTML()}
         <div class="inv-main">
@@ -974,6 +1000,13 @@ async function invReverseOldForEdit() {
 }
 
 async function invSave(andNew) {
+    // ★ حفظ فاتورة مبيعات وإحنا أوفلاين لسه مش مدعوم (خطة الأوفلاين
+    //   بتوصل لشاشة المبيعات في المرحلة 3، بعد التحصيل/الدفع/المصروفات) —
+    //   نمنع بوضوح بدل ما نسيب المحاولة تفشل بأخطاء Supabase مربكة.
+    if (typeof isOnline === 'function' && !isOnline()) {
+        invToast('📴 لا يوجد اتصال بالإنترنت — حفظ الفواتير أوفلاين لسه مش متاح، حاول تاني لما الاتصال يرجع', 'error');
+        return;
+    }
     const filled = invItems.filter(i => i.pid && (i.qty||0) > 0);
     if (!filled.length) { invToast('⚠️ الفاتورة فارغة — أضف أصنافاً أولاً', 'error'); return; }
 
