@@ -8,7 +8,7 @@
 //     supabase-js/xlsx, الأيقونات) → cache-first مع تحديث في الخلفية،
 //     عشان التطبيق نفسه (مش بياناته) يفتح حتى بدون إنترنت.
 
-const SHELL_CACHE = 'sultan-erp-shell-v1';
+const SHELL_CACHE = 'sultan-erp-shell-v2';
 const SUPABASE_HOST = 'fanaozxqlodzfdgstwaz.supabase.co';
 
 const SHELL_URLS = [
@@ -102,22 +102,22 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // قشرة التطبيق + مكتبات CDN: cache-first + تحديث في الخلفية.
-    // لو المصدر ده مش متخزّن أصلاً (أول زيارة أوفلاين قبل ما install
-    // يخلّص) والشبكة فشلت كمان، نرجّع Response حقيقي بدل undefined
-    // (تسبيب "Failed to convert value to Response" لو سابناها للـ catch بس).
+    // قشرة التطبيق + مكتبات CDN: network-first + رجوع للكاش لو الشبكة
+    // فشلت. عمداً مش cache-first — التطبيق ده بيتعدّل باستمرار وقت
+    // التطوير، وcache-first كان بيسبب ظهور كود قديم فعلياً بعد أي تعديل
+    // (المستخدم بيفتح الصفحة فيلاقي نسخة الأمس رغم إن الملف اتغيّر على
+    // القرص) لحد ما sw.js نفسه يتغيّر ويعمل install جديد. أونلاين، الشبكة
+    // دايماً أسرع كفاية والفريش أهم من التخزين المؤقت. أوفلاين بس بيرجع
+    // للكاش.
     event.respondWith(
-        caches.match(event.request).then((cached) => {
-            const network = fetch(event.request)
-                .then((resp) => {
-                    if (resp && (resp.ok || resp.type === 'opaque')) {
-                        const clone = resp.clone();
-                        caches.open(SHELL_CACHE).then((cache) => cache.put(event.request, clone));
-                    }
-                    return resp;
-                })
-                .catch(() => cached || new Response('غير متاح أوفلاين', { status: 503 }));
-            return cached || network;
-        })
+        fetch(event.request)
+            .then((resp) => {
+                if (resp && (resp.ok || resp.type === 'opaque')) {
+                    const clone = resp.clone();
+                    caches.open(SHELL_CACHE).then((cache) => cache.put(event.request, clone));
+                }
+                return resp;
+            })
+            .catch(() => caches.match(event.request).then((cached) => cached || new Response('غير متاح أوفلاين', { status: 503 })))
     );
 });
