@@ -43,7 +43,7 @@
 .dash-muted { color:#94A3B8; font-size:12px; }
 .dash-amount { font-weight:800; color:#0F172A; }
 .dash-inv-no { font-family:'Courier New',monospace; font-weight:700; color:#3B82F6; direction:ltr; display:inline-block; }
-.dash-badge { padding:3px 10px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.dash-badge { padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; }
 .dash-badge-green { background:#F0FDF4; color:#059669; }
 .dash-badge-blue { background:#EFF6FF; color:#2563EB; }
 .dash-s-green { color:#059669; font-weight:700; }
@@ -56,7 +56,7 @@
 .dash-cust-bal { font-size:14px; font-weight:800; margin-top:2px; }
 .dash-limit-bar { height:6px; background:#F1F5F9; border-radius:6px; overflow:hidden; margin-top:6px; }
 .dash-limit-fill { height:100%; border-radius:6px; transition:width .3s; }
-.dash-cust-hint { font-size:10.5px; color:#94A3B8; margin-top:3px; }
+.dash-cust-hint { font-size:11.5px; color:#94A3B8; margin-top:3px; }
 
 /* ── أكثر مبيعاً ── */
 .dash-top-item { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #F8FAFC; font-size:13px; }
@@ -69,7 +69,7 @@
 .dash-low-item { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #F8FAFC; }
 .dash-low-item:last-child { border-bottom:none; }
 .dash-low-name { font-size:13px; font-weight:700; color:#1E293B; }
-.dash-low-code { font-size:10.5px; color:#94A3B8; direction:ltr; text-align:right; }
+.dash-low-code { font-size:11.5px; color:#94A3B8; direction:ltr; text-align:right; }
 .dash-low-qty { font-weight:800; font-size:13px; padding:3px 10px; border-radius:8px; }
 .dash-low-warn { background:#FFFBEB; color:#D97706; }
 .dash-low-zero { background:#FEF2F2; color:#DC2626; }
@@ -85,7 +85,7 @@
 /* ════════════════════════════════════════════
    inventory.js — مخزون
    ════════════════════════════════════════════ */
-.inv-qty-cell small { color:#94A3B8; font-size:10.5px; }
+.inv-qty-cell small { color:#94A3B8; font-size:11.5px; }
 .inv-qty { font-weight:800; font-size:14px; color:#0F172A; }
 .inv-qty-low { color:#D97706; }
 .inv-qty-zero { color:#DC2626; }

@@ -145,7 +145,7 @@ window.custShowStatement = async function(customerId) {
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:#64748B;margin-bottom:4px">الرصيد الحالي</div>
                     <div style="font-size:22px;font-weight:800;color:${balNow>0?'#DC2626':balNow<0?'#059669':'#64748B'}">${custFmt(balNow)} ج.م</div>
-                    <div style="font-size:10px;color:#94A3B8">${balNow>0?'مدين (لنا عليه)':balNow<0?'دائن (لنا عنده)':'مسدد'}</div>
+                    <div style="font-size:11.5px;color:#94A3B8">${balNow>0?'مدين (لنا عليه)':balNow<0?'دائن (لنا عنده)':'مسدد'}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:#64748B;margin-bottom:4px">إجمالي المبيعات (آجل)</div>
@@ -178,7 +178,7 @@ window.custShowStatement = async function(customerId) {
                         <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
                         <td>
                             ${icon} ${m.desc}
-                            ${isCash ? '<span style="font-size:10px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
+                            ${isCash ? '<span style="font-size:11.5px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
                         </td>
                         <td style="text-align:left;font-weight:600;color:#DC2626">${m.debit?custFmt(m.debit):'—'}</td>
                         <td style="text-align:left;font-weight:600;color:#059669">${m.credit?custFmt(m.credit):'—'}</td>

@@ -144,7 +144,7 @@ window.supShowStatement = async function(supplierId) {
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:#64748B;margin-bottom:4px">المستحق حالياً</div>
                     <div style="font-size:22px;font-weight:800;color:${balNow>0?'#DC2626':'#059669'}">${supFmt(Math.abs(balNow))} ج.م</div>
-                    <div style="font-size:10px;color:#94A3B8">${balNow>0?'مستحق عليه لنا':balNow<0?'لنا عنده (مقدم)':'مسدد'}</div>
+                    <div style="font-size:11.5px;color:#94A3B8">${balNow>0?'مستحق عليه لنا':balNow<0?'لنا عنده (مقدم)':'مسدد'}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:#64748B;margin-bottom:4px">إجمالي المشتريات (آجل)</div>
@@ -177,7 +177,7 @@ window.supShowStatement = async function(supplierId) {
                         <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
                         <td>
                             ${icon} ${m.desc}
-                            ${isCash ? '<span style="font-size:10px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
+                            ${isCash ? '<span style="font-size:11.5px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
                         </td>
                         <td style="text-align:left;font-weight:600;color:#059669">${m.debit?supFmt(m.debit):'—'}</td>
                         <td style="text-align:left;font-weight:600;color:#D97706">${m.credit?supFmt(m.credit):'—'}</td>

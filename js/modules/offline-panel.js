@@ -87,7 +87,7 @@ async function opRenderReconciliation(body) {
                     <div>
                         <div style="font-weight:700;font-size:13px">${it.summary}</div>
                         <div style="font-size:11px;color:#92400E;margin-top:4px">${(it.flags || []).join(' — ')}</div>
-                        <div style="font-size:10px;color:#94A3B8;margin-top:2px">${opTimeAgo(it.at)}</div>
+                        <div style="font-size:11.5px;color:#94A3B8;margin-top:2px">${opTimeAgo(it.at)}</div>
                     </div>
                     ${!it.resolved ? `<button class="cc-edit" onclick="resolveReconciliation(${it.id}).then(()=>opRenderTab())">✅ تمت المراجعة</button>` : ''}
                 </div>

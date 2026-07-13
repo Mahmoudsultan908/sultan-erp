@@ -598,7 +598,7 @@ function invRenderItems() {
                 <input type="number" class="inv-cell-input is-num" value="${it.disc||0}" min="0" max="100" step="0.1"
                     oninput="invItems[${idx}].disc=parseFloat(this.value)||0;invUpdateRowTotal(${idx});invUpdateSummary()">
             </td>
-            <td class="inv-cell-total" id="invRowTotal-${idx}">${invFmt(lineTotal)}<div style="font-size:9px;color:${marginPct>=20?'var(--inv-green)':'var(--inv-red)'};font-weight:600">${prod && costPrice ? marginPct+'% ربح' : ''}</div></td>
+            <td class="inv-cell-total" id="invRowTotal-${idx}">${invFmt(lineTotal)}<div style="font-size:10.5px;color:${marginPct>=20?'var(--inv-green)':'var(--inv-red)'};font-weight:600">${prod && costPrice ? marginPct+'% ربح' : ''}</div></td>
             <td class="inv-cell-del">
                 <button class="inv-del-btn" onclick="invRemoveRow(${idx})">✕</button>
             </td>
@@ -623,7 +623,7 @@ function invUpdateRowTotal(idx) {
     const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
     const costPrice = prod ? invGetBuyPrice(prod) : 0;
     const marginPct = (it.price && costPrice) ? Math.round(((it.price - costPrice) / it.price) * 100) : 0;
-    el.innerHTML = `${invFmt(lineTotal)}<div style="font-size:9px;color:${marginPct>=20?'var(--inv-green)':'var(--inv-red)'};font-weight:600">${prod && costPrice ? marginPct+'% ربح' : ''}</div>`;
+    el.innerHTML = `${invFmt(lineTotal)}<div style="font-size:10.5px;color:${marginPct>=20?'var(--inv-green)':'var(--inv-red)'};font-weight:600">${prod && costPrice ? marginPct+'% ربح' : ''}</div>`;
 }
 
 function invUpdateSummary() {

@@ -183,7 +183,7 @@ function _expCatsPanelHTML(categories, catUsage) {
                     </div>
                     <div class="cc-bar-wrap">
                         <div class="limit-bar" style="margin:0"><div class="limit-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
-                        <div style="font-size:9px;color:#94A3B8;text-align:center;margin-top:2px">${pct.toFixed(0)}%</div>
+                        <div style="font-size:11px;color:#94A3B8;text-align:center;margin-top:2px">${pct.toFixed(0)}%</div>
                     </div>
                     <div class="cc-amt">
                         <div class="used">${_expFmt(used)}</div>

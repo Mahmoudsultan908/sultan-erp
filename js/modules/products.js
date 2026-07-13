@@ -96,7 +96,7 @@ function prodRenderRows() {
         const cat = _prodCategories.find(c=>c.id===p.category_id);
         const stockColor = p._totalStock <= 0 ? '#DC2626' : p._totalStock <= (p.reorder_point||0) ? '#D97706' : '#059669';
         return `<tr>
-            <td><strong>${p.name}</strong>${p.barcode?`<div style="font-size:10px;color:#94A3B8;direction:ltr;text-align:right">${p.barcode}</div>`:''}</td>
+            <td><strong>${p.name}</strong>${p.barcode?`<div style="font-size:11.5px;color:#94A3B8;direction:ltr;text-align:right">${p.barcode}</div>`:''}</td>
             <td><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace;direction:ltr;display:inline-block">${p.code||'—'}</span></td>
             <td>${cat?.name || '—'}</td>
             <td>${p.unit || p.sale_unit || '—'}</td>

@@ -107,7 +107,7 @@ function wrRenderValuation() {
             ${_wrWarehouses.length ? _wrWarehouses.map(w => {
                 const agg = byWh[w.id] || { itemCount: 0, qtyTotal: 0, value: 0 };
                 return `<tr>
-                    <td><strong>${w.name}</strong>${w.is_main ? ' <span style="font-size:10px;color:#94A3B8">(رئيسي)</span>' : ''}</td>
+                    <td><strong>${w.name}</strong>${w.is_main ? ' <span style="font-size:11.5px;color:#94A3B8">(رئيسي)</span>' : ''}</td>
                     <td style="text-align:center">${agg.itemCount}</td>
                     <td style="text-align:center">${wrFmt(agg.qtyTotal)}</td>
                     <td style="text-align:left;font-weight:700">${wrFmt(agg.value)}</td>
@@ -126,7 +126,7 @@ function wrRenderValuation() {
             <th>الصنف</th><th>المخزن</th><th style="text-align:center">الكمية</th><th style="text-align:left">تكلفة الوحدة</th><th style="text-align:left">القيمة</th>
         </tr></thead><tbody>
             ${topRows.length ? topRows.map(r => `<tr>
-                <td><strong>${r.name}</strong>${!r.active ? ' <span style="font-size:10px;color:#DC2626">(غير نشط)</span>' : ''}${r.code ? `<div style="font-size:11px;color:#94A3B8">${r.code}</div>` : ''}</td>
+                <td><strong>${r.name}</strong>${!r.active ? ' <span style="font-size:11.5px;color:#DC2626">(غير نشط)</span>' : ''}${r.code ? `<div style="font-size:11.5px;color:#94A3B8">${r.code}</div>` : ''}</td>
                 <td>${r.whName}</td>
                 <td style="text-align:center">${wrFmt(r.qty)} ${r.unit || ''}</td>
                 <td style="text-align:left">${wrFmt(r.cost)}</td>
