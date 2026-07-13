@@ -31,6 +31,14 @@ async function renderCustomersManage(c) {
         _mgCustClassifications = classifications || [];
         _mgCustGroups = groups || [];
         custRenderPage(c);
+
+        // ★ جاي من زرار "تعديل بيانات العميل" في كشف الحساب (customers.js) —
+        //   افتح نافذة التعديل لنفس العميل تلقائياً بدل ما المستخدم يدوّر عليه تاني
+        if (window._pendingCustomerEdit) {
+            const pendId = window._pendingCustomerEdit;
+            window._pendingCustomerEdit = null;
+            custOpenEdit(pendId);
+        }
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
@@ -206,6 +214,12 @@ async function renderSuppliersManage(c) {
         const { data: suppliers } = await sb.from('suppliers').select('*').order('name');
         _mgSuppList = suppliers || [];
         suppRenderPage(c);
+
+        if (window._pendingSupplierEdit) {
+            const pendId = window._pendingSupplierEdit;
+            window._pendingSupplierEdit = null;
+            suppOpenEdit(pendId);
+        }
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }

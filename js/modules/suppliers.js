@@ -76,7 +76,10 @@ window.supShowStatement = async function(supplierId) {
     modal.innerHTML = `
         <div class="mod-modal" style="max-width:820px">
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${sup.name}</h3>
-                <button class="mod-modal-close" onclick="supCloseModal('supStmtModal')">&times;</button></div>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="supGoEditProfile('${sup.id}')">✏️ تعديل بيانات المورد</button>
+                    <button class="mod-modal-close" onclick="supCloseModal('supStmtModal')">&times;</button>
+                </div></div>
             <div class="mod-modal-body" id="supStmtBody">
                 <div class="empty-state"><span>⏳</span>جاري تجميع الحركات...</div>
             </div>
@@ -84,23 +87,42 @@ window.supShowStatement = async function(supplierId) {
     document.body.appendChild(modal);
 
     try {
-        // جلب حركات المورد بالتوازي
+        // جلب حركات المورد بالتوازي — ★ دلوقتي بتشمل فواتير الشراء النقدية
+        // والمرتجعات كمان (كانوا ناقصين). purchase_returns معندهاش عمود
+        // payment_type بتاعها، فبنجيبه من الفاتورة الأصلية المرتبطة
+        // (purchase_id) لو موجودة — لو المرتجع مش مرتبط بفاتورة، بيتعامل
+        // معه كمعلومة بس من غير أثر على الرصيد (أأمن اختيار من غير تخمين).
         const [
             { data: purchases },
             { data: payments },
+            { data: returns },
         ] = await Promise.all([
             sb.from('purchases').select('invoice_no, total, payment_type, status, created_at')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
             sb.from('supplier_payments').select('ref, amount, status, created_at')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
+            sb.from('purchase_returns').select('return_no, total, status, created_at, purchases(payment_type)')
+                .eq('supplier_id', supplierId).order('created_at', { ascending: true }).limit(100),
         ]);
 
         // دمج الحركات + رصيد متحرك
-        // منطق المورد: الشراء الآجل = دائن (لنا عليه)، الدفع = مدين (نسدده)
+        // منطق المورد: الشراء الآجل = دائن (لنا عليه)، الدفع = مدين (نسدده)،
+        // مرتجع شراء آجل = مدين (بيقلل اللي علينا)
         const moves = [];
         (purchases||[]).forEach(p => {
-            if (p.payment_type === 'credit' && p.status === 'confirmed') {
-                moves.push({ date: p.created_at, desc: `فاتورة شراء ${p.invoice_no}`, debit: 0, credit: Number(p.total)||0, type: 'purchase' });
+            if (p.status !== 'confirmed') return;
+            if (p.payment_type === 'credit') {
+                moves.push({ date: p.created_at, desc: `فاتورة شراء ${p.invoice_no}`, debit: 0, credit: Number(p.total)||0, type: 'purchase-credit' });
+            } else {
+                moves.push({ date: p.created_at, desc: `فاتورة شراء نقدي ${p.invoice_no}`, debit: 0, credit: 0, type: 'purchase-cash' });
+            }
+        });
+        (returns||[]).forEach(r => {
+            if (r.status !== 'confirmed') return;
+            if (r.purchases?.payment_type === 'credit') {
+                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no}`, debit: Number(r.total)||0, credit: 0, type: 'return-credit' });
+            } else {
+                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no}`, debit: 0, credit: 0, type: 'return-cash' });
             }
         });
         (payments||[]).forEach(p => {
@@ -143,16 +165,25 @@ window.supShowStatement = async function(supplierId) {
                 </tr></thead>
                 <tbody>
                     ${moves.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
-                    moves.map(m => `<tr style="${m.type==='purchase'?'background:#FEF3C7':'background:#ECFDF5'}">
+                    moves.map(m => {
+                        const isCash = m.type.endsWith('-cash');
+                        const bg = m.type==='purchase-credit' ? '#FEF3C7' : m.type==='payment' ? '#ECFDF5'
+                            : m.type.startsWith('return') ? '#FFFBEB' : '#F8FAFC';
+                        const icon = m.type==='purchase-credit' ? '<span style="color:#D97706">📥</span>'
+                            : m.type==='purchase-cash' ? '<span style="color:#94A3B8">💰</span>'
+                            : m.type.startsWith('return') ? '<span style="color:#DC2626">↩️</span>'
+                            : '<span style="color:#059669">💸</span>';
+                        return `<tr style="background:${bg}">
                         <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
                         <td>
-                            ${m.type==='purchase' ? '<span style="color:#D97706">📥</span>' : '<span style="color:#059669">💸</span>'}
-                            ${m.desc}
+                            ${icon} ${m.desc}
+                            ${isCash ? '<span style="font-size:10px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
                         </td>
                         <td style="text-align:left;font-weight:600;color:#059669">${m.debit?supFmt(m.debit):'—'}</td>
                         <td style="text-align:left;font-weight:600;color:#D97706">${m.credit?supFmt(m.credit):'—'}</td>
                         <td style="text-align:left;font-weight:700">${supFmt(m.balance)}</td>
-                    </tr>`).join('')}
+                    </tr>`;
+                    }).join('')}
                 </tbody>
                 ${moves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
                     <td colspan="2">الإجمالي</td>
@@ -168,6 +199,14 @@ window.supShowStatement = async function(supplierId) {
 };
 
 window.supCloseModal = function(id) { const m = document.getElementById(id); if (m) m.remove(); };
+
+// ينقل لصفحة "إدارة الموردين" (master-data.js) ويفتح نافذة تعديل بيانات
+// نفس المورد تلقائياً — نفس فكرة custGoEditProfile في customers.js.
+window.supGoEditProfile = function(supplierId) {
+    window._pendingSupplierEdit = supplierId;
+    supCloseModal('supStmtModal');
+    document.querySelector('[data-mod="suppliers-manage"]')?.click();
+};
 
 // ════════════════════════════════════════════════════════════
 // 3) أدوات مساعدة

@@ -78,7 +78,10 @@ window.custShowStatement = async function(customerId) {
     modal.innerHTML = `
         <div class="mod-modal" style="max-width:820px">
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${cust.name}</h3>
-                <button class="mod-modal-close" onclick="custCloseModal('custStmtModal')">&times;</button></div>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
+                    <button class="mod-modal-close" onclick="custCloseModal('custStmtModal')">&times;</button>
+                </div></div>
             <div class="mod-modal-body" id="custStmtBody">
                 <div class="empty-state"><span>⏳</span>جاري تجميع الحركات...</div>
             </div>
@@ -86,23 +89,40 @@ window.custShowStatement = async function(customerId) {
     document.body.appendChild(modal);
 
     try {
-        // جلب كل حركات العميل بالتوازي
+        // جلب كل حركات العميل بالتوازي — ★ دلوقتي بتشمل الفواتير النقدية
+        // والمرتجعات كمان (كانوا ناقصين، فالمستخدم كان لازم يدوّر عليهم
+        // في شاشة تانية) — النقدي بيظهر للمراجعة بس من غير أثر على
+        // الرصيد المتحرك (لأنه اتقبض وقتها فعلاً).
         const [
             { data: sales },
             { data: payments },
+            { data: returns },
         ] = await Promise.all([
             sb.from('sales').select('invoice_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }),
             sb.from('customer_payments').select('ref, amount, status, created_at')
+                .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
+            sb.from('sales_returns').select('return_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
         ]);
 
         // دمج الحركات في timeline واحد + حساب الرصيد المتحرك
         const moves = [];
         (sales||[]).forEach(s => {
-            // الآجل بس بيزود الرصيد (مدين)؛ النقدي متساوي (مش بياثر على الرصيد)
-            if (s.payment_type === 'credit' && s.status === 'confirmed') {
-                moves.push({ date: s.created_at, desc: `فاتورة بيع ${s.invoice_no}`, debit: Number(s.total)||0, credit: 0, type: 'sale' });
+            if (s.status !== 'confirmed') return;
+            if (s.payment_type === 'credit') {
+                moves.push({ date: s.created_at, desc: `فاتورة بيع ${s.invoice_no}`, debit: Number(s.total)||0, credit: 0, type: 'sale-credit' });
+            } else {
+                // نقدي: بيتقيّد للمراجعة بس مالوش أثر على الرصيد (اتقبض وقتها)
+                moves.push({ date: s.created_at, desc: `فاتورة بيع نقدي ${s.invoice_no}`, debit: 0, credit: 0, type: 'sale-cash' });
+            }
+        });
+        (returns||[]).forEach(r => {
+            if (r.status !== 'confirmed') return;
+            if (r.payment_type === 'credit') {
+                moves.push({ date: r.created_at, desc: `مرتجع بيع ${r.return_no}`, debit: 0, credit: Number(r.total)||0, type: 'return-credit' });
+            } else {
+                moves.push({ date: r.created_at, desc: `مرتجع بيع نقدي ${r.return_no}`, debit: 0, credit: 0, type: 'return-cash' });
             }
         });
         (payments||[]).forEach(p => {
@@ -146,16 +166,25 @@ window.custShowStatement = async function(customerId) {
                 </tr></thead>
                 <tbody>
                     ${moves.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
-                    moves.map(m => `<tr style="${m.type==='sale'?'background:#FEF2F2':'background:#ECFDF5'}">
+                    moves.map(m => {
+                        const isCash = m.type.endsWith('-cash');
+                        const bg = m.type==='sale-credit' ? '#FEF2F2' : m.type==='payment' ? '#ECFDF5'
+                            : m.type==='return-credit' || m.type==='return-cash' ? '#FFFBEB' : '#F8FAFC';
+                        const icon = m.type==='sale-credit' ? '<span style="color:#DC2626">🛒</span>'
+                            : m.type==='sale-cash' ? '<span style="color:#94A3B8">💰</span>'
+                            : m.type.startsWith('return') ? '<span style="color:#D97706">↩️</span>'
+                            : '<span style="color:#059669">💵</span>';
+                        return `<tr style="background:${bg}">
                         <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
                         <td>
-                            ${m.type==='sale' ? '<span style="color:#DC2626">🛒</span>' : '<span style="color:#059669">💵</span>'}
-                            ${m.desc}
+                            ${icon} ${m.desc}
+                            ${isCash ? '<span style="font-size:10px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
                         </td>
                         <td style="text-align:left;font-weight:600;color:#DC2626">${m.debit?custFmt(m.debit):'—'}</td>
                         <td style="text-align:left;font-weight:600;color:#059669">${m.credit?custFmt(m.credit):'—'}</td>
                         <td style="text-align:left;font-weight:700">${custFmt(m.balance)}</td>
-                    </tr>`).join('')}
+                    </tr>`;
+                    }).join('')}
                 </tbody>
                 ${moves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
                     <td colspan="2">الإجمالي</td>
@@ -171,6 +200,16 @@ window.custShowStatement = async function(customerId) {
 };
 
 window.custCloseModal = function(id) { const m = document.getElementById(id); if (m) m.remove(); };
+
+// ينقل لصفحة "إدارة العملاء" (master-data.js) ويفتح نافذة تعديل بيانات
+// نفس العميل تلقائياً — قبل كده كانت الصفحتين منفصلتين تماماً من غير أي
+// رابط بينهم، فالمستخدم كان لازم يقفل كشف الحساب ويدوّر على العميل تاني
+// في شاشة تانية عشان يعدّل رقم تليفون أو حد ائتماني مثلاً.
+window.custGoEditProfile = function(customerId) {
+    window._pendingCustomerEdit = customerId;
+    custCloseModal('custStmtModal');
+    document.querySelector('[data-mod="customers-manage"]')?.click();
+};
 
 // ════════════════════════════════════════════════════════════
 // 3) أدوات مساعدة

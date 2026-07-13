@@ -76,6 +76,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
         <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="customers" onclick="loadMod(this, 'customers')">📇 كشف حساب عميل</div>
+        <div class="nav-item" data-mod="sales-reps" onclick="loadMod(this, 'sales-reps')">🚗 المندوبون</div>
 
         <div class="nav-group">المشتريات والموردين</div>
         <div class="nav-item" data-mod="purchases" onclick="loadMod(this, 'purchases')">📥 فاتورة المشتريات</div>
@@ -92,6 +93,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="stock-transfer" onclick="loadMod(this, 'stock-transfer')">🔄 تحويل مخزون</div>
         <div class="nav-item" data-mod="inventory" onclick="loadMod(this, 'inventory')">📦 المخزون</div>
         <div class="nav-item" data-mod="warehouses" onclick="loadMod(this, 'warehouses')">🏭 إدارة المخازن</div>
+        <div class="nav-item" data-mod="warehouse-reports" onclick="loadMod(this, 'warehouse-reports')">📊 تقارير المخازن</div>
 
         <div class="nav-group">المحاسبة</div>
         <div class="nav-item" data-mod="coa" onclick="loadMod(this, 'coa')">📒 شجرة الحسابات</div>
@@ -103,12 +105,6 @@ function buildLayout() {
         <div class="nav-item" data-mod="balancesheet" onclick="loadMod(this, 'balancesheet')">🏦 الميزانية العمومية</div>
 
         <div class="nav-group">🔜 قريباً</div>
-        <div class="nav-item" data-mod="warehouse-reports" onclick="loadMod(this, 'warehouse-reports')">📊 تقارير المخازن</div>
-        <div class="nav-item" data-mod="general-import-export" onclick="loadMod(this, 'general-import-export')">🔄 استيراد/تصدير عام</div>
-        <div class="nav-item" data-mod="sales-reps" onclick="loadMod(this, 'sales-reps')">🚗 المندوبون</div>
-        <div class="nav-item" data-mod="performance-reports" onclick="loadMod(this, 'performance-reports')">📈 تقارير الأداء المتقدمة</div>
-        <div class="nav-item" data-mod="advanced-permissions" onclick="loadMod(this, 'advanced-permissions')">🔐 الصلاحيات المتقدمة</div>
-        <div class="nav-item" data-mod="print-center" onclick="loadMod(this, 'print-center')">🖨️ مركز الطباعة</div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء</div>
         <div class="nav-item" data-mod="archive" onclick="loadMod(this, 'archive')">🗄️ الأرشيف</div>
         <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب</div>
@@ -119,9 +115,13 @@ function buildLayout() {
 
         <div class="nav-group">التقارير والإعدادات</div>
         <div class="nav-item" data-mod="reports" onclick="loadMod(this, 'reports')">📈 التقارير</div>
+        <div class="nav-item" data-mod="performance-reports" onclick="loadMod(this, 'performance-reports')">📈 تقارير الأداء المتقدمة</div>
+        <div class="nav-item" data-mod="general-import-export" onclick="loadMod(this, 'general-import-export')">🔄 استيراد/تصدير عام</div>
+        <div class="nav-item" data-mod="print-center" onclick="loadMod(this, 'print-center')">🖨️ مركز الطباعة</div>
         <div class="nav-item" data-mod="opening-balances" onclick="loadMod(this, 'opening-balances')">📋 الأرصدة الافتتاحية</div>
         <div class="nav-item" data-mod="settings" onclick="loadMod(this, 'settings')">⚙️ الإعدادات</div>
         <div class="nav-item" data-mod="users" onclick="loadMod(this, 'users')">👥 المستخدمون</div>
+        <div class="nav-item" data-mod="advanced-permissions" onclick="loadMod(this, 'advanced-permissions')">🔐 الصلاحيات المتقدمة</div>
         
         <div class="sidebar-footer"><span>© 2026 Sultan Food</span><span style="color:#3B82F6">v2.0</span></div>
       </aside>
@@ -129,7 +129,7 @@ function buildLayout() {
         <div class="topbar">
           <div style="display:flex;align-items:center;gap:10px">
             <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="إظهار/إخفاء القائمة (Alt+H)">☰</button>
-            <div class="topbar-title" id="topbarTitle">لوحة تحكم المصروفات</div>
+            <div class="topbar-title" id="topbarTitle">لوحة التحكم</div>
           </div>
           <div class="topbar-actions">
             <div class="badge-offline" id="topbarOffline" onclick="offlineOpenPanel()" title="حالة الاتصال والمزامنة">🟢 متصل</div>

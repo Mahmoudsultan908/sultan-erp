@@ -189,8 +189,13 @@ window.qtConvertToSale = async function(quoteId) {
         const { data: quote } = await sb.from('quotations').select('*').eq('id', quoteId).single();
         if (!items || !items.length) { alert('⚠️ لا توجد أصناف في هذا العرض'); return; }
 
-        // تجهيز بيانات التحويل — sales.js هيقرأها عند فتح الشاشة
+        // ★ العرض بيفضل "قائم" لحد ما فاتورة البيع الفعلية تتحفظ بنجاح —
+        //   sales.js هو اللي بيعلّمه "تم التحويل" بعد الحفظ، مش هنا. قبل
+        //   كده كان بيتعلّم "تم التحويل" فوراً، فلو المستخدم قفل شاشة
+        //   المبيعات من غير ما يحفظ، كان العرض بيفضل واقف على "تم
+        //   التحويل" من غير ما فاتورة حقيقية تتسجّل.
         window._pendingQuoteConversion = {
+            quoteId,
             customerId: quote.customer_id,
             items: items.map(it => ({
                 pid: it.product_id, name: it.products?.name || '', code: it.products?.code || '',
@@ -199,7 +204,6 @@ window.qtConvertToSale = async function(quoteId) {
             })),
         };
 
-        await sb.from('quotations').update({ status: 'converted' }).eq('id', quoteId);
         loadMod(document.querySelector('[data-mod="sales"]'), 'sales');
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };

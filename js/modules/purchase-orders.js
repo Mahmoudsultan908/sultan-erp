@@ -186,7 +186,13 @@ window.poConvertToPurchase = async function(orderId) {
         const { data: order } = await sb.from('purchase_orders').select('*').eq('id', orderId).single();
         if (!items || !items.length) { alert('⚠️ لا توجد أصناف في هذا الأمر'); return; }
 
+        // ★ الأمر بيفضل "قائم" لحد ما فاتورة الشراء الفعلية تتحفظ بنجاح —
+        //   purchases.js هو اللي بيعلّمه "تم الاستلام" بعد الحفظ، مش هنا.
+        //   قبل كده كان بيتعلّم "تم الاستلام" فوراً هنا، فلو المستخدم قفل
+        //   شاشة المشتريات من غير ما يحفظ، كان الأمر بيفضل واقف على "تم
+        //   الاستلام" من غير ما فاتورة شراء حقيقية أو حركة مخزون تكون حصلت.
         window._pendingPOConversion = {
+            orderId,
             supplierId: order.supplier_id,
             items: items.map(it => ({
                 pid: it.product_id, name: it.products?.name || '', code: it.products?.code || '',
@@ -196,7 +202,6 @@ window.poConvertToPurchase = async function(orderId) {
             })),
         };
 
-        await sb.from('purchase_orders').update({ status: 'received' }).eq('id', orderId);
         loadMod(document.querySelector('[data-mod="purchases"]'), 'purchases');
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };

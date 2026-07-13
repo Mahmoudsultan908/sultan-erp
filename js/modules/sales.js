@@ -26,6 +26,7 @@ let invEditingOldTotal = 0;
 let invEditingOldPayType = null;
 let invEditingOldCustId = null;
 let invEditingOldInvoiceNo = null;
+let invPendingQuoteId = null; // عرض سعر بيتحوّل حالياً — يتعلّم "تم التحويل" بعد نجاح الحفظ بس (مش قبله)
 
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات الحية من Supabase
@@ -253,6 +254,7 @@ async function renderSales(c) {
     invPriceLevelCode = '';
     invRepId = null;
     invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
+    invPendingQuoteId = null;
 
     // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
     if (window._pendingSalesEdit) {
@@ -298,6 +300,8 @@ async function renderSales(c) {
             invItems.push({ id: Date.now()+Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', stock: 0 });
         }
         if (pending.customerId) invCustId = pending.customerId;
+        // هيتعلّم "تم التحويل" بعد الحفظ الناجح فعلاً — راجع التعليق في quotations.js
+        invPendingQuoteId = pending.quoteId || null;
     }
 
     c.innerHTML = `
@@ -1142,6 +1146,7 @@ async function invSave(andNew) {
                 _stockDeltas: stockDeltas,
                 _custId: (invPayType === 'credit' && invCustId) ? invCustId : null,
                 _custEstBalanceAfter: null,
+                _quoteId: invPendingQuoteId || null,
             };
             if (payload._custId) {
                 const c = INV_DB.customers.find(x => x.id === invCustId);
@@ -1275,6 +1280,16 @@ async function invSave(andNew) {
             updated_at: new Date().toISOString(),
         });
         INV_DB.invoiceNo++;
+
+        // ★ لو الفاتورة دي جاية من تحويل عرض سعر، اتعلّم "تم التحويل" دلوقتي
+        //   بس — بعد ما فاتورة البيع الحقيقية اتسجّلت بنجاح فعلاً (راجع
+        //   التعليق في quotations.js لسبب التعديل).
+        if (invPendingQuoteId) {
+            try {
+                await sb.from('quotations').update({ status: 'converted' }).eq('id', invPendingQuoteId);
+            } catch {}
+            invPendingQuoteId = null;
+        }
 
         // لو آجل → حدّث رصيد العميل محلياً (الـ trigger في DB المفروض بيعملها)
         if (invPayType === 'credit' && invCustId) {
@@ -1600,7 +1615,7 @@ Object.assign(window, {
 // ════════════════════════════════════════════════════════════
 if (typeof registerSyncHandler === 'function') {
     registerSyncHandler('sale', async (entry) => {
-        const { tempInvoiceNo, saleRow, items, _custId, _custEstBalanceAfter, _stockDeltas } = entry.payload;
+        const { tempInvoiceNo, saleRow, items, _custId, _custEstBalanceAfter, _stockDeltas, _quoteId } = entry.payload;
         try {
             // تحقق حي من rep_id (نفس منطق invSave الأونلاين) — لو اتحذف
             // المندوب بعد ما الفاتورة اتسجّلت أوفلاين، ابعتها بدون مندوب.
@@ -1631,6 +1646,12 @@ if (typeof registerSyncHandler === 'function') {
             await sb.from('app_settings').upsert({
                 key: 'invoice_counter', value: String(counter + 1), updated_at: new Date().toISOString(),
             });
+
+            // لو الفاتورة دي جاية أصلاً من تحويل عرض سعر، اتعلّم "تم التحويل"
+            // دلوقتي بس — بعد ما فاتورة البيع اتزامنت فعلياً على السيرفر.
+            if (_quoteId) {
+                try { await sb.from('quotations').update({ status: 'converted' }).eq('id', _quoteId); } catch {}
+            }
 
             // مطابقة: قارن المخزون/رصيد العميل الفعليين (بعد الـ triggers) بالتقدير المحلي وقت الأوفلاين
             const flags = [];

@@ -25,6 +25,7 @@ let purEditingOldTotal = 0;
 let purEditingOldSupplierId = null;
 let purEditingOldPayType = null;
 let purEditingOldInvoiceNo = null;
+let purPendingPOOrderId = null; // أمر شراء بيتحوّل حالياً — يتعلّم "تم الاستلام" بعد نجاح الحفظ بس (مش قبله)
 
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات من Supabase
@@ -86,6 +87,7 @@ async function renderPurchases(c) {
     purSupplierId = null;
     purPayType = 'cash';
     purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null;
+    purPendingPOOrderId = null;
 
     // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
     if (window._pendingPurchaseEdit) {
@@ -130,6 +132,8 @@ async function renderPurchases(c) {
             purItems.push({ id: Date.now()+Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' });
         }
         if (pending.supplierId) purSupplierId = pending.supplierId;
+        // هيتعلّم "تم الاستلام" في purSave بس لو الحفظ نجح فعلاً — راجع التعليق في purchase-orders.js
+        purPendingPOOrderId = pending.orderId || null;
     }
 
     c.innerHTML = `
@@ -169,6 +173,7 @@ async function renderPurchases(c) {
                 ${purTotalsCardHTML()}
                 ${purActionsCardHTML()}
                 ${purNotesCardHTML()}
+                ${purDraftsCardHTML()}
             </div>
         </div>
     </div>`;
@@ -176,6 +181,9 @@ async function renderPurchases(c) {
     purRenderItems();
     purUpdateSummary();
     purUpdateSupplierChip();
+    purRenderDrafts();
+    purStartAutoSave();
+    setTimeout(() => { purCheckAutoSaveRestore(); }, 150);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -287,6 +295,7 @@ function purActionsCardHTML() {
     <div class="inv-actions">
         <button class="inv-btn inv-btn-save" onclick="purSave(false)" style="background:linear-gradient(135deg,#16A34A,#22C55E);box-shadow:0 4px 14px rgba(22,163,74,0.35)">💾 حفظ الفاتورة <kbd>F4</kbd></button>
         <button class="inv-btn inv-btn-new" onclick="purSave(true)">➕ حفظ وفاتورة جديدة <kbd>Alt+N</kbd></button>
+        <button class="inv-btn inv-btn-draft" onclick="purDraft()">📋 تعليق الفاتورة</button>
     </div>`;
 }
 
@@ -295,6 +304,14 @@ function purNotesCardHTML() {
     <div class="inv-card">
         <div class="inv-card-title">📝 ملاحظات</div>
         <textarea class="inv-notes" id="purNotes" rows="2" placeholder="ملاحظات الفاتورة..."></textarea>
+    </div>`;
+}
+
+function purDraftsCardHTML() {
+    return `
+    <div class="inv-card inv-drafts" id="purDraftsCard">
+        <div class="inv-card-title">📋 فواتير معلّقة <span class="inv-draft-badge" id="purDraftCount">0</span><span class="inv-autosave-badge" style="margin-right:auto"><span class="dot"></span> حفظ تلقائي</span></div>
+        <div id="purDraftsList"></div>
     </div>`;
 }
 
@@ -702,6 +719,17 @@ async function purSave(andNew) {
         await sb.from('app_settings').upsert({ key: 'purchase_counter', value: String(PUR_DB.purchaseNo + 1), updated_at: new Date().toISOString() });
         PUR_DB.purchaseNo++;
 
+        // ★ لو الفاتورة دي جاية من تحويل أمر شراء، اتعلّم "تم الاستلام"
+        //   دلوقتي بس — بعد ما فاتورة الشراء الحقيقية اتسجّلت بنجاح فعلاً،
+        //   مش قبل كده (راجع التعليق في purchase-orders.js لسبب التعديل).
+        if (purPendingPOOrderId) {
+            try {
+                await sb.from('purchase_orders').update({ status: 'received' }).eq('id', purPendingPOOrderId);
+            } catch {}
+            purPendingPOOrderId = null;
+        }
+
+        localStorage.removeItem(PUR_AUTOSAVE_KEY);
         if (purEditingId) {
             purToast(`✅ تم إلغاء فاتورة الشراء ${purEditingOldInvoiceNo} وتسجيل الفاتورة المعدّلة ${invoiceNo} — ${purFmt(net)} ج.م`, 'success');
             purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null;
@@ -728,6 +756,7 @@ async function purSave(andNew) {
 }
 function purClose() {
     if (confirm('إغلاق فاتورة المشتريات؟')) {
+        purStopAutoSave();
         document.getElementById('app-content').innerHTML = '<div class="empty-state"><span>📥</span>اضغط "المشتريات" لإنشاء فاتورة جديدة</div>';
     }
 }
@@ -735,6 +764,131 @@ function purOnWarehouseChange() {
     const sel = document.getElementById('purWarehouse');
     if (sel) purWarehouseId = sel.value;
     purRenderItems(); purUpdateSummary();
+}
+
+// ════════════════════════════════════════════════════════════
+// 7ب) المسودات (تعليق فاتورة) + الحفظ التلقائي — نفس نمط sales.js
+//     بالحرف (invDraft/invStartAutoSave...) — كان ناقص من قبل، وده كان
+//     بيعني إن أي انقطاع كهرباء أو قفل تاب غلط في نص فاتورة شراء طويلة
+//     بيضيّع كل حاجة من غير أي حماية.
+// ════════════════════════════════════════════════════════════
+const PUR_DRAFTS_KEY = 'pur_drafts';
+const PUR_AUTOSAVE_KEY = 'pur_autosave';
+
+function purGetDrafts() { try { return JSON.parse(localStorage.getItem(PUR_DRAFTS_KEY) || '[]'); } catch { return []; } }
+function purSetDrafts(arr) { localStorage.setItem(PUR_DRAFTS_KEY, JSON.stringify(arr)); }
+
+function purSnapshot() {
+    const { net } = purCalcNet();
+    return {
+        items: JSON.parse(JSON.stringify(purItems)),
+        supplierId: purSupplierId, payType: purPayType,
+        discExtra: parseFloat(document.getElementById('purDiscExtra')?.value) || 0,
+        notes: document.getElementById('purNotes')?.value || '',
+        date: document.getElementById('purDate')?.value || new Date().toISOString().split('T')[0],
+        net,
+        savedAt: Date.now(),
+    };
+}
+
+function purDraft() {
+    const filled = purItems.filter(i => i.pid);
+    if (!filled.length) { purToast('⚠️ لا يمكن تعليق فاتورة فارغة', 'error'); return; }
+    const snap = purSnapshot();
+    const drafts = purGetDrafts();
+    snap.id = Date.now();
+    snap.title = purSupplierId ? (PUR_DB.suppliers.find(s => s.id === purSupplierId)?.name || 'مورد') : 'مورد نقدي';
+    drafts.unshift(snap);
+    purSetDrafts(drafts);
+    purRenderDrafts();
+    purToast(`📋 تم تعليق فاتورة الشراء (${purFmt(snap.net)} ج.م)`, 'success');
+    renderPurchases(document.getElementById('app-content'));
+}
+
+function purRestoreDraft(id) {
+    const drafts = purGetDrafts();
+    const d = drafts.find(x => x.id === id);
+    if (!d) return;
+    if (purItems.filter(i => i.pid).length) {
+        if (!confirm('الفاتورة الحالية فيها أصناف. استبدالها بالمسودة المعلّقة؟')) return;
+    }
+    purItems = d.items; purSupplierId = d.supplierId; purPayType = d.payType;
+    document.getElementById('purDiscExtra').value = d.discExtra || 0;
+    document.getElementById('purNotes').value = d.notes || '';
+    document.getElementById('purDate').value = d.date || new Date().toISOString().split('T')[0];
+    document.getElementById('purPayType').value = d.payType;
+    purSetPayType(d.payType);
+    purRenderItems(); purUpdateSummary(); purUpdateSupplierChip();
+    purRenderDrafts();
+    purToast('♻️ تم استرجاع فاتورة الشراء المعلّقة', 'success');
+}
+
+function purDeleteDraft(id, ev) {
+    ev?.stopPropagation();
+    const drafts = purGetDrafts().filter(x => x.id !== id);
+    purSetDrafts(drafts);
+    purRenderDrafts();
+    purToast('🗑️ تم حذف المسودة', 'info');
+}
+
+function purRenderDrafts() {
+    const card = document.getElementById('purDraftsCard');
+    const list = document.getElementById('purDraftsList');
+    const cnt  = document.getElementById('purDraftCount');
+    if (!card) return;
+    const drafts = purGetDrafts();
+    card.classList.toggle('has', drafts.length > 0);
+    if (cnt) cnt.textContent = drafts.length;
+    if (!list) return;
+    list.innerHTML = drafts.slice(0, 8).map(d => `
+        <div class="inv-draft-item" onclick="purRestoreDraft(${d.id})">
+            <span class="di-ic">📥</span>
+            <div class="di-info">
+                <div class="di-title">${d.title || 'مورد نقدي'}</div>
+                <div class="di-sub">${purTimeAgo(d.savedAt)} · ${d.items.filter(i=>i.pid).length} صنف</div>
+            </div>
+            <span class="di-amt">${purFmt(d.net)}</span>
+            <button class="di-del" onclick="purDeleteDraft(${d.id},event)" title="حذف">✕</button>
+        </div>`).join('');
+}
+
+function purTimeAgo(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return 'الآن';
+    if (s < 3600) return Math.floor(s / 60) + ' دقيقة';
+    if (s < 86400) return Math.floor(s / 3600) + ' ساعة';
+    return Math.floor(s / 86400) + ' يوم';
+}
+
+let _purAutoSaveTimer = null;
+function purStartAutoSave() {
+    purStopAutoSave();
+    _purAutoSaveTimer = setInterval(() => {
+        const filled = purItems.filter(i => i.pid);
+        if (filled.length) {
+            localStorage.setItem(PUR_AUTOSAVE_KEY, JSON.stringify(purSnapshot()));
+        }
+    }, 5000);
+}
+function purStopAutoSave() { if (_purAutoSaveTimer) { clearInterval(_purAutoSaveTimer); _purAutoSaveTimer = null; } }
+function purCheckAutoSaveRestore() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(PUR_AUTOSAVE_KEY) || 'null');
+        if (saved && saved.items && saved.items.filter(i => i.pid).length) {
+            const mins = Math.floor((Date.now() - (saved.savedAt || 0)) / 60000);
+            if (confirm(`♻️ يوجد فاتورة شراء محفوظة تلقائياً (${mins} دقيقة). استعادتها؟`)) {
+                purItems = saved.items; purSupplierId = saved.supplierId; purPayType = saved.payType;
+                document.getElementById('purDiscExtra').value = saved.discExtra || 0;
+                document.getElementById('purNotes').value = saved.notes || '';
+                document.getElementById('purDate').value = saved.date || new Date().toISOString().split('T')[0];
+                document.getElementById('purPayType').value = saved.payType;
+                purSetPayType(saved.payType);
+                purRenderItems(); purUpdateSummary(); purUpdateSupplierChip();
+                purToast('♻️ تمت استعادة فاتورة الشراء المحفوظة', 'success');
+            }
+            localStorage.removeItem(PUR_AUTOSAVE_KEY);
+        }
+    } catch {}
 }
 
 // ════════════════════════════════════════════════════════════
@@ -769,11 +923,13 @@ function purGlobalKeys(e) {
         const k = e.key.toLowerCase();
         if (k === 's') { e.preventDefault(); purSave(false); return; }         // Alt+S حفظ
         if (k === 'n') { e.preventDefault(); purSave(true); return; }          // Alt+N فاتورة جديدة
+        if (k === 'd') { e.preventDefault(); purDraft(); return; }             // Alt+D تعليق
         if (k === 'f') { e.preventDefault(); document.getElementById('purFastSearch')?.focus(); return; }  // Alt+F بحث صنف
         return;
     }
-    // F4 فقط (F3=بحث الصفحة وF5=تحديث محجوزين في كروم ولا يمكن منعهما فعلياً)
+    // F4/F8 فقط (F3=بحث الصفحة وF5=تحديث محجوزين في كروم ولا يمكن منعهما فعلياً)
     if (e.key === 'F4') { e.preventDefault(); purSave(false); }
+    else if (e.key === 'F8') { e.preventDefault(); purDraft(); }
     else if (e.key === 'Escape') {
         const open = document.querySelector('.inv-ac.show');
         if (open) open.classList.remove('show');
@@ -787,4 +943,5 @@ Object.assign(window, {
     purOnName, purOnNameKey, purOnCode, purRowKey, purUpdateSummary, purUpdateRowTotal,
     purRowACHover, purSuppACHover, purFastHover,
     purOnWarehouseChange,
+    purDraft, purRestoreDraft, purDeleteDraft,
 });
