@@ -633,32 +633,24 @@ function purCalcChange() {
 
 // ═══════════════ INSERT فقط — الـ Triggers تتولى الباقي ═══════════════
 async function purReverseOldForEdit() {
-    // 1) علّم فاتورة الشراء القديمة كملغاة
-    await sb.from('purchases').update({ status: 'cancelled' }).eq('id', purEditingId);
+    // ★ عملية واحدة ذرّية في قاعدة البيانات بدل 3 نداءات منفصلة —
+    //   راجع نفس التعليق في invReverseOldForEdit (sales.js) وملف
+    //   edit_reversal_atomic_migration.sql.
+    const { error } = await sb.rpc('fn_reverse_purchase_for_edit', { p_purchase_id: purEditingId });
+    if (error) throw error;
 
-    // 2) اخصم الكمية اللي كانت اتضافت للمخزون وقت فاتورة الشراء القديمة
+    // تحديث الكاش المحلي (تقدير للعرض بس) بنفس القيم اللي السيرفر طبّقها فعلاً
     if (purEditingOldWarehouse) {
         for (const it of purEditingOldItems) {
             const need = Number(it.qty) || 0;
             if (!it.product_id || !need) continue;
-            const { data: stockRow } = await sb.from('inventory_stock')
-                .select('id, qty').eq('warehouse_id', purEditingOldWarehouse).eq('product_id', it.product_id).maybeSingle();
-            if (stockRow) {
-                await sb.from('inventory_stock').update({ qty: (Number(stockRow.qty) || 0) - need }).eq('id', stockRow.id);
-            }
             const key = purEditingOldWarehouse + '|' + it.product_id;
             PUR_DB.stockMap[key] = (PUR_DB.stockMap[key] || 0) - need;
         }
     }
-
-    // 3) ارجع رصيد المورد لو كانت الفاتورة القديمة آجلة
     if (purEditingOldPayType === 'credit' && purEditingOldSupplierId) {
-        const { data: supRow } = await sb.from('suppliers').select('balance').eq('id', purEditingOldSupplierId).maybeSingle();
-        if (supRow) {
-            await sb.from('suppliers').update({ balance: (Number(supRow.balance) || 0) - purEditingOldTotal }).eq('id', purEditingOldSupplierId);
-            const s = PUR_DB.suppliers.find(x => x.id === purEditingOldSupplierId);
-            if (s) s.balance = (Number(s.balance) || 0) - purEditingOldTotal;
-        }
+        const s = PUR_DB.suppliers.find(x => x.id === purEditingOldSupplierId);
+        if (s) s.balance = (Number(s.balance) || 0) - purEditingOldTotal;
     }
 }
 

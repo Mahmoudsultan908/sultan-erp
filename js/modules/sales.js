@@ -1034,34 +1034,26 @@ function invCheckAutoSaveRestore() {
 }
 
 async function invReverseOldForEdit() {
-    // 1) علّم الفاتورة القديمة كملغاة
-    await sb.from('sales').update({ status: 'cancelled' }).eq('id', invEditingId);
+    // ★ الإلغاء + إرجاع المخزون + إرجاع الرصيد كانوا 3 نداءات منفصلة من
+    //   المتصفح — لو حصل قطع اتصال في النص، ممكن يفضل المخزون أو الرصيد
+    //   متسق جزئياً بس. دلوقتي عملية واحدة ذرّية في قاعدة البيانات
+    //   (fn_reverse_sale_for_edit — راجع edit_reversal_atomic_migration.sql)،
+    //   كلها بتنجح أو كلها بترجع. نفس الحسابات بالظبط اللي كانت هنا.
+    const { error } = await sb.rpc('fn_reverse_sale_for_edit', { p_sale_id: invEditingId });
+    if (error) throw error;
 
-    // 2) ارجع الكمية المخصومة من المخزون وقت الفاتورة القديمة
+    // تحديث الكاش المحلي (تقدير للعرض بس) بنفس القيم اللي السيرفر طبّقها فعلاً
     if (invEditingOldWarehouse) {
         for (const it of invEditingOldItems) {
             const need = (Number(it.qty) || 0) + (Number(it.free_qty) || 0);
             if (!it.product_id || !need) continue;
-            const { data: stockRow } = await sb.from('inventory_stock')
-                .select('id, qty').eq('warehouse_id', invEditingOldWarehouse).eq('product_id', it.product_id).maybeSingle();
-            if (stockRow) {
-                await sb.from('inventory_stock').update({ qty: (Number(stockRow.qty) || 0) + need }).eq('id', stockRow.id);
-            } else {
-                await sb.from('inventory_stock').insert({ warehouse_id: invEditingOldWarehouse, product_id: it.product_id, qty: need });
-            }
             const key = invEditingOldWarehouse + '|' + it.product_id;
             INV_DB.stockMap[key] = (INV_DB.stockMap[key] || 0) + need;
         }
     }
-
-    // 3) ارجع رصيد العميل لو كانت الفاتورة القديمة آجلة
     if (invEditingOldPayType === 'credit' && invEditingOldCustId) {
-        const { data: custRow } = await sb.from('customers').select('balance').eq('id', invEditingOldCustId).maybeSingle();
-        if (custRow) {
-            await sb.from('customers').update({ balance: (Number(custRow.balance) || 0) - invEditingOldTotal }).eq('id', invEditingOldCustId);
-            const c = INV_DB.customers.find(x => x.id === invEditingOldCustId);
-            if (c) c.balance = (Number(c.balance) || 0) - invEditingOldTotal;
-        }
+        const c = INV_DB.customers.find(x => x.id === invEditingOldCustId);
+        if (c) c.balance = (Number(c.balance) || 0) - invEditingOldTotal;
     }
 }
 
