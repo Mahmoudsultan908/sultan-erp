@@ -51,18 +51,22 @@ async function renderReturns(c) {
         if (typeof dbSetCache === 'function') {
             dbSetCache('customers', RET_DB.customers);
             dbSetCache('suppliers', RET_DB.suppliers);
+            dbSetCache('inventory_stock', r5.data || []);
         }
     } catch (err) {
         // فشل التحميل الحي (أوفلاين أو خطأ شبكة) → ارجع لآخر نسخة محفوظة في الكاش
-        // (المخزون نفسه مش متاح أوفلاين — بيفضل فاضي وبيتقدّر بس من طابور المرتجعات المعلّقة)
         if (typeof dbGetCache === 'function') {
-            const [cc, cs, cp, cw] = await Promise.all([dbGetCache('customers'), dbGetCache('suppliers'), dbGetCache('products'), dbGetCache('warehouses')]);
+            const [cc, cs, cp, cw, csk] = await Promise.all([dbGetCache('customers'), dbGetCache('suppliers'), dbGetCache('products'), dbGetCache('warehouses'), dbGetCache('inventory_stock')]);
             if (cc?.data?.length || cp?.data?.length) {
                 RET_DB.customers = cc?.data || [];
                 RET_DB.suppliers = cs?.data || [];
                 RET_DB.products = cp?.data || [];
                 RET_DB.warehouses = cw?.data || [];
+                // ★ لازم نبني الخريطة من الكاش، مش نسيبها فاضية — من غيرها كل
+                //   تقدير مخزون أوفلاين بيبدأ من صفر بدل الرصيد الحقيقي (نفس
+                //   المشكلة اللي ظهرت فعلياً في sales.js — راجع الجلسة).
                 RET_DB.stockMap = {};
+                (csk?.data || []).forEach(r => { RET_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0; });
                 RET_DB.isOfflineData = true;
                 RET_DB.offlineDataAge = Math.min(cc?.updatedAt || Date.now(), cp?.updatedAt || Date.now());
             } else {

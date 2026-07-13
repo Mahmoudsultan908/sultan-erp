@@ -111,6 +111,7 @@ async function offlineWarmCache() {
         const [
             { data: products, error: e1 }, { data: customers, error: e2 }, { data: suppliers, error: e3 },
             { data: warehouses, error: e4 }, { data: expenseCategories, error: e5 }, { data: recentSales, error: e6 },
+            { data: inventoryStock, error: e7 },
         ] = await Promise.all([
             sb.from('products').select('*').eq('is_active', true).order('name'),
             sb.from('customers').select('*').eq('is_active', true).order('name'),
@@ -121,6 +122,11 @@ async function offlineWarmCache() {
             // تلاقي الفاتورة الأصلية وإحنا أوفلاين (وضع "مرتبط بفاتورة")
             sb.from('sales').select('*, sale_items(*, products(name,code,unit)), customers(name)')
                 .order('created_at', { ascending: false }).limit(150),
+            // ★ أرصدة المخزون الحقيقية — بدونها، أي تقدير مخزون أوفلاين
+            //   (sales.js/returns.js) بيبدأ من صفر بدل الرصيد الحقيقي، وده
+            //   بيولّد فرق ثابت وهمي في تقرير المطابقة لكل عملية أوفلاين
+            //   (نفس المشكلة اللي ظهرت فعلياً — راجع نقاش الجلسة).
+            sb.from('inventory_stock').select('warehouse_id, product_id, qty'),
         ]);
         console.log('[offline] نتيجة تسخين الكاش الأولي:', {
             products: products?.length, productsErr: e1?.message,
@@ -129,6 +135,7 @@ async function offlineWarmCache() {
             warehouses: warehouses?.length, warehousesErr: e4?.message,
             expenseCategories: expenseCategories?.length, expenseCategoriesErr: e5?.message,
             recentSales: recentSales?.length, recentSalesErr: e6?.message,
+            inventoryStock: inventoryStock?.length, inventoryStockErr: e7?.message,
         });
         await Promise.all([
             dbSetCache('products', products || []),
@@ -137,6 +144,7 @@ async function offlineWarmCache() {
             dbSetCache('warehouses', warehouses || []),
             dbSetCache('expense_categories', expenseCategories || []),
             dbSetCache('recent_sales', recentSales || []),
+            dbSetCache('inventory_stock', inventoryStock || []),
         ]);
     } catch (err) {
         console.error('[offline] فشل تسخين الكاش الأولي:', err);

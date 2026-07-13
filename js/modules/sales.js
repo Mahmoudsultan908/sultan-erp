@@ -64,11 +64,15 @@ async function invLoadData() {
     INV_DB.isOfflineData = false;
     INV_DB.offlineDataAge = null;
     if (liveLoadFailed && typeof dbGetCache === 'function') {
-        const [cp, cc, cw] = await Promise.all([dbGetCache('products'), dbGetCache('customers'), dbGetCache('warehouses')]);
+        const [cp, cc, cw, cs] = await Promise.all([dbGetCache('products'), dbGetCache('customers'), dbGetCache('warehouses'), dbGetCache('inventory_stock')]);
         if (cp?.data?.length || cc?.data?.length) {
             products = cp?.data || [];
             customers = cc?.data || [];
             warehouses = cw?.data || [];
+            // ★ مهم: من غير الرجوع لهنا، stockRows بتفضل null والمخزون
+            //   بيتقدّر من صفر بدل الرصيد الحقيقي المخزّن — ده كان بيسبب
+            //   فرق ثابت وهمي في تقرير المطابقة لكل عملية أوفلاين (راجع الجلسة).
+            stockRows = cs?.data || [];
             INV_DB.isOfflineData = true;
             INV_DB.offlineDataAge = Math.min(cp?.updatedAt || Infinity, cc?.updatedAt || Infinity);
         }
@@ -85,6 +89,7 @@ async function invLoadData() {
         dbSetCache('products', INV_DB.products);
         dbSetCache('customers', INV_DB.customers);
         dbSetCache('warehouses', INV_DB.warehouses);
+        dbSetCache('inventory_stock', stockRows || []);
     }
 
     // خريطة أسعار المنتجات: 'productId|LEVELCODE' => price
@@ -498,7 +503,7 @@ function invActionsCardHTML() {
     <div class="inv-actions">
         <button class="inv-btn inv-btn-save" onclick="invSave(false)">💾 حفظ الفاتورة <kbd>F4</kbd></button>
         <button class="inv-btn inv-btn-new"  onclick="invSave(true)">➕ حفظ وفاتورة جديدة <kbd>Alt+N</kbd></button>
-        <button class="inv-btn inv-btn-print" onclick="invPrint()">🖨️ حفظ وطباعة</button>
+        <button class="inv-btn inv-btn-print" onclick="invSaveAndPrint()">🖨️ حفظ وطباعة</button>
         <button class="inv-btn inv-btn-draft" onclick="invDraft()">📋 تعليق الفاتورة</button>
     </div>`;
 }
@@ -1064,11 +1069,11 @@ async function invSave(andNew) {
     //   محتاج اتصال. الحفظ العادي (فاتورة جديدة) هو المدعوم أوفلاين.
     if (invEditingId && offline) {
         invToast('📴 تعديل فاتورة موجودة محتاج اتصال بالإنترنت — التعديل هيتاح تاني لما الاتصال يرجع', 'error');
-        return;
+        return false;
     }
 
     const filled = invItems.filter(i => i.pid && (i.qty||0) > 0);
-    if (!filled.length) { invToast('⚠️ الفاتورة فارغة — أضف أصنافاً أولاً', 'error'); return; }
+    if (!filled.length) { invToast('⚠️ الفاتورة فارغة — أضف أصنافاً أولاً', 'error'); return false; }
 
     const { subtotal, rowsDisc, extra, net } = invCalcNet();
     const invoiceNo = 'INV-' + String(INV_DB.invoiceNo).padStart(4, '0');
@@ -1085,7 +1090,7 @@ async function invSave(andNew) {
         }
         if (warnings.length) {
             const proceed = confirm('⚠️ تحذير نقص مخزون:\n\n' + warnings.join('\n') + '\n\nهل تريد المتابعة؟ (سيصبح المخزون بالسالب)');
-            if (!proceed) return;
+            if (!proceed) return false;
         }
     }
 
@@ -1095,7 +1100,7 @@ async function invSave(andNew) {
         const limit = Number(c?.credit_limit) || 0;
         if (limit > 0 && (Number(c?.balance)||0) + net > limit) {
             const over = ((Number(c?.balance)||0) + net - limit).toFixed(2);
-            if (!confirm(`⚠️ تجاوز الحد الائتماني!\n\nالعميل: ${c.name}\nالحد: ${invFmt(limit)} ج.م\nالرصيد الحالي: ${invFmt(c.balance)} ج.م\nالفاتورة: ${invFmt(net)} ج.م\nالتجاوز: ${over} ج.م\n\nهل تريد المتابعة؟`)) return;
+            if (!confirm(`⚠️ تجاوز الحد الائتماني!\n\nالعميل: ${c.name}\nالحد: ${invFmt(limit)} ج.م\nالرصيد الحالي: ${invFmt(c.balance)} ج.م\nالفاتورة: ${invFmt(net)} ج.م\nالتجاوز: ${over} ج.م\n\nهل تريد المتابعة؟`)) return false;
         }
     }
 
@@ -1167,7 +1172,7 @@ async function invSave(andNew) {
                 const badge = document.querySelector('.inv-no-badge');
                 if (badge) badge.textContent = payload.tempInvoiceNo;
             }
-            return;
+            return true;
         }
 
         // ★ لو في وضع تعديل: ألغِ الفاتورة القديمة وارجع المخزون والرصيد قبل إنشاء النسخة الجديدة
@@ -1297,8 +1302,13 @@ async function invSave(andNew) {
         if (andNew) {
             renderSales(document.getElementById('app-content'));
         } else {
-            document.querySelector('.inv-no-badge').textContent = 'INV-' + String(INV_DB.invoiceNo).padStart(4, '0');
+            // ★ نعرض رقم الفاتورة اللي اتحفظت فعلاً (invoiceNo، محسوب قبل
+            //   الزيادة فوق) مش INV_DB.invoiceNo (اتزود بالفعل، بيمثّل
+            //   الرقم *الجاي* مش اللي اتسجّل دلوقتي) — قبل كده كان البادج
+            //   بيعرض رقم غلط بعد أي حفظ عادي (غير "حفظ وفاتورة جديدة").
+            document.querySelector('.inv-no-badge').textContent = invoiceNo;
         }
+        return true;
     } catch (err) {
         // ★ نطبع تفاصيل الخطأ كاملة (message/details/hint/code) بدل الاكتفاء بـ message —
         //   عشان نعرف بالظبط أي constraint اتكسر (ممكن يكون invoice_no مكرر
@@ -1307,11 +1317,17 @@ async function invSave(andNew) {
             message: err.message, details: err.details, hint: err.hint, code: err.code, raw: err,
         });
         alert('❌ خطأ أثناء حفظ الفاتورة: ' + err.message + (err.details ? '\n\nتفاصيل: ' + err.details : '') + (err.hint ? '\nاقتراح: ' + err.hint : ''));
+        return false;
     } finally {
         saveBtns.forEach(b => { b.disabled = false; });
     }
 }
-async function invPrint() {
+
+// previousBalanceOverride: اختياري — رصيد العميل *قبل* الفاتورة دي بالظبط.
+// لازم يتبعت صراحة من invSaveAndPrint لأن invSave بيحدّث رصيد العميل محلياً
+// (تفاؤلياً) فور نجاحه، فلو invPrint قرا الرصيد من INV_DB.customers بعد
+// ما invSave يشتغل، هيلاقي الرصيد *بعد* الفاتورة مش قبلها.
+async function invPrint(previousBalanceOverride) {
     const filled = invItems.filter(i => i.pid && (i.qty||0) > 0);
     if (!filled.length) { invToast('⚠️ لا توجد أصناف لطباعتها', 'error'); return; }
     const { subtotal, extra, net } = invCalcNet();
@@ -1329,9 +1345,21 @@ async function invPrint() {
         paymentType: invPayType,
         items: filled.map(it => ({ name: it.name, qty: it.qty, unit_price: it.price, line_total: (it.qty||0)*(it.price||0)*(1-(it.disc||0)/100) })),
         subtotal, discount: extra, total: net,
-        previousBalance: cust?.balance || 0,
+        previousBalance: previousBalanceOverride != null ? previousBalanceOverride : (cust?.balance || 0),
         paidAmount: paid,
     });
+}
+
+// زرار "حفظ وطباعة": يحفظ الفاتورة فعلياً الأول (invSave)، وبس لو الحفظ
+// نجح فعلاً بيطبع (invPrint) — قبل كده كان بيطبع مباشرة من غير ما يحفظ
+// خالص، رغم إن اسم الزرار بيوعد بالحفظ (بيخلي "الرصيد الساري" في الإيصال
+// غلط لو اتطبع قبل ما الفاتورة تتحفظ فعلياً). بنلقط رصيد العميل *قبل*
+// الحفظ صراحةً هنا، عشان invSave بيحدّثه محلياً فور النجاح.
+async function invSaveAndPrint() {
+    const cust = invCustId ? INV_DB.customers.find(x=>x.id===invCustId) : null;
+    const previousBalance = cust?.balance || 0;
+    const ok = await invSave(false);
+    if (ok) await invPrint(previousBalance);
 }
 function invClose() {
     if (confirm('إغلاق الفاتورة؟ سيتم فقدان التغييرات غير المحفوظة.')) {
@@ -1551,7 +1579,7 @@ function invShortcutList() {
 
 // تصدير الدوال اللي بتشتغل من onclick داخل HTML
 Object.assign(window, {
-    invSave, invPrint, invDraft, invClose, invAddRow, invRemoveRow, invFocusRow,
+    invSave, invPrint, invSaveAndPrint, invDraft, invClose, invAddRow, invRemoveRow, invFocusRow,
     invSetPayType, invSetCash, invSetExactCash, invCalcChange, invTogglePayType,
     invSelectCustomer, invClearCustomer, invPickProduct, invPickInline,
     invOnName, invOnNameKey, invOnCode, invRowKey, invUpdateSummary, invUpdateRowTotal, invSetPriceLevel,

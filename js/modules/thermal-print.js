@@ -7,7 +7,17 @@
    (قابلة للتعديل من صفحة الإعدادات الموجودة أصلاً)
    ════════════════════════════════════════════════════════════ */
 
-function tpFmt(n) { return (Number(n)||0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+// ★ en-US مش ar-EG عمداً: ar-EG بيرجّع أرقام هندية شرقية (٢٬٥٠٤٫٠٠) في أغلب
+//   المتصفحات، مش الأرقام الغربية (2,504.00) المطلوبة فعلياً في التصميم —
+//   نفس الاتفاقية المستخدمة في كل الموديولات التانية (invFmt/custFmt/...).
+function tpFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+// تاريخ/وقت بأرقام غربية يدوياً بدل toLocaleString — عشان نضمن نفس الصيغة
+// (HH:MM DD/MM/YYYY) بالظبط زي التصميم المرجعي، من غير ما نعتمد على سلوك
+// اللغة الافتراضي في متصفح المستخدم.
+function tpDateStr(d) {
+    const p = (n) => String(n).padStart(2, '0');
+    return `${p(d.getHours())}:${p(d.getMinutes())} ${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`;
+}
 
 async function tpGetCompanyInfo() {
     const { data } = await sb.from('app_settings').select('key,value').in('key', ['company_name','company_phone','company_address']);
@@ -47,7 +57,7 @@ async function printThermalReceipt(type, data) {
 // على شكل وصل القبض/الصرف والمرتجعات اللي بتفضل مستخدمة الرأس الافتراضي.
 // ════════════════════════════════════════════════════════════
 function tpWrapper(company, title, bodyHTML, customHeaderHTML) {
-    const now = new Date().toLocaleString('ar-EG', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    const now = tpDateStr(new Date());
     const defaultHeader = `
     <div class="tp-center">
         <div class="tp-company-name">${company.name}</div>
@@ -130,10 +140,16 @@ function tpBuildSaleHeaderHTML(company) {
 }
 
 function tpBuildSaleHTML(company, data) {
-    const newBalance = (data.previousBalance||0) + (data.paymentType==='credit' ? data.total : 0);
+    // ★ مطابق للتصميم المرجعي (شكل فاتورة المبيعات.png) بالحساب العكسي من
+    //   أرقام حقيقية فيه: الفاتورة 2,504.00 + الرصيد الساري 1,038.50 =
+    //   الاجمالى 3,542.50 بالظبط — يعني "الرصيد الساري" هو رصيد العميل
+    //   *قبل* الفاتورة دي (مش بعدها)، و"الاجمالى" هو إجمالي المستحق كله
+    //   (الفاتورة + الرصيد السابق)، و"الباقي" = الاجمالى - المدفوع.
+    const previousBalance = data.previousBalance || 0;
+    const grandTotal = previousBalance + (data.total || 0);
     const paid = data.paidAmount != null ? data.paidAmount : (data.paymentType === 'cash' ? data.total : 0);
-    const remaining = Math.max(0, data.total - paid);
-    const now = new Date().toLocaleString('ar-EG', { hour:'2-digit', minute:'2-digit', day:'numeric', month:'2-digit', year:'numeric' });
+    const remaining = Math.max(0, grandTotal - paid);
+    const now = tpDateStr(new Date());
 
     const body = `
     <div class="tps-meta-row"><span>الرقم : ${data.invoiceNo}</span><span>التاريخ : ${now}</span></div>
@@ -157,11 +173,11 @@ function tpBuildSaleHTML(company, data) {
     <table class="tps-totals">
         <tr>
             <td><span class="lbl">الفاتورة</span><span class="val">${tpFmt(data.total)} ج.م</span></td>
-            <td><span class="lbl">الرصيد الساري</span><span class="val">${tpFmt(newBalance)} ج.م</span></td>
+            <td><span class="lbl">الرصيد الساري</span><span class="val">${tpFmt(previousBalance)} ج.م</span></td>
         </tr>
         <tr>
+            <td><span class="lbl">الاجمالى</span><span class="val">${tpFmt(grandTotal)} ج.م</span></td>
             <td><span class="lbl">المدفوع</span><span class="val">${tpFmt(paid)} ج.م</span></td>
-            <td><span class="lbl">الاجمالى</span><span class="val">${tpFmt(data.subtotal)} ج.م</span></td>
         </tr>
         <tr>
             <td><span class="lbl">الباقي</span><span class="val">${tpFmt(remaining)} ج.م</span></td>
