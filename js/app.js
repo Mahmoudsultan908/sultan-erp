@@ -157,13 +157,16 @@ async function setupApp() {
         offlineUpdateBadge();
         if (isOnline() && typeof offlineWarmCache === 'function') offlineWarmCache(); // تسخين الكاش في الخلفية، مش بلوكينج
     }
-    try {
-        const { data: cash } = await sb.rpc('get_cash_balance');
-        document.getElementById('topbarCash').textContent = '💰 ' + (cash || 0).toFixed(2) + ' ج.م';
-    } catch(e) {
-        document.getElementById('topbarCash').textContent = '💰 0.00 ج.م';
-    }
-    
+    // ★ رصيد الخزينة في الشريط العلوي مش لازم يوقف فتح الداشبورد — بيجري
+    //   بالتوازي في الخلفية ويحدّث نفسه أول ما يوصل، بدل ما يأخر أول عرض للصفحة.
+    sb.rpc('get_cash_balance').then(({ data: cash }) => {
+        const el = document.getElementById('topbarCash');
+        if (el) el.textContent = '💰 ' + (cash || 0).toFixed(2) + ' ج.م';
+    }).catch(() => {
+        const el = document.getElementById('topbarCash');
+        if (el) el.textContent = '💰 0.00 ج.م';
+    });
+
     loadMod(document.querySelector('[data-mod="dashboard"]'), 'dashboard');
 }
 
