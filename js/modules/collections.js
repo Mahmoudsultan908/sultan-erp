@@ -11,6 +11,7 @@ let _colCustomers = [];
 let _colSelectedId = null;
 let _colList = [];
 let _colTreasuries = [];
+let _colEditingId = null; // معرّف سند التحصيل الجاري تعديله (مودال التعديل)
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -87,26 +88,38 @@ async function renderCollections(c) {
 
         ${colDebtListHTML(debtCustomers)}
 
-        <div class="mod-table-wrap" style="margin-top:16px">
-            <table class="mod-table"><thead><tr>
+        <div class="mod-card" style="padding:12px 16px;margin-top:16px;display:flex;align-items:center;gap:10px">
+            <input type="text" id="colHistSearch" class="mod-form-input" style="margin:0;max-width:280px" placeholder="🔍 بحث في السجل بالعميل..." oninput="colFilterHistory()">
+        </div>
+
+        <div class="mod-table-wrap" style="margin-top:10px">
+            <table class="mod-table" id="colHistTable"><thead><tr>
                 <th>الرقم</th><th>العميل</th><th>التاريخ</th><th style="text-align:left">المبلغ</th><th>الحالة</th><th></th>
             </tr></thead>
             <tbody>
                 ${displayRows.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>💵</span>لا توجد تحصيلات.</td></tr>` :
-                displayRows.map(p => `<tr>
+                displayRows.map(p => `<tr data-name="${(p.customers?.name||'').toLowerCase()}">
                     <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
                     <td><strong>${p.customers?.name || '—'}</strong></td>
                     <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
                     <td style="text-align:left;font-weight:700;color:#059669">${colFmt(p.amount)}</td>
                     <td>${p._queue
                         ? (p.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
-                        : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
-                    <td>${p._queue ? '' : `<button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button>`}</td>
+                        : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:#94A3B8;font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="colOpenEditModal('${p.id}')">✏️ تعديل</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
     `;
 }
+
+// فلترة سجل التحصيلات المعروض حسب اسم العميل (بحث فوري داخل الصفوف المعروضة فعلاً)
+window.colFilterHistory = function() {
+    const term = (document.getElementById('colHistSearch')?.value || '').trim().toLowerCase();
+    document.querySelectorAll('#colHistTable tbody tr[data-name]').forEach(tr => {
+        tr.style.display = (!term || tr.dataset.name.includes(term)) ? '' : 'none';
+    });
+};
 
 // تقدير محلي تراكمي لرصيد العملاء: يطرح كل عمليات التحصيل المعلّقة في
 // الطابور (لسه ماتزامنتش) من الرصيد المعروض، عشان لو فتحت "تحصيل" تاني
@@ -163,6 +176,7 @@ window.colOpenAdd = function(presetCustomerId = null) {
                 <button class="mod-modal-close" onclick="colCloseModal('colModal')">&times;</button></div>
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>العميل *</label>
+                    <input type="text" id="colCustFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث بالاسم / الهاتف / الكود" oninput="colFilterCustList('colCustId')" autocomplete="off">
                     <select id="colCustId" class="mod-form-input" onchange="colOnCustChange()">
                         <option value="">-- اختر العميل --</option>
                         ${_colCustomers.map(c => `<option value="${c.id}" ${c.id===presetCustomerId?'selected':''}>${c.name} ${c.balance>0?'(مستحق '+colFmt(c.balance)+')':''}</option>`).join('')}
@@ -196,6 +210,27 @@ window.colCloseModal = function(id) { const m = document.getElementById(id); if 
 window.colOnCustChange = function() {
     _colSelectedId = document.getElementById('colCustId').value;
     colPreview();
+};
+
+// فلترة قايمة اختيار العميل (بالاسم/الهاتف/الكود) — مستخدمة في مودال
+// الإضافة (colCustId + colCustFilter) ومودال التعديل (colEditCustId +
+// colEditCustFilter)، بنفس الدالة عن طريق تمرير id السيلكت.
+window.colFilterCustList = function(selectId) {
+    selectId = selectId || 'colCustId';
+    const filterId = selectId === 'colCustId' ? 'colCustFilter' : 'colEditCustFilter';
+    const term = (document.getElementById(filterId)?.value || '').trim().toLowerCase();
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const current = sel.value;
+    const list = term
+        ? _colCustomers.filter(c => (c.name||'').toLowerCase().includes(term) || (c.phone||'').includes(term) || (c.code||'').toLowerCase().includes(term))
+        : _colCustomers;
+    sel.innerHTML = `<option value="">-- اختر العميل --</option>` +
+        list.map(c => `<option value="${c.id}" ${c.id===current?'selected':''}>${c.name} ${c.balance>0?'(مستحق '+colFmt(c.balance)+')':''}</option>`).join('');
+    if (current && !list.some(c => c.id === current)) {
+        const kept = _colCustomers.find(c => c.id === current);
+        if (kept) sel.insertAdjacentHTML('beforeend', `<option value="${kept.id}" selected>${kept.name} (مختار حالياً)</option>`);
+    }
 };
 
 window.colPreview = function() {
@@ -274,6 +309,119 @@ window.colSave = async function() {
         renderCollections(document.getElementById('app-content'));
     } catch (err) { alert('خطأ أثناء التحصيل: ' + err.message); }
     finally { btn.innerText = '💾 تحصيل الدفعة'; btn.disabled = false; }
+};
+
+// ════════════════════════════════════════════════════════════
+// 3ب) تعديل سند تحصيل مؤكّد بعد الحفظ
+// نفس فلسفة js/modules/invoice-review.js تماماً: ممنوع UPDATE مباشر على
+// صف مؤكّد (trigger fn_block_amount_edit_after_confirm بيمنع أي تعديل
+// غير تغيير status لـ cancelled) — فبدل ما نعدّل السطر القديم، بنلغيه
+// (UPDATE status='cancelled'، والـ trigger fn_customer_payment_status_
+// change بيرجّع الخزنة ورصيد العميل ويعكس القيد تلقائياً — كله في نفس
+// الـ UPDATE الواحد، يعني ذرّي من غير حاجة لـ RPC إضافية) وبعدين نسجّل
+// سند جديد بالبيانات المعدّلة (نفس مسار الحفظ العادي).
+// ════════════════════════════════════════════════════════════
+window.colOpenEditModal = function(id) {
+    const p = _colList.find(x => x.id === id);
+    if (!p) return alert('تعذّر العثور على سند التحصيل');
+    if (p.status !== 'confirmed') return alert('هذا السند غير مؤكد بالفعل ولا يمكن تعديله');
+    _colEditingId = id;
+
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'colEditModal';
+    modal.innerHTML = `
+        <div class="mod-modal">
+            <div class="mod-modal-header"><h3>✏️ تعديل سند تحصيل ${p.ref||''}</h3>
+                <button class="mod-modal-close" onclick="colCloseModal('colEditModal')">&times;</button></div>
+            <div class="mod-modal-body">
+                <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 12px;border-radius:8px;margin-bottom:14px;font-size:12px">
+                    ⚠️ الحفظ هيلغي سند التحصيل القديم تلقائياً (المبلغ يرجع لرصيد العميل والخزنة) ويسجّل سنداً جديداً بالبيانات المعدّلة — حفاظاً على سجل تاريخي كامل، بدل التعديل المباشر.
+                </div>
+                <div class="mod-form-group"><label>العميل *</label>
+                    <input type="text" id="colEditCustFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث بالاسم / الهاتف / الكود" oninput="colFilterCustList('colEditCustId')" autocomplete="off">
+                    <select id="colEditCustId" class="mod-form-input">
+                        <option value="">-- اختر العميل --</option>
+                        ${_colCustomers.map(c => `<option value="${c.id}" ${c.id===p.customer_id?'selected':''}>${c.name} ${c.balance>0?'(مستحق '+colFmt(c.balance)+')':''}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="mod-form-group"><label>المبلغ المحصّل (ج.م) *</label>
+                    <input type="number" id="colEditAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="${Number(p.amount)||0}">
+                </div>
+                <div class="mod-form-group"><label>المرجع / البيان</label>
+                    <input type="text" id="colEditRef" class="mod-form-input" value="${p.ref||''}">
+                </div>
+                <div class="mod-form-group"><label>الخزنة</label>
+                    <select id="colEditTreasuryId" class="mod-form-input">
+                        ${_colTreasuries.map(t => `<option value="${t.id}" ${t.id===p.treasury_id?'selected':(!p.treasury_id&&t.is_default?'selected':'')}>${t.name}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="colCloseModal('colEditModal')">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" onclick="colSaveEdit()">💾 حفظ التعديل</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+};
+
+window.colSaveEdit = async function() {
+    const oldId = _colEditingId;
+    if (!oldId) return;
+    const custId = document.getElementById('colEditCustId').value;
+    const amount = parseFloat(document.getElementById('colEditAmount').value);
+    const ref = document.getElementById('colEditRef').value.trim();
+    const treasuryId = document.getElementById('colEditTreasuryId').value || null;
+    if (!custId) return alert('اختر العميل');
+    if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
+
+    if (typeof isOnline === 'function' && !isOnline()) {
+        alert('📴 تعديل سند تحصيل موجود محتاج اتصال بالإنترنت — حاول تاني لما الاتصال يرجع');
+        return;
+    }
+
+    const btn = document.querySelector('#colEditModal .mod-btn-primary');
+    btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
+
+    try {
+        // 1) إلغاء السند القديم — UPDATE واحد ذرّي، الـ trigger بيرجّع
+        //    الخزنة ورصيد العميل ويعكس القيد المحاسبي تلقائياً.
+        const { error: cancelErr } = await sb.from('customer_payments').update({ status: 'cancelled' }).eq('id', oldId);
+        if (cancelErr) throw cancelErr;
+
+        // 2) تسجيل سند جديد بالبيانات المعدّلة (نفس مسار colSave العادي)
+        const { error: insErr } = await sb.from('customer_payments').insert({
+            ref: ref || 'COL-' + Date.now(),
+            customer_id: custId,
+            amount,
+            status: 'confirmed',
+            treasury_id: treasuryId,
+            created_by: currentUser?.id || null,
+        });
+        if (insErr) {
+            // السند القديم اتلغى فعلاً (ورجع الرصيد/الخزنة) لكن السند
+            // الجديد فشل — نوضّح للمستخدم إن الإلغاء تم بنجاح ومحتاج
+            // يسجّل السند الصحيح يدوياً من "تحصيل دفعة جديدة".
+            alert('⚠️ تم إلغاء السند القديم بنجاح (رجع المبلغ لرصيد العميل والخزنة)، لكن فشل تسجيل السند الجديد المعدّل: ' + insErr.message + '\n\nسجّل السند بالبيانات الصحيحة يدوياً من زرار "تحصيل دفعة جديدة".');
+            colCloseModal('colEditModal');
+            _colEditingId = null;
+            renderCollections(document.getElementById('app-content'));
+            return;
+        }
+
+        colCloseModal('colEditModal');
+        _colEditingId = null;
+        try {
+            const { data: cash } = await sb.rpc('get_cash_balance');
+            const tb = document.getElementById('topbarCash');
+            if (tb) tb.textContent = '💰 ' + (cash || 0).toFixed(2) + ' ج.م';
+        } catch {}
+        renderCollections(document.getElementById('app-content'));
+    } catch (err) {
+        alert('❌ خطأ أثناء تعديل التحصيل: ' + err.message);
+    } finally {
+        btn.innerText = '💾 حفظ التعديل'; btn.disabled = false;
+    }
 };
 
 // ════════════════════════════════════════════════════════════
