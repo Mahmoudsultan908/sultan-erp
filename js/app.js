@@ -90,6 +90,7 @@ function buildLayout() {
 
         <div class="nav-group">المالية والمخزن</div>
         <div class="nav-item" data-mod="expenses" onclick="loadMod(this, 'expenses')">💸 المصروفات</div>
+        <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="stock-transfer" onclick="loadMod(this, 'stock-transfer')">🔄 تحويل مخزون</div>
         <div class="nav-item" data-mod="inventory" onclick="loadMod(this, 'inventory')">📦 المخزون</div>
         <div class="nav-item" data-mod="warehouses" onclick="loadMod(this, 'warehouses')">🏭 إدارة المخازن</div>
@@ -206,6 +207,7 @@ window.loadMod = async function(el, modName) {
         'journal': 'القيود اليومية',
         'ledger': 'الأستاذ العام',
         'cash-movement': 'حركة الخزينة التفصيلية',
+        'treasury': 'الخزن',
         'audit-log': 'سجل التدقيق',
         'trialbalance': 'ميزان المراجعة',
         'balancesheet': 'الميزانية العمومية',
@@ -254,6 +256,7 @@ window.loadMod = async function(el, modName) {
     if (modName === 'journal' && typeof renderJournalView === 'function') await renderJournalView(c);
     if (modName === 'ledger' && typeof renderGeneralLedger === 'function') await renderGeneralLedger(c);
     if (modName === 'cash-movement' && typeof renderCashMovement === 'function') await renderCashMovement(c);
+    if (modName === 'treasury' && typeof renderTreasury === 'function') await renderTreasury(c);
     if (modName === 'audit-log' && typeof renderAuditLog === 'function') await renderAuditLog(c);
     if (modName === 'trialbalance' && typeof renderTrialBalance === 'function') await renderTrialBalance(c);
     if (modName === 'balancesheet' && typeof renderBalanceSheet === 'function') await renderBalanceSheet(c);

@@ -13,7 +13,8 @@ let _cmTo = '';
 const CASH_REF_LABELS = {
     sale: 'بيع', purchase: 'شراء', expense: 'مصروف',
     collection: 'تحصيل عميل', payment: 'دفع مورد',
-    reversal: 'عكس عملية', opening_balance: 'رصيد افتتاحي'
+    reversal: 'عكس عملية', opening_balance: 'رصيد افتتاحي',
+    treasury_transfer: 'تحويل بين الخزن', balance_transfer: 'تحويل أرصدة'
 };
 
 function cmFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
