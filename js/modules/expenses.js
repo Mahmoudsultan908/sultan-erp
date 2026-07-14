@@ -171,33 +171,53 @@ function _expCatsPanelHTML(categories, catUsage) {
         <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0">
             <div style="font-size:14px;font-weight:800;color:#0F172A">دليل بنود المصروفات والحدود الشهرية</div>
             <div style="font-size:12px;color:#64748B;margin-top:4px">عدّل الحد الشهري لكل بند — الاستهلاك يُحتسب من مصروفات الشهر الحالي</div>
+            <div class="mod-form-group" style="margin:12px 0 0;max-width:320px">
+                <input type="text" id="expCatSearch" class="mod-form-input" placeholder="🔍 بحث عن بند بالاسم..." oninput="expFilterCatItems(this.value)">
+            </div>
         </div>
         <div style="padding:16px 20px">
-            ${categories.map(c => {
-                const used = catUsage[c.id] || 0;
-                const lim = parseFloat(c.monthly_limit) || 0;
-                const pct = lim > 0 ? (used / lim) * 100 : 0;
-                const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'safe';
-                return `<div class="cat-card">
-                    <div class="cc-ic">📋</div>
-                    <div class="cc-info">
-                        <div class="cc-name">${c.name}</div>
-                        <div class="cc-sub">${c.code || 'بدون كود'} · ${c.subtype || 'operating'} · حساب: ${c.account_code || '—'}</div>
-                    </div>
-                    <div class="cc-bar-wrap">
-                        <div class="limit-bar" style="margin:0"><div class="limit-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
-                        <div style="font-size:11px;color:#94A3B8;text-align:center;margin-top:2px">${pct.toFixed(0)}%</div>
-                    </div>
-                    <div class="cc-amt">
-                        <div class="used">${_expFmt(used)}</div>
-                        <div class="lim">/ ${lim > 0 ? _expFmt(lim) : '∞'}</div>
-                    </div>
-                    <button class="cc-edit" onclick="expOpenLimit('${c.id}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})">✏️ الحد</button>
-                </div>`;
-            }).join('')}
+            <div id="expCatsList">
+                ${categories.map(c => {
+                    const used = catUsage[c.id] || 0;
+                    const lim = parseFloat(c.monthly_limit) || 0;
+                    const pct = lim > 0 ? (used / lim) * 100 : 0;
+                    const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'safe';
+                    return `<div class="cat-card" data-cat-name="${(c.name || '').toLowerCase()}">
+                        <div class="cc-ic">📋</div>
+                        <div class="cc-info">
+                            <div class="cc-name">${c.name}</div>
+                            <div class="cc-sub">${c.code || 'بدون كود'} · ${c.subtype || 'operating'} · حساب: ${c.account_code || '—'}</div>
+                        </div>
+                        <div class="cc-bar-wrap">
+                            <div class="limit-bar" style="margin:0"><div class="limit-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+                            <div style="font-size:11px;color:#94A3B8;text-align:center;margin-top:2px">${pct.toFixed(0)}%</div>
+                        </div>
+                        <div class="cc-amt">
+                            <div class="used">${_expFmt(used)}</div>
+                            <div class="lim">/ ${lim > 0 ? _expFmt(lim) : '∞'}</div>
+                        </div>
+                        <button class="cc-edit" onclick="expOpenLimit('${c.id}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})">✏️ الحد</button>
+                    </div>`;
+                }).join('')}
+            </div>
+            <div class="empty-state" id="expCatsNoMatch" style="display:none"><span>🔍</span>لا توجد بنود مطابقة للبحث.</div>
         </div>
     </div>`;
 }
+
+// فلترة بنود المصروفات بالاسم (client-side بحت — بدون أي استعلام جديد لـ Supabase)
+window.expFilterCatItems = function (val) {
+    const q = (val || '').trim().toLowerCase();
+    const cards = document.querySelectorAll('#expCatsList .cat-card');
+    let visibleCount = 0;
+    cards.forEach(card => {
+        const match = !q || (card.dataset.catName || '').includes(q);
+        card.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+    const noMatch = document.getElementById('expCatsNoMatch');
+    if (noMatch) noMatch.style.display = (q && visibleCount === 0) ? '' : 'none';
+};
 
 // ════════════════════════════════════════════════════════════
 // 3) تبديل التبويبات
