@@ -7,6 +7,7 @@ let _paySuppliers = [];
 let _paySelectedId = null;
 let _payList = [];
 let _payTreasuries = [];
+let _payEditingId = null; // معرّف سند الصرف الجاري تعديله (مودال التعديل)
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -74,26 +75,38 @@ async function renderPayments(c) {
 
         ${paySuppliersDebtListHTML(debtSuppliers)}
 
-        <div class="mod-table-wrap" style="margin-top:16px">
-            <table class="mod-table"><thead><tr>
+        <div class="mod-card" style="padding:12px 16px;margin-top:16px;display:flex;align-items:center;gap:10px">
+            <input type="text" id="payHistSearch" class="mod-form-input" style="margin:0;max-width:280px" placeholder="🔍 بحث في السجل بالمورد..." oninput="payFilterHistory()">
+        </div>
+
+        <div class="mod-table-wrap" style="margin-top:10px">
+            <table class="mod-table" id="payHistTable"><thead><tr>
                 <th>الرقم</th><th>المورد</th><th>التاريخ</th><th style="text-align:left">المبلغ</th><th>الحالة</th><th></th>
             </tr></thead>
             <tbody>
                 ${displayRows.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>💸</span>لا توجد مدفوعات.</td></tr>` :
-                displayRows.map(p => `<tr>
+                displayRows.map(p => `<tr data-name="${(p.suppliers?.name||'').toLowerCase()}">
                     <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
                     <td><strong>${p.suppliers?.name || '—'}</strong></td>
                     <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
                     <td style="text-align:left;font-weight:700;color:#059669">${payFmt(p.amount)}</td>
                     <td>${p._queue
                         ? (p.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
-                        : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
-                    <td>${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>`}</td>
+                        : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:#94A3B8;font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
     `;
 }
+
+// فلترة سجل المدفوعات المعروض حسب اسم المورد (بحث فوري داخل الصفوف المعروضة فعلاً)
+window.payFilterHistory = function() {
+    const term = (document.getElementById('payHistSearch')?.value || '').trim().toLowerCase();
+    document.querySelectorAll('#payHistTable tbody tr[data-name]').forEach(tr => {
+        tr.style.display = (!term || tr.dataset.name.includes(term)) ? '' : 'none';
+    });
+};
 
 // تقدير محلي تراكمي لرصيد الموردين (نفس منطق colApplyPendingEstimates)
 async function payApplyPendingEstimates(suppliers) {
@@ -148,6 +161,7 @@ window.payOpenAdd = function(presetSupplierId = null) {
                 <button class="mod-modal-close" onclick="payCloseModal('payModal')">&times;</button></div>
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>المورد *</label>
+                    <input type="text" id="paySuppFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث بالاسم / الهاتف / الكود" oninput="payFilterSuppList('paySuppId')" autocomplete="off">
                     <select id="paySuppId" class="mod-form-input" onchange="payOnSuppChange()">
                         <option value="">-- اختر المورد --</option>
                         ${_paySuppliers.map(s => `<option value="${s.id}" ${s.id===presetSupplierId?'selected':''}>${s.name} ${s.balance>0?'(مستحق '+payFmt(s.balance)+')':''}</option>`).join('')}
@@ -182,6 +196,27 @@ window.payCloseModal = function(id) { const m = document.getElementById(id); if 
 window.payOnSuppChange = function() {
     _paySelectedId = document.getElementById('paySuppId').value;
     payPreview();
+};
+
+// فلترة قايمة اختيار المورد (بالاسم/الهاتف/الكود) — مستخدمة في مودال
+// الإضافة (paySuppId + paySuppFilter) ومودال التعديل (payEditSuppId +
+// payEditSuppFilter)، بنفس الدالة عن طريق تمرير id السيلكت.
+window.payFilterSuppList = function(selectId) {
+    selectId = selectId || 'paySuppId';
+    const filterId = selectId === 'paySuppId' ? 'paySuppFilter' : 'payEditSuppFilter';
+    const term = (document.getElementById(filterId)?.value || '').trim().toLowerCase();
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const current = sel.value;
+    const list = term
+        ? _paySuppliers.filter(s => (s.name||'').toLowerCase().includes(term) || (s.phone||'').includes(term) || (s.code||'').toLowerCase().includes(term))
+        : _paySuppliers;
+    sel.innerHTML = `<option value="">-- اختر المورد --</option>` +
+        list.map(s => `<option value="${s.id}" ${s.id===current?'selected':''}>${s.name} ${s.balance>0?'(مستحق '+payFmt(s.balance)+')':''}</option>`).join('');
+    if (current && !list.some(s => s.id === current)) {
+        const kept = _paySuppliers.find(s => s.id === current);
+        if (kept) sel.insertAdjacentHTML('beforeend', `<option value="${kept.id}" selected>${kept.name} (مختار حالياً)</option>`);
+    }
 };
 
 window.payPreview = function() {
@@ -260,6 +295,119 @@ window.paySave = async function() {
         renderPayments(document.getElementById('app-content'));
     } catch (err) { alert('خطأ أثناء الصرف: ' + err.message); }
     finally { btn.innerText = '💾 صرف الدفعة'; btn.disabled = false; }
+};
+
+// ════════════════════════════════════════════════════════════
+// 3ب) تعديل سند صرف مؤكّد بعد الحفظ
+// نفس فلسفة js/modules/invoice-review.js تماماً: ممنوع UPDATE مباشر على
+// صف مؤكّد (trigger fn_block_amount_edit_after_confirm بيمنع أي تعديل
+// غير تغيير status لـ cancelled) — فبدل ما نعدّل السطر القديم، بنلغيه
+// (UPDATE status='cancelled'، والـ trigger fn_payment_status_change
+// بيرجّع الخزنة ورصيد المورد ويعكس القيد تلقائياً — كله في نفس الـ
+// UPDATE الواحد، يعني ذرّي من غير حاجة لـ RPC إضافية) وبعدين نسجّل سند
+// جديد بالبيانات المعدّلة (نفس مسار الحفظ العادي).
+// ════════════════════════════════════════════════════════════
+window.payOpenEditModal = function(id) {
+    const p = _payList.find(x => x.id === id);
+    if (!p) return alert('تعذّر العثور على سند الصرف');
+    if (p.status !== 'confirmed') return alert('هذا السند غير مؤكد بالفعل ولا يمكن تعديله');
+    _payEditingId = id;
+
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'payEditModal';
+    modal.innerHTML = `
+        <div class="mod-modal">
+            <div class="mod-modal-header"><h3>✏️ تعديل سند صرف ${p.ref||''}</h3>
+                <button class="mod-modal-close" onclick="payCloseModal('payEditModal')">&times;</button></div>
+            <div class="mod-modal-body">
+                <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 12px;border-radius:8px;margin-bottom:14px;font-size:12px">
+                    ⚠️ الحفظ هيلغي سند الصرف القديم تلقائياً (المبلغ يرجع للخزنة ويترحّل على رصيد المورد) ويسجّل سنداً جديداً بالبيانات المعدّلة — حفاظاً على سجل تاريخي كامل، بدل التعديل المباشر.
+                </div>
+                <div class="mod-form-group"><label>المورد *</label>
+                    <input type="text" id="payEditSuppFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث بالاسم / الهاتف / الكود" oninput="payFilterSuppList('payEditSuppId')" autocomplete="off">
+                    <select id="payEditSuppId" class="mod-form-input">
+                        <option value="">-- اختر المورد --</option>
+                        ${_paySuppliers.map(s => `<option value="${s.id}" ${s.id===p.supplier_id?'selected':''}>${s.name} ${s.balance>0?'(مستحق '+payFmt(s.balance)+')':''}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="mod-form-group"><label>المبلغ (ج.م) *</label>
+                    <input type="number" id="payEditAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="${Number(p.amount)||0}">
+                </div>
+                <div class="mod-form-group"><label>المرجع / البيان</label>
+                    <input type="text" id="payEditRef" class="mod-form-input" value="${p.ref||''}">
+                </div>
+                <div class="mod-form-group"><label>الخزنة</label>
+                    <select id="payEditTreasuryId" class="mod-form-input">
+                        ${_payTreasuries.map(t => `<option value="${t.id}" ${t.id===p.treasury_id?'selected':(!p.treasury_id&&t.is_default?'selected':'')}>${t.name}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="payCloseModal('payEditModal')">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" onclick="paySaveEdit()">💾 حفظ التعديل</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+};
+
+window.paySaveEdit = async function() {
+    const oldId = _payEditingId;
+    if (!oldId) return;
+    const suppId = document.getElementById('payEditSuppId').value;
+    const amount = parseFloat(document.getElementById('payEditAmount').value);
+    const ref = document.getElementById('payEditRef').value.trim();
+    const treasuryId = document.getElementById('payEditTreasuryId').value || null;
+    if (!suppId) return alert('اختر المورد');
+    if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
+
+    if (typeof isOnline === 'function' && !isOnline()) {
+        alert('📴 تعديل سند صرف موجود محتاج اتصال بالإنترنت — حاول تاني لما الاتصال يرجع');
+        return;
+    }
+
+    const btn = document.querySelector('#payEditModal .mod-btn-primary');
+    btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
+
+    try {
+        // 1) إلغاء السند القديم — UPDATE واحد ذرّي، الـ trigger بيرجّع
+        //    الخزنة ورصيد المورد ويعكس القيد المحاسبي تلقائياً.
+        const { error: cancelErr } = await sb.from('supplier_payments').update({ status: 'cancelled' }).eq('id', oldId);
+        if (cancelErr) throw cancelErr;
+
+        // 2) تسجيل سند جديد بالبيانات المعدّلة (نفس مسار paySave العادي)
+        const { error: insErr } = await sb.from('supplier_payments').insert({
+            ref: ref || 'PAY-' + Date.now(),
+            supplier_id: suppId,
+            amount,
+            status: 'confirmed',
+            treasury_id: treasuryId,
+            created_by: currentUser?.id || null,
+        });
+        if (insErr) {
+            // السند القديم اتلغى فعلاً (ورجع الرصيد/الخزنة) لكن السند
+            // الجديد فشل — نوضّح للمستخدم إن الإلغاء تم بنجاح ومحتاج
+            // يسجّل السند الصحيح يدوياً من "صرف دفعة جديدة".
+            alert('⚠️ تم إلغاء السند القديم بنجاح (رجع المبلغ للخزنة ورصيد المورد)، لكن فشل تسجيل السند الجديد المعدّل: ' + insErr.message + '\n\nسجّل السند بالبيانات الصحيحة يدوياً من زرار "صرف دفعة جديدة".');
+            payCloseModal('payEditModal');
+            _payEditingId = null;
+            renderPayments(document.getElementById('app-content'));
+            return;
+        }
+
+        payCloseModal('payEditModal');
+        _payEditingId = null;
+        try {
+            const { data: cash } = await sb.rpc('get_cash_balance');
+            const tb = document.getElementById('topbarCash');
+            if (tb) tb.textContent = '💰 ' + (cash || 0).toFixed(2) + ' ج.م';
+        } catch {}
+        renderPayments(document.getElementById('app-content'));
+    } catch (err) {
+        alert('❌ خطأ أثناء تعديل الدفعة: ' + err.message);
+    } finally {
+        btn.innerText = '💾 حفظ التعديل'; btn.disabled = false;
+    }
 };
 
 // ════════════════════════════════════════════════════════════
