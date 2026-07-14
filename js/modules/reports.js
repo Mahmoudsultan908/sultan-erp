@@ -5,6 +5,8 @@
 
 async function renderReports(container) {
     let activeReport = 'pl';
+    let _repDefSuppliers = [];
+    let _repDefManual = [];
     const fmt = n => Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
 
     const reportTabs = [
@@ -253,12 +255,22 @@ async function renderReports(container) {
     // 5) تقرير المؤجلات
     // ─────────────────────────────────────────
     async function renderDeferred(c) {
-        const { data: summary } = await sb.from('deferred_rebates_supplier_summary').select('*').order('total_remaining', { ascending: false });
+        const [{ data: summary }, { data: suppliers }, { data: manual }] = await Promise.all([
+            sb.from('deferred_rebates_supplier_summary').select('*').order('total_remaining', { ascending: false }),
+            sb.from('suppliers').select('id,name').eq('is_active', true).order('name'),
+            sb.from('deferred_rebates_manual').select('*, suppliers(name)').neq('status', 'cancelled').order('created_at', { ascending: false }),
+        ]);
+        _repDefSuppliers = suppliers || [];
+        _repDefManual = manual || [];
 
         c.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div style="font-size:12px;color:#64748B">المتوقع/المستلم/المتبقي من فواتير الشراء المؤجلة الحالية. المؤجلات القديمة (قبل تتبع النظام) تُسجَّل يدوياً وتظهر في الجدول تحت.</div>
+            <button class="mod-btn mod-btn-primary" onclick="repDefOpenAddHistorical()">+ إضافة مؤجل قديم</button>
+        </div>
         <div class="dash-card" style="padding:0;overflow:hidden">
             <table class="dash-table" style="margin:0">
-                <thead><tr><th>المورد</th><th>عدد البنود</th><th>المتوقع</th><th>المستلم</th><th>المتبقي</th></tr></thead>
+                <thead><tr><th>المورد</th><th>عدد البنود</th><th>المتوقع</th><th>المستلم</th><th>المتبقي</th><th></th></tr></thead>
                 <tbody>
                     ${(summary||[]).filter(s=>s.items_count>0).map(s => `<tr>
                         <td><strong>${s.supplier_name}</strong></td>
@@ -266,11 +278,173 @@ async function renderReports(container) {
                         <td>${fmt(s.total_expected)}</td>
                         <td class="dash-s-green">${fmt(s.total_received)}</td>
                         <td class="dash-amount" style="color:${s.total_remaining>0?'#D97706':'#059669'}">${fmt(s.total_remaining)}</td>
-                    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مؤجلات مسجلة</td></tr>'}
+                        <td>${s.total_remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:#ECFDF5;color:#059669" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 تسجيل استلام</button>` : ''}</td>
+                    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مؤجلات مسجلة</td></tr>'}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top:18px;font-size:13px;font-weight:800;color:#334155">📜 مؤجلات مسجّلة يدوياً (قديمة قبل تتبع النظام)</div>
+        <div class="dash-card" style="padding:0;overflow:hidden;margin-top:8px">
+            <table class="dash-table" style="margin:0">
+                <thead><tr><th>المورد</th><th>المبلغ</th><th>المستلم</th><th>المتبقي</th><th>الاستحقاق</th><th>ملاحظات</th><th></th></tr></thead>
+                <tbody>
+                    ${_repDefManual.length ? _repDefManual.map(m => {
+                        const remaining = (Number(m.amount)||0) - (Number(m.received_amount)||0);
+                        return `<tr>
+                        <td><strong>${m.suppliers?.name || '—'}</strong></td>
+                        <td>${fmt(m.amount)}</td>
+                        <td class="dash-s-green">${fmt(m.received_amount)}</td>
+                        <td class="dash-amount" style="color:${remaining>0?'#D97706':'#059669'}">${fmt(remaining)}</td>
+                        <td>${m.due_date || '—'}</td>
+                        <td style="font-size:11px;color:#64748B">${m.notes || '—'}</td>
+                        <td>${remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:#ECFDF5;color:#059669" onclick="repDefReceiveManual('${m.id}',${remaining})">💰 استلام</button>` : '<span style="color:#059669;font-size:11px">✅ مكتمل</span>'}</td>
+                    </tr>`;
+                    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مؤجلات يدوية مسجلة</td></tr>'}
                 </tbody>
             </table>
         </div>`;
     }
+
+    // ════════════════════════════════════════════════════════════
+    // مؤجلات — إضافة مؤجل قديم يدوياً + تسجيل استلام
+    // (جدول deferred_rebates_manual جديد ومستقل — راجع
+    //  deferred_rebates_manual_migration.sql لسبب القرار ده)
+    // ════════════════════════════════════════════════════════════
+    window.repDefOpenAddHistorical = function () {
+        const modal = document.createElement('div');
+        modal.className = 'mod-modal-bg active';
+        modal.id = 'repDefAddModal';
+        modal.innerHTML = `
+        <div class="mod-modal">
+            <div class="mod-modal-header"><h3>📜 إضافة مؤجل قديم (قبل تتبع النظام)</h3>
+                <button class="mod-modal-close" onclick="repDefCloseModal('repDefAddModal')">&times;</button></div>
+            <div class="mod-modal-body">
+                <div class="mod-form-group"><label>المورد *</label>
+                    <select id="repDefSuppId" class="mod-form-input">
+                        <option value="">-- اختر المورد --</option>
+                        ${_repDefSuppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="mod-form-group"><label>المبلغ (ج.م) *</label>
+                    <input type="number" id="repDefAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr">
+                </div>
+                <div class="mod-form-group"><label>تاريخ الاستحقاق (اختياري)</label>
+                    <input type="date" id="repDefDueDate" class="mod-form-input">
+                </div>
+                <div class="mod-form-group"><label>ملاحظات</label>
+                    <input type="text" id="repDefNotes" class="mod-form-input" placeholder="مثال: رصيد مؤجل من قبل استخدام النظام">
+                </div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="repDefCloseModal('repDefAddModal')">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" onclick="repDefSaveHistorical()">💾 حفظ</button>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+    };
+
+    window.repDefCloseModal = function (id) { const m = document.getElementById(id); if (m) m.remove(); };
+
+    window.repDefSaveHistorical = async function () {
+        const supplierId = document.getElementById('repDefSuppId').value;
+        const amount = parseFloat(document.getElementById('repDefAmount').value);
+        const dueDate = document.getElementById('repDefDueDate').value || null;
+        const notes = document.getElementById('repDefNotes').value.trim() || null;
+        if (!supplierId) return alert('اختر المورد');
+        if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
+
+        const btn = document.querySelector('#repDefAddModal .mod-btn-primary');
+        btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
+        try {
+            const { error } = await sb.rpc('fn_register_historical_deferred_rebate', {
+                p_supplier_id: supplierId, p_amount: amount, p_due_date: dueDate, p_notes: notes,
+            });
+            if (error) throw error;
+            repDefCloseModal('repDefAddModal');
+            renderDeferred(document.getElementById('rep-content'));
+        } catch (err) {
+            alert('خطأ أثناء الحفظ: ' + err.message);
+        } finally {
+            if (btn) { btn.innerText = '💾 حفظ'; btn.disabled = false; }
+        }
+    };
+
+    window.repDefReceiveManual = async function (id, remaining) {
+        const amountStr = prompt(`المبلغ المستلم (المتبقي: ${fmt(remaining)} ج.م):`, fmt(remaining));
+        if (amountStr === null) return;
+        const amount = parseFloat(amountStr);
+        if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
+        if (amount > remaining + 0.001) return alert('المبلغ أكبر من المتبقي');
+        try {
+            const { error } = await sb.rpc('fn_receive_deferred_rebate_manual', { p_id: id, p_amount: amount });
+            if (error) throw error;
+            renderDeferred(document.getElementById('rep-content'));
+        } catch (err) {
+            alert('خطأ أثناء تسجيل الاستلام: ' + err.message);
+        }
+    };
+
+    window.repDefOpenReceive = async function (supplierId, supplierName) {
+        const modal = document.createElement('div');
+        modal.className = 'mod-modal-bg active';
+        modal.id = 'repDefReceiveModal';
+        modal.innerHTML = `
+        <div class="mod-modal">
+            <div class="mod-modal-header"><h3>💰 تسجيل استلام مؤجل — ${supplierName}</h3>
+                <button class="mod-modal-close" onclick="repDefCloseModal('repDefReceiveModal')">&times;</button></div>
+            <div class="mod-modal-body" id="repDefReceiveBody">
+                <div style="text-align:center;padding:20px;color:#64748B">⏳ جاري التحميل...</div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="repDefCloseModal('repDefReceiveModal')">إغلاق</button>
+                <button class="mod-btn mod-btn-primary" onclick="repDefConfirmReceiveReal('${supplierId}')">✅ تأكيد استلام المحدد</button>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+
+        const body = document.getElementById('repDefReceiveBody');
+        if (!supplierId) {
+            body.innerHTML = `<div style="color:#94A3B8;font-size:12px">تعذّر تحديد المورد تلقائياً — استخدم جدول "مؤجلات مسجّلة يدوياً" بالأسفل لو المؤجل ده يدوي، أو راجع المطوّر.</div>`;
+            return;
+        }
+        try {
+            const { data: pending, error } = await sb.rpc('fn_list_pending_deferred_rebates', { p_supplier_id: supplierId });
+            if (error) throw error;
+            if (!pending || !pending.length) {
+                body.innerHTML = `<div style="color:#94A3B8;font-size:12px">لا توجد بنود مؤجلة معلّقة من فواتير شراء لهذا المورد.</div>`;
+                return;
+            }
+            body.innerHTML = `
+            <div style="font-size:11px;color:#64748B;margin-bottom:8px">حدد البنود اللي المورد استلمها فعلاً (خصم/استرداد) ثم اضغط "تأكيد استلام المحدد".</div>
+            <table class="mod-table"><thead><tr><th></th><th>الصنف</th><th>الكمية</th><th>النسبة%</th><th>الاستحقاق</th><th>المبلغ المتوقع</th></tr></thead>
+            <tbody>
+                ${pending.map(p => `<tr>
+                    <td><input type="checkbox" class="repDefRecvChk" value="${p.id}"></td>
+                    <td>${p.product_name || '—'}</td>
+                    <td>${p.qty}</td>
+                    <td>${p.rate}%</td>
+                    <td>${p.due_date || '—'}</td>
+                    <td>${fmt(p.expected_amount)}</td>
+                </tr>`).join('')}
+            </tbody></table>`;
+        } catch (err) {
+            body.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:12px;border-radius:8px;font-size:12px">خطأ: ${err.message}</div>`;
+        }
+    };
+
+    window.repDefConfirmReceiveReal = async function () {
+        const ids = Array.from(document.querySelectorAll('.repDefRecvChk:checked')).map(el => el.value);
+        if (!ids.length) return alert('حدد بند واحد على الأقل');
+        try {
+            const { error } = await sb.rpc('fn_mark_deferred_rebate_received', { p_ids: ids });
+            if (error) throw error;
+            repDefCloseModal('repDefReceiveModal');
+            renderDeferred(document.getElementById('rep-content'));
+        } catch (err) {
+            alert('خطأ أثناء تسجيل الاستلام: ' + err.message);
+        }
+    };
 
     renderReportContent(activeReport);
 }
