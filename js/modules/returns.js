@@ -22,9 +22,17 @@ let retType = 'sales';      // 'sales' | 'purchase'
 let retMode = 'linked';     // 'linked' (مرتبط بفاتورة) | 'manual' (مستقل)
 let retLinkedDoc = null;    // الفاتورة الأصلية لو في وضع linked
 let retEntityId = null;     // customer_id أو supplier_id
+let retRepId = null;        // مندوب المبيعات (اختياري — مرتجع مبيعات بس، لخصمه من إجمالي مبيعاته)
 let retWarehouseId = null;
 let retItems = [];          // { id, pid, name, code, unit, qty, price, disc, maxQty }
 let retTableMissing = false;
+// ★ تعديل مرتجع قديم (قادم من صفحة "مراجعة الفواتير" — invoice-review.js) —
+//   نفس فلسفة invEditingId/purEditingId بالضبط: المرتجع القديم بيتلغي
+//   تلقائياً (عكس أثره على المخزون/الرصيد عبر RPC) ويتسجّل مرتجع جديد
+//   بدل التعديل المباشر فوق نفس السجل. راجع returns_edit_reversal_migration.sql.
+let retEditingId = null;
+let retEditingOldReturnNo = null;
+let retEditingLinkId = null; // sale_id/purchase_id الأصلي بتاع المرتجع القديم (لو كان مرتبط بفاتورة) — بنحافظ عليه في المرتجع الجديد
 
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات + التقديم الرئيسي
@@ -34,13 +42,14 @@ async function renderReturns(c) {
     RET_DB.isOfflineData = false;
     RET_DB.offlineDataAge = null;
     try {
-        const [r1, r2, r3, r4, r5, r6] = await Promise.all([
+        const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
             sb.from('customers').select('id,name,phone,balance').eq('is_active', true).order('name'),
             sb.from('suppliers').select('id,name,phone,balance').eq('is_active', true).order('name'),
             sb.from('products').select('id,name,code,unit,wholesale_price,retail_price,purchase_price').eq('is_active', true).order('name'),
             sb.from('warehouses').select('id,name,is_main').order('name'),
             sb.from('inventory_stock').select('warehouse_id, product_id, qty'),
             sb.from('treasuries').select('*').eq('is_active', true).order('is_default', { ascending: false }),
+            sb.from('sales_reps').select('id,name,commission_pct').eq('is_active', true).order('name'),
         ]);
         if (r1.error || !r1.data || r3.error || !r3.data) throw (r1.error || r3.error || new Error('no data'));
         RET_DB.customers = r1.data;
@@ -48,22 +57,30 @@ async function renderReturns(c) {
         RET_DB.products = r3.data;
         RET_DB.warehouses = r4.data || [];
         RET_DB.treasuries = r6.data || [];
+        // مندوبو المبيعات (اختياري زي sales.js — لو جدول sales_reps لسه ما اتعملش، r7.error
+        // بيرجع من غير ما يوقف الـ Promise.all كله، فبنتجاهله بهدوء والقائمة بتختفي فقط)
+        RET_DB.reps = r7.data || [];
         RET_DB.stockMap = {};
         (r5.data || []).forEach(r => { RET_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0; });
         if (typeof dbSetCache === 'function') {
             dbSetCache('customers', RET_DB.customers);
             dbSetCache('suppliers', RET_DB.suppliers);
             dbSetCache('inventory_stock', r5.data || []);
+            // ★ نفس كاش sales_reps اللي بيستخدمه sales.js بالظبط (مفتاح مشترك)
+            //   عشان مرتجع المبيعات يقدر يعرض دروب داون المندوب وقت الأوفلاين
+            //   كمان، بدل ما يختفي تماماً زي ما كان بيحصل في invSave قبل التصحيح.
+            if (RET_DB.reps.length) dbSetCache('sales_reps', RET_DB.reps);
         }
     } catch (err) {
         // فشل التحميل الحي (أوفلاين أو خطأ شبكة) → ارجع لآخر نسخة محفوظة في الكاش
         if (typeof dbGetCache === 'function') {
-            const [cc, cs, cp, cw, csk] = await Promise.all([dbGetCache('customers'), dbGetCache('suppliers'), dbGetCache('products'), dbGetCache('warehouses'), dbGetCache('inventory_stock')]);
+            const [cc, cs, cp, cw, csk, crep] = await Promise.all([dbGetCache('customers'), dbGetCache('suppliers'), dbGetCache('products'), dbGetCache('warehouses'), dbGetCache('inventory_stock'), dbGetCache('sales_reps')]);
             if (cc?.data?.length || cp?.data?.length) {
                 RET_DB.customers = cc?.data || [];
                 RET_DB.suppliers = cs?.data || [];
                 RET_DB.products = cp?.data || [];
                 RET_DB.warehouses = cw?.data || [];
+                RET_DB.reps = crep?.data || [];
                 // ★ لازم نبني الخريطة من الكاش، مش نسيبها فاضية — من غيرها كل
                 //   تقدير مخزون أوفلاين بيبدأ من صفر بدل الرصيد الحقيقي (نفس
                 //   المشكلة اللي ظهرت فعلياً في sales.js — راجع الجلسة).
@@ -82,9 +99,44 @@ async function renderReturns(c) {
     }
 
     // إعادة ضبط الحالة
-    retType = 'sales'; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retItems = [];
+    retType = 'sales'; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retRepId = null; retItems = [];
+    retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
     const mainWh = RET_DB.warehouses.find(w => w.is_main) || RET_DB.warehouses[0];
     retWarehouseId = mainWh?.id || null;
+
+    // ★ وضع تعديل مرتجع قديم (قادم من صفحة "مراجعة الفواتير")
+    if (window._pendingReturnEdit) {
+        const pend = window._pendingReturnEdit;
+        window._pendingReturnEdit = null;
+        retType = pend.type === 'purchase_return' ? 'purchase' : 'sales';
+        try {
+            const table = retType === 'sales' ? 'sales_returns' : 'purchase_returns';
+            const itemsTable = retType === 'sales' ? 'sale_return_items' : 'purchase_return_items';
+            const { data: oldRet, error } = await sb.from(table)
+                .select(`*, ${itemsTable}(*, products(name,code,unit))`).eq('id', pend.id).maybeSingle();
+            if (error) throw error;
+            if (oldRet) {
+                retEditingId = oldRet.id;
+                retEditingOldReturnNo = oldRet.return_no;
+                retEditingLinkId = oldRet.sale_id || oldRet.purchase_id || null;
+                // ★ وضع "مستقل" دايماً وقت التعديل — بيسيب المستخدم يعدّل الكميات/الأسعار
+                //   بحرية من غير قيد maxQty بتاع الفاتورة الأصلية (اللي مطبّق بس في وضع linked).
+                retMode = 'manual';
+                retEntityId = oldRet.customer_id || oldRet.supplier_id || null;
+                retRepId = retNormalizeRepId(oldRet.rep_id);
+                if (oldRet.warehouse_id) retWarehouseId = oldRet.warehouse_id;
+                retItems = (oldRet[itemsTable] || []).map(it => ({
+                    id: it.id, pid: it.product_id,
+                    name: it.products?.name || '—', code: it.products?.code || '',
+                    unit: it.products?.unit || it.unit_name || 'قطعة',
+                    qty: Number(it.qty) || 0, maxQty: null,
+                    price: Number(it.unit_price) || 0, disc: Number(it.discount_pct) || 0,
+                }));
+            }
+        } catch (err) {
+            alert('⚠️ تعذّر تحميل المرتجع للتعديل: ' + err.message);
+        }
+    }
 
     // مرتجعات مبيعات اتسجّلت أوفلاين ولسه في الطابور — طرح أثرها من المخزون المعروض (تقدير تراكمي)
     await retApplyPendingEstimates();
@@ -146,7 +198,9 @@ async function retLoadCounterPreview() {
 window.retSwitchType = async function (type) {
     if (retType === type) return;
     if (retItems.filter(i => i.pid).length && !confirm('سيتم فقد البيانات غير المحفوظة. تبديل نوع المرتجع؟')) return;
-    retType = type; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retItems = [];
+    if (retEditingId && !confirm('سيتم إلغاء وضع التعديل الحالي. تبديل نوع المرتجع؟')) return;
+    retType = type; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retRepId = null; retItems = [];
+    retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
     if (!RET_DB.isOfflineData) await retLoadRecent();
     await retLoadPendingList();
     retRenderScreen(document.getElementById('app-content'));
@@ -190,6 +244,10 @@ async function retAllocateRealReturnNo() {
 function retRenderScreen(c) {
     c.innerHTML = `
     <div class="inv-root density-cozy">
+        ${retEditingId ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
+            <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على المرتجع <strong>${retEditingOldReturnNo}</strong>. عند الحفظ: هيتلغي المرتجع القديم تلقائياً (مع عكس أثره على المخزون والرصيد) ويتسجّل مرتجع جديد بالتعديلات.</span>
+            <button class="inv-top-btn" style="padding:4px 10px" onclick="retEditingId=null;retEditingOldReturnNo=null;retEditingLinkId=null;renderReturns(document.getElementById('app-content'))">إلغاء التعديل</button>
+        </div>` : ''}
         ${retTableMissing ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12px">
             ⚠️ <strong>تنبيه:</strong> جدول <code>${retType === 'sales' ? 'sales_returns' : 'purchase_returns'}</code> أو جدول البنود المرتبط به غير مكتمل في قاعدة البيانات بعد.
             شغّل ملف <code>returns_migration.sql</code> في Supabase أولاً حتى تتحرّك المخازن والأرصدة تلقائياً.
@@ -370,7 +428,14 @@ function retNotesCardHTML() {
             <select id="retTreasuryId" class="mod-form-input">
                 ${(RET_DB.treasuries||[]).map(t => `<option value="${t.id}" ${t.is_default?'selected':''}>${t.name}</option>`).join('')}
             </select>
-        </div>` : ''}
+        </div>
+        ${(RET_DB.reps || []).length ? `
+        <div class="mod-form-group" style="margin-top:10px"><label>المندوب (يُخصم المرتجع من إجمالي مبيعاته)</label>
+            <select id="retRepId" class="mod-form-input" onchange="retOnRepChange()">
+                <option value="">🚗 بدون مندوب</option>
+                ${RET_DB.reps.map(r => `<option value="${r.id}" ${r.id === retRepId ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
+            </select>
+        </div>` : ''}` : ''}
     </div>`;
 }
 
@@ -391,7 +456,7 @@ function retRecentListHTML() {
                 <td style="text-align:left;font-weight:700;color:#DC2626">${retFmt(r.total)}</td>
                 <td>${r._queue
                     ? (r.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
-                    : '<span style="color:#059669;font-weight:600">✅ مؤكد</span>'}</td>
+                    : r.status === 'cancelled' ? '<span style="color:#94A3B8">🚫 ملغى (معدّل)</span>' : '<span style="color:#059669;font-weight:600">✅ مؤكد</span>'}</td>
             </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مرتجعات بعد</td></tr>`}
         </tbody>
         </table>
@@ -429,6 +494,16 @@ function retOnWarehouseChange() {
     const sel = document.getElementById('retWarehouse');
     if (sel) retWarehouseId = sel.value;
     retRenderItems();
+}
+// بيرجع null صراحة لأي قيمة فاضية (نفس invNormalizeRepId في sales.js)
+function retNormalizeRepId(v) {
+    if (v == null) return null;
+    const s = String(v).trim();
+    return s ? s : null;
+}
+function retOnRepChange() {
+    const sel = document.getElementById('retRepId');
+    if (sel) retRepId = retNormalizeRepId(sel.value);
 }
 
 function retRenderItems() {
@@ -726,6 +801,8 @@ window.retSearchInvoice = async function () {
             if (!data) { retToast('❌ الفاتورة دي مش موجودة في آخر نسخة محفوظة (📴 أوفلاين) — جرّب لما الاتصال يرجع', 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
             retLinkedDoc = data;
             retEntityId = data.customer_id;
+            // ★ اقتراح مندوب الفاتورة الأصلية تلقائياً (قابل للتغيير عادي من الدروب داون)
+            retRepId = retNormalizeRepId(data.rep_id);
             retWarehouseId = data.warehouse_id || retWarehouseId;
             retItems = (data.sale_items || []).map(it => ({
                 id: it.id, pid: it.product_id,
@@ -736,6 +813,8 @@ window.retSearchInvoice = async function () {
             }));
             const whSel = document.getElementById('retWarehouse');
             if (whSel) whSel.value = retWarehouseId || '';
+            const repSel = document.getElementById('retRepId');
+            if (repSel) repSel.value = retRepId || '';
             retRenderItems();
             retUpdateSummary();
             retUpdateEntityChip();
@@ -752,6 +831,8 @@ window.retSearchInvoice = async function () {
             if (!data) { retToast('❌ لا توجد فاتورة بيع بهذا الرقم', 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
             retLinkedDoc = data;
             retEntityId = data.customer_id;
+            // ★ اقتراح مندوب الفاتورة الأصلية تلقائياً (قابل للتغيير عادي من الدروب داون)
+            retRepId = retNormalizeRepId(data.rep_id);
             retWarehouseId = data.warehouse_id || retWarehouseId;
             retItems = (data.sale_items || []).map(it => ({
                 id: it.id, pid: it.product_id,
@@ -780,6 +861,8 @@ window.retSearchInvoice = async function () {
 
         const whSel = document.getElementById('retWarehouse');
         if (whSel) whSel.value = retWarehouseId || '';
+        const repSel = document.getElementById('retRepId');
+        if (repSel) repSel.value = retRepId || '';
         retRenderItems();
         retUpdateSummary();
         retUpdateEntityChip();
@@ -791,6 +874,18 @@ window.retSearchInvoice = async function () {
     }
 };
 
+// ═══════════════ عكس مرتجع قديم وقت التعديل — عبر RPC واحدة ذرّية ═══════════════
+// راجع returns_edit_reversal_migration.sql (fn_reverse_sales_return_for_edit /
+// fn_reverse_purchase_return_for_edit) — نفس فلسفة fn_reverse_sale_for_edit
+// و fn_reverse_purchase_for_edit في edit_reversal_atomic_migration.sql بالظبط،
+// بس بعكس اتجاه أثر تريجرز المرتجع (مرتجع بيع رجّع مخزون → التعديل بيخصمه
+// تاني، مرتجع بيع آجل نقّص رصيد العميل → التعديل بيرجّعه، ...إلخ).
+async function retReverseOldForEdit() {
+    const rpcName = retType === 'sales' ? 'fn_reverse_sales_return_for_edit' : 'fn_reverse_purchase_return_for_edit';
+    const { error } = await sb.rpc(rpcName, { p_return_id: retEditingId });
+    if (error) throw error;
+}
+
 // ════════════════════════════════════════════════════════════
 // 6) الحفظ — INSERT فقط (الـ Trigger يتكفّل بالمخزون/الأرصدة) — نفس المنطق القديم بالحرف
 // ════════════════════════════════════════════════════════════
@@ -801,6 +896,13 @@ window.retSave = async function () {
     const offline = typeof isOnline === 'function' && !isOnline();
     if (offline && retType === 'purchase') {
         retToast('📴 مرتجع المشتريات محتاج اتصال بالإنترنت — لسه غير مدعوم أوفلاين', 'error');
+        return;
+    }
+    // ★ تعديل مرتجع موجود محتاج عملية إلغاء حيّة عبر RPC (فحص + عكس تأثير على
+    //   المخزون/الرصيد) — زي invEditingId/purEditingId بالظبط، ده معقّد وخطير
+    //   يتنفّذ بتقدير محلي فبيفضل محتاج اتصال.
+    if (retEditingId && offline) {
+        retToast('📴 تعديل مرتجع موجود محتاج اتصال بالإنترنت', 'error');
         return;
     }
 
@@ -826,6 +928,7 @@ window.retSave = async function () {
                     warehouse_id: retWarehouseId,
                     payment_type: retLinkedDoc?.payment_type || 'cash',
                     treasury_id: treasuryId,
+                    rep_id: retNormalizeRepId(retRepId),
                     subtotal, total, status: 'confirmed',
                     reason: notes,
                     created_by: currentUser?.id || null,
@@ -857,6 +960,12 @@ window.retSave = async function () {
     }
 
     try {
+        // ★ لو في وضع تعديل: ألغِ المرتجع القديم وارجع أثره على المخزون/الرصيد
+        //   قبل إنشاء النسخة الجديدة (نفس ترتيب invReverseOldForEdit/purReverseOldForEdit)
+        if (retEditingId) {
+            await retReverseOldForEdit();
+        }
+
         const counterKey = retType === 'sales' ? 'sales_return_counter' : 'purchase_return_counter';
         const prefix = retType === 'sales' ? 'RS' : 'RP';
         const { data: counterRow } = await sb.from('app_settings').select('value').eq('key', counterKey).maybeSingle();
@@ -867,10 +976,11 @@ window.retSave = async function () {
             const { data: retRows, error: retErr } = await sb.from('sales_returns').insert({
                 return_no: returnNo,
                 customer_id: retEntityId || null,
-                sale_id: retLinkedDoc?.id || null,
+                sale_id: retLinkedDoc?.id || retEditingLinkId || null,
                 warehouse_id: retWarehouseId,
                 payment_type: retLinkedDoc?.payment_type || 'cash',
                 treasury_id: treasuryId,
+                rep_id: retNormalizeRepId(retRepId),
                 subtotal, total, status: 'confirmed',
                 reason: notes,
                 created_by: currentUser?.id || null,
@@ -892,7 +1002,7 @@ window.retSave = async function () {
             const { data: retRows, error: retErr } = await sb.from('purchase_returns').insert({
                 return_no: returnNo,
                 supplier_id: retEntityId || null,
-                purchase_id: retLinkedDoc?.id || null,
+                purchase_id: retLinkedDoc?.id || retEditingLinkId || null,
                 warehouse_id: retWarehouseId,
                 subtotal, total, status: 'confirmed',
                 reason: notes,
@@ -913,7 +1023,12 @@ window.retSave = async function () {
             await sb.from('app_settings').upsert({ key: counterKey, value: String(counter + 1), updated_at: new Date().toISOString() });
         }
 
-        retToast(`✅ تم حفظ المرتجع ${returnNo} بنجاح`, 'success');
+        if (retEditingId) {
+            retToast(`✅ تم إلغاء المرتجع ${retEditingOldReturnNo} وتسجيل المرتجع المعدّل ${returnNo}`, 'success');
+            retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
+        } else {
+            retToast(`✅ تم حفظ المرتجع ${returnNo} بنجاح`, 'success');
+        }
         try {
             const { data: cash } = await sb.rpc('get_cash_balance');
             const tb = document.getElementById('topbarCash');
@@ -986,7 +1101,7 @@ function retToast(msg, type = 'info') {
 }
 
 Object.assign(window, {
-    renderReturns, retSwitchType, retSwitchMode, retOnWarehouseChange,
+    renderReturns, retSwitchType, retSwitchMode, retOnWarehouseChange, retOnRepChange,
     retClearEntity, retSelectEntity, retEntACHover,
     retSave, retPrint, retSearchInvoice,
     retAddRow, retRemoveRow, retOnCode, retOnName, retOnNameKey, retPickInline, retRowACHover,
@@ -1003,10 +1118,20 @@ if (typeof registerSyncHandler === 'function') {
     registerSyncHandler('sale_return', async (entry) => {
         const { tempReturnNo, returnRow, items, _stockDeltas } = entry.payload;
         try {
+            // تحقق حي من rep_id (نفس منطق sync handler الخاص بـ 'sale' في sales.js) —
+            // لو المندوب اتحذف بعد ما المرتجع اتسجّل أوفلاين، ابعته بدون مندوب بدل ما تفشل المزامنة كلها.
+            let repId = returnRow.rep_id;
+            if (repId) {
+                try {
+                    const { data: repCheck } = await sb.from('sales_reps').select('id').eq('id', repId).maybeSingle();
+                    if (!repCheck) repId = null;
+                } catch {}
+            }
+
             const { returnNo, counter } = await retAllocateRealReturnNo();
 
             const { data: retRows, error: retErr } = await sb.from('sales_returns').insert({
-                ...returnRow, return_no: returnNo,
+                ...returnRow, rep_id: repId, return_no: returnNo,
             }).select();
             if (retErr) return { ok: false, error: retErr.message, summary: `مرتجع ${tempReturnNo}` };
             const returnId = retRows[0].id;

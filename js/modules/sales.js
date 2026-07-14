@@ -139,11 +139,28 @@ async function invLoadData() {
 
     // مندوبو المبيعات (اختياري — لو جدول sales_reps لسه ما اتعملش في Supabase، نتجاهل الخطأ بهدوء
     // والقائمة المنسدلة بتختفي من الرأس تلقائياً بدل ما توقف تحميل الفاتورة كلها)
+    // ★ لازم يتخزّن في نفس كاش الأوفلاين اللي بيستخدمه products/customers/warehouses —
+    //   من غيره القائمة المنسدلة بتختفي تماماً وقت الأوفلاين (شرط invHeaderHTML هو
+    //   `(INV_DB.reps||[]).length`)، يعني المستخدم أصلاً مايقدرش يختار مندوب وهو أوفلاين،
+    //   فـ rep_id بيتبعت null للطابور من الأساس. ده كان السبب الحقيقي وراء "اسم المندوب
+    //   بيختفي بعد المزامنة" — مش مشكلة في استرجاع rep_id من الـ payload وقت المزامنة
+    //   (ده شغال صح فعلاً، راجع registerSyncHandler('sale', ...) تحت)، المشكلة إن
+    //   المستخدم أصلاً مايقدرش يختاره وهو أوفلاين لأن القائمة كانت بتختفي.
     try {
         const { data: reps, error: repsErr } = await sb.from('sales_reps').select('*').eq('is_active', true).order('name');
         if (repsErr) throw repsErr;
         INV_DB.reps = reps || [];
-    } catch { INV_DB.reps = []; }
+        if (typeof dbSetCache === 'function') dbSetCache('sales_reps', INV_DB.reps);
+    } catch {
+        if (typeof dbGetCache === 'function') {
+            try {
+                const cachedReps = await dbGetCache('sales_reps');
+                INV_DB.reps = cachedReps?.data || [];
+            } catch { INV_DB.reps = []; }
+        } else {
+            INV_DB.reps = [];
+        }
+    }
 }
 
 // تقدير محلي تراكمي: يطرح أثر كل فواتير المبيعات المعلّقة (لسه ماتزامنتش)

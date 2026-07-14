@@ -527,12 +527,29 @@ function purPickProduct(pid) {
             purItems.push({ id: Date.now(), pid: p.id, name: p.name, code: p.code||'', qty: 1, price: buy, disc: 0, free: 0, unit: p.unit||'', upc: p.units_per_carton||1, deferredRate: 0, deferredDate: '' });
         }
         purEnsureNewRow();
+        purAutoFillSupplierFromProduct(p);
     }
     document.getElementById('purFastSearch').value = '';
     document.getElementById('purFastAC').classList.remove('show');
     _purFastIdx = -1;
     purRenderItems();
     purUpdateSummary();
+}
+
+// ★ أول صنف بيتضاف لفاتورة شراء لسه مالهاش مورد مختار → اقتراح المورد
+//   المرتبط بالصنف (products.supplier_id) تلقائياً. ده مجرد اقتراح أولي
+//   بس — المستخدم يقدر يغيّره أو يمسحه عادي من دروب داون المورد زي أي
+//   اختيار يدوي (مفيش قفل). لو purSupplierId متحدد بالفعل (يدوياً أو من
+//   صنف سابق)، ما بنلمسهوش. `product?.supplier_id` بأمان لأن العمود ده
+//   لسه بيتضاف لجدول products من فريق تاني — لو مش موجود لسه هيرجع
+//   undefined عادي من غير ما يبوّظ حاجة.
+function purAutoFillSupplierFromProduct(product) {
+    if (purSupplierId || !product?.supplier_id) return;
+    const s = PUR_DB.suppliers.find(x => x.id === product.supplier_id);
+    if (!s) return;
+    purSupplierId = s.id;
+    purUpdateSupplierChip();
+    purToast(`🏭 تم اقتراح المورد تلقائياً: ${s.name}`, 'info');
 }
 function purEnsureNewRow() {
     const last = purItems[purItems.length-1];
@@ -574,6 +591,7 @@ function purPickInline(idx, pid) {
     if (!p) return;
     const buy = purGetBuyPrice(p);
     purItems[idx] = { id: purItems[idx].id, pid: p.id, name: p.name, code: p.code||'', qty: purItems[idx].qty||1, price: buy, disc: 0, free: purItems[idx].free||0, unit: p.unit||'', upc: p.units_per_carton||1, deferredRate: purItems[idx].deferredRate||0, deferredDate: '' };
+    purAutoFillSupplierFromProduct(p);
     purEnsureNewRow();
     purRenderItems(); purUpdateSummary();
     setTimeout(()=>{ const r=document.getElementById('purItemsBody')?.rows[idx]; if(r){ const inp=r.querySelectorAll('input')[2]; if(inp){inp.focus();inp.select();} } },30);
@@ -744,11 +762,12 @@ async function purSave(andNew) {
             if (tb) tb.textContent = '💰 ' + (cash || 0).toFixed(2) + ' ج.م';
         } catch {}
 
-        if (andNew) {
-            renderPurchases(document.getElementById('app-content'));
-        } else {
-            document.querySelector('.inv-no-badge').textContent = 'PUR-' + String(PUR_DB.purchaseNo).padStart(4, '0');
-        }
+        // ★ أي حفظ ناجح بيفتح فاتورة شراء جديدة فاضية دايماً (زي andNew بالظبط،
+        //   ونفس تصحيح invSave في sales.js) — قبل كده كان الحفظ العادي (زرار
+        //   "حفظ" بدون andNew) بيسيب الأصناف القديمة ظاهرة وبس بيغيّر رقم
+        //   الفاتورة في الشارة، فالمستخدم كان بيفضل واقف على نفس الأصناف
+        //   ويقدر يحفظها تاني بالغلط فوق فاتورة جديدة.
+        renderPurchases(document.getElementById('app-content'));
     } catch (err) {
         alert('❌ خطأ أثناء حفظ الفاتورة: ' + err.message);
     } finally {

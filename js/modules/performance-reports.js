@@ -232,26 +232,41 @@ window.prfLoadByRep = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
 
     try {
-        const [{ data: allSales, error: e1 }, { data: repSales, error: e2 }] = await Promise.all([
+        // ★ مرتجعات المبيعات لازم تتخصم من إجمالي مبيعات المندوب (وإلا العمولة
+        //   المحسوبة هنا بتفضل أعلى من الحقيقي لو حصل مرتجع بعد الفاتورة). جدول
+        //   sales_returns.rep_id عمود جديد (راجع sales_returns_rep_id_migration.sql) —
+        //   لو لسه ما اتضافش/الجدول لسه مش موجود، e3 بيرجع خطأ ونتجاهله بهدوء
+        //   ونحسب من غير خصم مرتجعات (نفس فلسفة sales_reps الاختيارية فوق).
+        const [{ data: allSales, error: e1 }, { data: repSales, error: e2 }, { data: repReturns, error: e3 }] = await Promise.all([
             sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
             sb.from('sales').select('rep_id, total').eq('status', 'confirmed').not('rep_id', 'is', null).gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            sb.from('sales_returns').select('rep_id, total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;
+        const allReturns = e3 ? [] : (repReturns || []);
 
         const grandTotal = (allSales || []).reduce((s, r) => s + (Number(r.total) || 0), 0);
+        const grandReturns = allReturns.reduce((s, r) => s + (Number(r.total) || 0), 0);
         const byRep = {};
         (repSales || []).forEach(s => {
-            const g = byRep[s.rep_id] || (byRep[s.rep_id] = { count: 0, total: 0 });
+            const g = byRep[s.rep_id] || (byRep[s.rep_id] = { count: 0, total: 0, returns: 0 });
             g.count++; g.total += Number(s.total) || 0;
         });
-        const attributedTotal = Object.values(byRep).reduce((s, g) => s + g.total, 0);
-        const coverage = grandTotal > 0 ? (attributedTotal / grandTotal * 100) : 0;
+        allReturns.forEach(r => {
+            if (!r.rep_id) return; // مرتجع مستقل من غير مندوب — مالوش تأثير على إحصائية مندوب بعينه
+            const g = byRep[r.rep_id] || (byRep[r.rep_id] = { count: 0, total: 0, returns: 0 });
+            g.returns += Number(r.total) || 0;
+        });
+        const attributedTotal = Object.values(byRep).reduce((s, g) => s + (g.total - g.returns), 0);
+        const netGrandTotal = grandTotal - grandReturns;
+        const coverage = netGrandTotal > 0 ? (attributedTotal / netGrandTotal * 100) : 0;
 
         const rows = Object.entries(byRep).map(([rid, g]) => {
             const rep = _perfReps.find(r => r.id === rid);
-            const commission = g.total * (Number(rep?.commission_pct) || 0) / 100;
-            return { name: rep?.name || 'مندوب محذوف', count: g.count, total: g.total, commission };
+            const netTotal = g.total - g.returns;
+            const commission = netTotal * (Number(rep?.commission_pct) || 0) / 100;
+            return { name: rep?.name || 'مندوب محذوف', count: g.count, total: netTotal, returns: g.returns, commission };
         }).sort((a, b) => b.total - a.total);
 
         resultEl.innerHTML = `
@@ -260,20 +275,22 @@ window.prfLoadByRep = async function () {
         </div>` : ''}
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">🚗</div><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">مندوبون لهم مبيعات</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💰</div><div class="mod-card-val">${perfFmt(attributedTotal)}</div><div class="mod-card-lbl">مبيعات مرتبطة بمندوب</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">📊</div><div class="mod-card-val">${coverage.toFixed(0)}%</div><div class="mod-card-lbl">نسبة التغطية (من ${perfFmt(grandTotal)} إجمالي)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💰</div><div class="mod-card-val">${perfFmt(attributedTotal)}</div><div class="mod-card-lbl">صافي مبيعات مرتبطة بمندوب (بعد خصم المرتجعات)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">📊</div><div class="mod-card-val">${coverage.toFixed(0)}%</div><div class="mod-card-lbl">نسبة التغطية (من ${perfFmt(netGrandTotal)} صافي إجمالي)</div></div>
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
                 <th>المندوب</th><th style="text-align:center">عدد الفواتير</th>
-                <th style="text-align:left">إجمالي المبيعات</th><th style="text-align:left">العمولة المستحقة</th>
+                <th style="text-align:left">مرتجعات</th>
+                <th style="text-align:left">صافي المبيعات</th><th style="text-align:left">العمولة المستحقة</th>
             </tr></thead><tbody>
                 ${rows.length ? rows.map(r => `<tr>
                     <td><strong>${r.name}</strong></td>
                     <td style="text-align:center">${r.count}</td>
+                    <td style="text-align:left;color:${r.returns > 0 ? '#DC2626' : '#94A3B8'}">${r.returns > 0 ? '-' + perfFmt(r.returns) : '—'}</td>
                     <td style="text-align:left;font-weight:700">${perfFmt(r.total)}</td>
                     <td style="text-align:left;font-weight:700;color:#059669">${perfFmt(r.commission)}</td>
-                </tr>`).join('') : `<tr><td colspan="4" class="empty-state"><span>📭</span>لا توجد مبيعات مرتبطة بمندوب في هذه الفترة</td></tr>`}
+                </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مبيعات مرتبطة بمندوب في هذه الفترة</td></tr>`}
             </tbody></table>
         </div>`;
     } catch (err) {
