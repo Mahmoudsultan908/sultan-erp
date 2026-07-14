@@ -6,6 +6,7 @@
 let _expGlobalLimit = 0;   // الحد الإجمالي الشهري لكل المصروفات
 let _expUserRole = 'admin'; // افتراضياً admin (هيحدد من session)
 let _expList = [];         // آخر قائمة مصروفات محمّلة — للطباعة (expPrintVoucher)
+let _expModalCategories = []; // بنود المصروفات المحمّلة لمودال "تسجيل مصروف جديد" — لخانة البحث
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -219,6 +220,21 @@ window.expFilterCatItems = function (val) {
     if (noMatch) noMatch.style.display = (q && visibleCount === 0) ? '' : 'none';
 };
 
+// فلترة قايمة "بند المصروف" جوه مودال تسجيل مصروف جديد (نفس فكرة colFilterCustList)
+window.expFilterCatSelect = function () {
+    const term = (document.getElementById('expCatFilter')?.value || '').trim().toLowerCase();
+    const sel = document.getElementById('expCatId');
+    if (!sel) return;
+    const current = sel.value;
+    const list = term ? _expModalCategories.filter(c => (c.name || '').toLowerCase().includes(term)) : _expModalCategories;
+    sel.innerHTML = `<option value="">-- اختر البند --</option>` +
+        list.map(c => `<option value="${c.id}" data-limit="${c.monthly_limit || 0}" ${c.id === current ? 'selected' : ''}>${c.name}</option>`).join('');
+    if (current && !list.some(c => c.id === current)) {
+        const kept = _expModalCategories.find(c => c.id === current);
+        if (kept) sel.insertAdjacentHTML('beforeend', `<option value="${kept.id}" data-limit="${kept.monthly_limit||0}" selected>${kept.name} (مختار حالياً)</option>`);
+    }
+};
+
 // ════════════════════════════════════════════════════════════
 // 3) تبديل التبويبات
 // ════════════════════════════════════════════════════════════
@@ -250,6 +266,7 @@ window.expOpenAdd = async function() {
             categories = cached?.data || [];
         }
     }
+    _expModalCategories = categories;
 
     let treasuries = [];
     try {
@@ -266,6 +283,7 @@ window.expOpenAdd = async function() {
                 <button class="mod-modal-close" onclick="expCloseModal('expModal')">&times;</button></div>
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>بند المصروف *</label>
+                    <input type="text" id="expCatFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث عن بند..." oninput="expFilterCatSelect()" autocomplete="off">
                     <select id="expCatId" class="mod-form-input" onchange="expCheckLimit()">
                         <option value="">-- اختر البند --</option>
                         ${categories.map(c => `<option value="${c.id}" data-limit="${c.monthly_limit||0}">${c.name}</option>`).join('')}
