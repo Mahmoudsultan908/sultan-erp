@@ -10,9 +10,13 @@ let _prodCategories = [];
 let _prodCompanies = [];
 let _prodPriceLevels = [];
 let _prodPricesMap = {};
+let _prodSuppliers = [];
 let _prodSearch = '';
 let _prodFilterCat = '';
 let _prodEditingId = null;
+// نسبة المؤجل التقديرية المستخدمة في حساب هامش الربح داخل مودال التعديل الحالي
+// (آخر نسبة مؤجل اتسجلت لهذا الصنف في فواتير الشراء — راجع prodOpenModal)
+let _prodModalDeferredRate = 0;
 
 function prodFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -22,7 +26,7 @@ function prodFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFra
 async function renderProducts(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل الأصناف...</div>';
     try {
-        const [{ data: products }, { data: categories }, { data: companies }, { data: levels }, { data: stock }, { data: allPrices }] = await Promise.all([
+        const [{ data: products }, { data: categories }, { data: companies }, { data: levels }, { data: stock }, { data: allPrices }, { data: suppliers }] = await Promise.all([
             sb.from('products').select('*').order('name'),
             sb.from('product_categories').select('*').order('name'),
             sb.from('product_companies').select('*').order('name'),
@@ -32,11 +36,13 @@ async function renderProducts(c) {
             //   الأسعار الباقية (مش سعر البيع الأساسي بس) في قائمة الأصناف
             //   نفسها، بدل ما يحتاج المستخدم يفتح تعديل كل صنف لوحده.
             sb.from('product_prices').select('product_id, price_level_id, price'),
+            sb.from('suppliers').select('id, name').eq('is_active', true).order('name'),
         ]);
         _prodList = products || [];
         _prodCategories = categories || [];
         _prodCompanies = companies || [];
         _prodPriceLevels = levels || [];
+        _prodSuppliers = suppliers || [];
 
         // مجموع المخزون لكل صنف (عبر كل المخازن) — للعرض السريع في القائمة
         const stockTotals = {};
@@ -65,10 +71,10 @@ function prodRenderPage(c) {
         </div>
 
         <div class="mod-grid">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🏷️</div><div class="mod-card-val">${_prodList.length}</div><div class="mod-card-lbl">إجمالي الأصناف</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">📦</div><div class="mod-card-val">${_prodList.filter(p=>p._totalStock>0).length}</div><div class="mod-card-lbl">متوفر بالمخزون</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">🔴</div><div class="mod-card-val">${_prodList.filter(p=>p._totalStock<=0).length}</div><div class="mod-card-lbl">نفد المخزون</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F5F3FF;color:#7C3AED">📁</div><div class="mod-card-val">${_prodCategories.length}</div><div class="mod-card-lbl">مجموعات</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🏷️</div><div class="mod-card-val" id="prodCardTotal">${_prodList.length}</div><div class="mod-card-lbl">إجمالي الأصناف</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">📦</div><div class="mod-card-val" id="prodCardInStock">${_prodList.filter(p=>p._totalStock>0).length}</div><div class="mod-card-lbl">متوفر بالمخزون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">🔴</div><div class="mod-card-val" id="prodCardOutStock">${_prodList.filter(p=>p._totalStock<=0).length}</div><div class="mod-card-lbl">نفد المخزون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F5F3FF;color:#7C3AED">📁</div><div class="mod-card-val" id="prodCardCats">${_prodCategories.length}</div><div class="mod-card-lbl">مجموعات</div></div>
         </div>
 
         <div class="mod-card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0">
@@ -137,6 +143,16 @@ function prodRenderRows() {
     }).join('');
 }
 
+// تحديث كروت الملخص (إجمالي/متوفر/نافد/مجموعات) من الـ state المحلي فقط
+// من غير أي fetch جديد — بيتنادى بعد أي تعديل محلي على _prodList/_prodCategories.
+function prodUpdateCards() {
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setTxt('prodCardTotal', _prodList.length);
+    setTxt('prodCardInStock', _prodList.filter(p=>p._totalStock>0).length);
+    setTxt('prodCardOutStock', _prodList.filter(p=>p._totalStock<=0).length);
+    setTxt('prodCardCats', _prodCategories.length);
+}
+
 // تصدير كل الأصناف لإكسيل — عمود منفصل لكل مستوى سعر (نفس تنظيم الجدول)
 window.prodExportXls = function() {
     if (!_prodList.length) { alert('لا يوجد أصناف للتصدير'); return; }
@@ -185,11 +201,29 @@ window.prodOpenEdit = function(id) {
 };
 
 async function prodOpenModal(p) {
-    // لو في تعديل، نجيب الأسعار الحالية لكل المستويات
+    // لو في تعديل، نجيب الأسعار الحالية لكل المستويات + آخر نسبة مؤجل اتسجلت
+    // لهذا الصنف في فواتير الشراء (تقريب لهامش الربح — المؤجل مرتبط بالمورد/
+    // الفاتورة مش بالصنف نفسه، فبناخد آخر نسبة مؤجل استُخدمت فعلياً لآخر
+    // فاتورة شراء تضمنت الصنف ده، كأفضل تقدير متاح).
     let existingPrices = {};
+    _prodModalDeferredRate = 0;
     if (p) {
-        const { data } = await sb.from('product_prices').select('price_level_id, price').eq('product_id', p.id);
+        const [{ data }, { data: piRows }] = await Promise.all([
+            sb.from('product_prices').select('price_level_id, price').eq('product_id', p.id),
+            // ملحوظة: من غير limit هنا — id بتاع purchase_items هو UUID عشوائي
+            // (مش تسلسلي)، فالترتيب/التحديد عليه ما كانش هيضمن فعلاً آخر
+            // فاتورة شراء زمنياً. بنجيب كل السجلات ونرتبها محلياً حسب تاريخ
+            // فاتورة الشراء الفعلي (purchases.created_at) عشان النتيجة تبقى صح.
+            sb.from('purchase_items')
+                .select('deferred_rate, purchases!inner(created_at, status)')
+                .eq('product_id', p.id)
+                .eq('purchases.status', 'confirmed'),
+        ]);
         (data||[]).forEach(r => existingPrices[r.price_level_id] = r.price);
+        if (piRows && piRows.length) {
+            const sorted = [...piRows].sort((a,b) => new Date(b.purchases?.created_at||0) - new Date(a.purchases?.created_at||0));
+            _prodModalDeferredRate = Number(sorted[0].deferred_rate) || 0;
+        }
     }
 
     const modal = document.createElement('div');
@@ -221,6 +255,12 @@ async function prodOpenModal(p) {
                             ${_prodCompanies.map(co=>`<option value="${co.id}" ${p?.company_id===co.id?'selected':''}>${co.name}</option>`).join('')}
                         </select></div>
                 </div>
+                <div class="mod-form-group"><label>المورّد</label>
+                    <select id="prodSupplier" class="mod-form-input">
+                        <option value="">بدون مورّد</option>
+                        ${_prodSuppliers.map(s=>`<option value="${s.id}" ${p?.supplier_id===s.id?'selected':''}>${s.name}</option>`).join('')}
+                    </select>
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>وحدة الشراء</label>
                         <input type="text" id="prodPurchaseUnit" class="mod-form-input" value="${p?.purchase_unit||'كرتونة'}"></div>
@@ -231,10 +271,15 @@ async function prodOpenModal(p) {
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>سعر الشراء (ج.م) *</label>
-                        <input type="number" id="prodPurchasePrice" class="mod-form-input" value="${p?.purchase_price||0}" min="0" step="0.01"></div>
+                        <input type="number" id="prodPurchasePrice" class="mod-form-input" value="${p?.purchase_price||0}" min="0" step="0.01" oninput="prodUpdateMargins()"></div>
                     <div class="mod-form-group"><label>حد الطلب (تنبيه نقص)</label>
                         <input type="number" id="prodReorderPoint" class="mod-form-input" value="${p?.reorder_point||0}" min="0" step="1"></div>
                 </div>
+                ${_prodModalDeferredRate > 0 ? `
+                <p style="font-size:11px;color:#94A3B8;margin-top:-4px">
+                    ℹ️ هامش الربح تحت محسوب بعد خصم نسبة مؤجل تقديرية ${prodFmt(_prodModalDeferredRate)}%
+                    (آخر نسبة مؤجل مسجّلة لهذا الصنف من فواتير الشراء).
+                </p>` : ''}
 
                 <div class="mod-form-group" style="margin-top:6px">
                     <label style="font-weight:800;color:#1E293B">💰 مستويات البيع</label>
@@ -243,7 +288,8 @@ async function prodOpenModal(p) {
                         <div>
                             <label style="font-size:11.5px;color:#64748B">${lvl.name}</label>
                             <input type="number" class="mod-form-input prod-price-lvl" data-level-id="${lvl.id}"
-                                value="${existingPrices[lvl.id]||0}" min="0" step="0.01" style="margin:2px 0 0">
+                                value="${existingPrices[lvl.id]||0}" min="0" step="0.01" style="margin:2px 0 0" oninput="prodUpdateMargins()">
+                            <div id="prodMarginLvl-${lvl.id}" style="font-size:11px;margin-top:2px;min-height:14px"></div>
                         </div>`).join('')}
                     </div>
                 </div>
@@ -255,9 +301,28 @@ async function prodOpenModal(p) {
         </div>`;
     document.body.appendChild(modal);
     setTimeout(()=>document.getElementById('prodName')?.focus(), 50);
+    prodUpdateMargins();
 }
 
 window.prodCloseModal = function() { document.getElementById('prodModal')?.remove(); };
+
+// هامش الربح % تحت كل مستوى سعر = (سعر المستوى - التكلفة الفعلية بعد خصم
+// نسبة المؤجل التقديرية) / سعر المستوى × 100. بيتحدّث لحظياً مع أي تعديل
+// في سعر الشراء أو أي مستوى سعر جوه المودال (من غير أي fetch جديد).
+window.prodUpdateMargins = function() {
+    const purchasePrice = parseFloat(document.getElementById('prodPurchasePrice')?.value) || 0;
+    const effectiveCost = purchasePrice * (1 - (_prodModalDeferredRate||0) / 100);
+    document.querySelectorAll('.prod-price-lvl').forEach(input => {
+        const levelId = input.dataset.levelId;
+        const marginEl = document.getElementById('prodMarginLvl-' + levelId);
+        if (!marginEl) return;
+        const price = parseFloat(input.value) || 0;
+        if (price <= 0) { marginEl.textContent = ''; return; }
+        const margin = ((price - effectiveCost) / price) * 100;
+        marginEl.textContent = `هامش الربح: ${margin.toFixed(1)}%`;
+        marginEl.style.color = margin >= 0 ? '#059669' : '#DC2626';
+    });
+};
 
 window.prodOpenCategoryManager = function() {
     const modal = document.createElement('div');
@@ -286,12 +351,26 @@ window.prodAddCategory = async function() {
     const name = document.getElementById('newCatName').value.trim();
     if (!name) return alert('اكتب اسم المجموعة');
     try {
-        const { error } = await sb.from('product_categories').insert({ name });
+        const { data, error } = await sb.from('product_categories').insert({ name }).select();
         if (error) throw error;
+        _prodCategories.push(data[0]);
+        _prodCategories.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ar'));
         document.getElementById('prodCatModal').remove();
-        renderProducts(document.getElementById('app-content'));
+        prodRebuildPagePreserveScroll(); // إعادة رسم الصفحة من الـ state المحلي (بدون fetch كامل جديد)، مع الحفاظ على موضع التمرير
     } catch(e) { alert('خطأ: ' + e.message); }
 };
+
+// إعادة رسم صفحة الأصناف كاملة من الـ state المحلي الحالي (من غير أي fetch
+// جديد لـ Supabase) مع حفظ موضع التمرير قبلها وإرجاعه بعدها — مستخدمة في
+// الحالات اللي محتاجة إعادة بناء الصفحة كلها (مثلاً تحديث قوائم المجموعات/
+// الشركات المنسدلة) بدل renderProducts() اللي بتعمل fetch كامل من الصفر.
+function prodRebuildPagePreserveScroll() {
+    const c = document.getElementById('app-content');
+    if (!c) return;
+    const scrollTop = c.scrollTop;
+    prodRenderPage(c);
+    c.scrollTop = scrollTop;
+}
 
 window.prodOpenCompanyManager = function() {
     const modal = document.createElement('div');
@@ -320,12 +399,26 @@ window.prodAddCompany = async function() {
     const name = document.getElementById('newCompName').value.trim();
     if (!name) return alert('اكتب اسم الشركة');
     try {
-        const { error } = await sb.from('product_companies').insert({ name });
+        const { data, error } = await sb.from('product_companies').insert({ name }).select();
         if (error) throw error;
+        _prodCompanies.push(data[0]);
+        _prodCompanies.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ar'));
         document.getElementById('prodCompModal').remove();
-        renderProducts(document.getElementById('app-content'));
+        prodRebuildPagePreserveScroll(); // إعادة رسم الصفحة من الـ state المحلي (بدون fetch كامل جديد)، مع الحفاظ على موضع التمرير
     } catch(e) { alert('خطأ: ' + e.message); }
 };
+
+// INSERT/UPDATE واحد لصف الصنف في products، بيرجّع { data, productId }
+async function prodSaveProductRow(payload, editingId) {
+    if (editingId) {
+        const { data, error } = await sb.from('products').update(payload).eq('id', editingId).select();
+        if (error) throw error;
+        return { data: data[0], productId: editingId };
+    }
+    const { data, error } = await sb.from('products').insert(payload).select();
+    if (error) throw error;
+    return { data: data[0], productId: data[0].id };
+}
 
 // ════════════════════════════════════════════════════════════
 // 3) الحفظ — UPSERT في products + product_prices
@@ -336,6 +429,7 @@ window.prodSave = async function() {
     const barcode = document.getElementById('prodBarcode').value.trim();
     const category_id = document.getElementById('prodCategory').value || null;
     const company_id = document.getElementById('prodCompany').value || null;
+    const supplier_id = document.getElementById('prodSupplier').value || null;
     const purchase_unit = document.getElementById('prodPurchaseUnit').value.trim() || 'كرتونة';
     const sale_unit = document.getElementById('prodSaleUnit').value.trim() || 'قطعة';
     const units_per_carton = parseFloat(document.getElementById('prodUnitsPerCarton').value) || 1;
@@ -349,44 +443,63 @@ window.prodSave = async function() {
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
 
     try {
+        // نجمع أسعار المستويات من الفورم أولاً عشان نضم مزامنة wholesale_price/
+        // retail_price في نفس نداء INSERT/UPDATE الرئيسي بدل نداءات UPDATE منفصلة.
+        const levelPrices = [...document.querySelectorAll('.prod-price-lvl')].map(input => ({
+            levelId: input.dataset.levelId,
+            price: parseFloat(input.value) || 0,
+        }));
+
         const payload = {
             name, code: code || null, barcode: barcode || null,
-            category_id, company_id, purchase_unit, sale_unit, unit: sale_unit,
+            category_id, company_id, supplier_id, purchase_unit, sale_unit, unit: sale_unit,
             units_per_carton, purchase_price, reorder_point,
         };
+        // مزامنة wholesale_price/retail_price (أعمدة WorkFlow Hub القديمة) من أول مستويين — للتوافق مع sales.js
+        if (_prodPriceLevels[0]) payload.wholesale_price = levelPrices.find(lp=>lp.levelId===_prodPriceLevels[0].id)?.price || 0;
+        if (_prodPriceLevels[1]) payload.retail_price = levelPrices.find(lp=>lp.levelId===_prodPriceLevels[1].id)?.price || 0;
 
         let productId = _prodEditingId;
+        let savedRow;
+        try {
+            const r = await prodSaveProductRow(payload, _prodEditingId);
+            savedRow = r.data; productId = r.productId;
+        } catch (err) {
+            // ★ لو عمود supplier_id لسه مش موجود في قاعدة البيانات الحية (الـ
+            //   migration في products_supplier_migration.sql لسه ما اتشغلش
+            //   يدوياً في Supabase)، بنعيد المحاولة من غيره بدل ما نمنع حفظ
+            //   الصنف بالكامل. باقي بيانات الصنف بتتحفظ عادي.
+            if (payload.supplier_id !== undefined && /supplier_id/i.test(err.message||'')) {
+                const { supplier_id, ...payloadNoSupplier } = payload;
+                const r = await prodSaveProductRow(payloadNoSupplier, _prodEditingId);
+                savedRow = r.data; productId = r.productId;
+                console.warn('⚠️ عمود products.supplier_id غير موجود بعد — شغّل products_supplier_migration.sql. تم حفظ باقي بيانات الصنف بدون المورّد.');
+            } else {
+                throw err;
+            }
+        }
+
+        // حفظ مستويات الأسعار (UPSERT لكل مستوى) — بالتوازي بدل التوالي
+        await Promise.all(levelPrices.map(lp => sb.from('product_prices').upsert({
+            product_id: productId, price_level_id: lp.levelId, price: lp.price
+        }, { onConflict: 'product_id,price_level_id' })));
+
+        // ★ تحديث الـ state المحلي (_prodList/_prodPricesMap) بدل إعادة تحميل
+        //   القايمة كلها من الصفر — بيحافظ على مكان المستخدم (تمرير/بحث/فلتر)
+        //   وبيبقى فوري بدل ما ينتظر fetch كامل تاني لكل الأصناف/المخزون/الأسعار.
         if (_prodEditingId) {
-            const { error } = await sb.from('products').update(payload).eq('id', _prodEditingId);
-            if (error) throw error;
+            const idx = _prodList.findIndex(x => x.id === _prodEditingId);
+            if (idx > -1) _prodList[idx] = { ..._prodList[idx], ...savedRow };
         } else {
-            const { data, error } = await sb.from('products').insert(payload).select();
-            if (error) throw error;
-            productId = data[0].id;
+            _prodList.push({ ...savedRow, _totalStock: 0 });
+            _prodList.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ar'));
         }
-
-        // حفظ مستويات الأسعار (UPSERT لكل مستوى)
-        const priceInputs = document.querySelectorAll('.prod-price-lvl');
-        for (const input of priceInputs) {
-            const levelId = input.dataset.levelId;
-            const price = parseFloat(input.value) || 0;
-            await sb.from('product_prices').upsert({
-                product_id: productId, price_level_id: levelId, price
-            }, { onConflict: 'product_id,price_level_id' });
-        }
-
-        // مزامنة wholesale_price/retail_price (أعمدة WorkFlow Hub القديمة) من أول مستويين — للتوافق مع sales.js
-        if (_prodPriceLevels[0]) {
-            const wPrice = parseFloat(document.querySelector(`.prod-price-lvl[data-level-id="${_prodPriceLevels[0].id}"]`)?.value) || 0;
-            await sb.from('products').update({ wholesale_price: wPrice }).eq('id', productId);
-        }
-        if (_prodPriceLevels[1]) {
-            const rPrice = parseFloat(document.querySelector(`.prod-price-lvl[data-level-id="${_prodPriceLevels[1].id}"]`)?.value) || 0;
-            await sb.from('products').update({ retail_price: rPrice }).eq('id', productId);
-        }
+        _prodPricesMap[productId] = _prodPricesMap[productId] || {};
+        levelPrices.forEach(lp => { _prodPricesMap[productId][lp.levelId] = lp.price; });
 
         prodCloseModal();
-        renderProducts(document.getElementById('app-content'));
+        prodRenderRows();   // إعادة رسم صفوف الجدول من الـ state المحلي فقط (من غير fetch جديد ومن غير ما نفقد موضع التمرير)
+        prodUpdateCards();
     } catch (err) {
         alert('❌ خطأ أثناء الحفظ: ' + err.message);
         btn.innerText = '💾 حفظ'; btn.disabled = false;
@@ -399,7 +512,11 @@ window.prodToggleActive = async function(id, activate) {
     try {
         const { error } = await sb.from('products').update({ is_active: activate }).eq('id', id);
         if (error) throw error;
-        renderProducts(document.getElementById('app-content'));
+        // تحديث محلي بدل fetch كامل من جديد — نفس منطق prodSave
+        const p = _prodList.find(x => x.id === id);
+        if (p) p.is_active = activate;
+        prodRenderRows();
+        prodUpdateCards();
     } catch(e) { alert('خطأ: ' + e.message); }
 };
 
