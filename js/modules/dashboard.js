@@ -22,6 +22,9 @@ async function renderDashboard(container) {
             { data: topProducts },
             { data: latestSales },
             { data: overdueCustomers },
+            { data: allStock },
+            { data: allCustomers },
+            { data: allSuppliers },
         ] = await Promise.all([
             sb.rpc('get_cash_balance'),
             sb.from('sales').select('total').eq('status','confirmed').gte('created_at', today),
@@ -41,6 +44,12 @@ async function renderDashboard(container) {
                 .order('created_at', { ascending: false })
                 .limit(6),
             sb.from('customers').select('name, balance, credit_limit').gt('balance', 0).order('balance', { ascending: false }).limit(5),
+            // نفس منطق حساب قيمة المخزون المستخدم في js/modules/inventory.js (qty * purchase_price)
+            sb.from('inventory_stock').select('qty, products(purchase_price)'),
+            // نفس منطق حساب مديونية العملاء المستخدم في js/modules/customers.js (مجموع الأرصدة الموجبة فقط)
+            sb.from('customers').select('balance'),
+            // نفس منطق حساب مستحقات الموردين المستخدم في js/modules/suppliers.js (مجموع الأرصدة الموجبة فقط)
+            sb.from('suppliers').select('balance'),
         ]);
 
         const cash = Number(cashData) || 0;
@@ -49,6 +58,13 @@ async function renderDashboard(container) {
         const monthPurchases = (purchasesMonth || []).reduce((s, r) => s + Number(r.total), 0);
         const monthExpenses = (expensesMonth || []).reduce((s, r) => s + Number(r.amount), 0);
         const monthProfit = monthSales - monthPurchases - monthExpenses;
+
+        // ── تقرير الجرد اليومي (صافي المركز المالي) ──────────────────
+        // قيمة المخزون + رصيد الخزنة + مديونية العملاء - مستحقات الموردين
+        const stockValue = (allStock || []).reduce((s, r) => s + (Number(r.qty) || 0) * Number(r.products?.purchase_price || 0), 0);
+        const customersDebt = (allCustomers || []).reduce((s, c) => s + (Number(c.balance) > 0 ? Number(c.balance) : 0), 0);
+        const suppliersDebt = (allSuppliers || []).reduce((s, sp) => s + (Number(sp.balance) > 0 ? Number(sp.balance) : 0), 0);
+        const netWorth = stockValue + cash + customersDebt - suppliersDebt;
 
         const fmt = (n) => Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const fmtDate = (d) => new Date(d).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -109,6 +125,25 @@ async function renderDashboard(container) {
                     <div class="dash-kpi-body">
                         <div class="dash-kpi-val">${fmt(monthExpenses)}</div>
                         <div class="dash-kpi-lbl">مصروفات ${monthName}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تقرير الجرد اليومي: صافي المركز المالي (قيمة مخزون + خزنة + مديونية عملاء - مستحقات موردين) -->
+            <div class="dash-row">
+                <div class="dash-card" style="flex:1">
+                    <div class="dash-card-header"><span>📋 تقرير الجرد اليومي — صافي المركز المالي</span></div>
+                    <div class="dash-summary-row"><span>📦 قيمة البضاعة (المخزون)</span><span class="dash-s-green">${fmt(stockValue)}</span></div>
+                    <div class="dash-summary-row"><span>💰 رصيد الخزنة (كل الخزن)</span><span class="dash-s-green">${fmt(cash)}</span></div>
+                    <div class="dash-summary-row"><span>👥 مديونية العملاء (لينا عندهم)</span><span class="dash-s-green">${fmt(customersDebt)}</span></div>
+                    <div class="dash-summary-row"><span>🏭 مستحقات الموردين (عندنا ليهم)</span><span class="dash-s-red">- ${fmt(suppliersDebt)}</span></div>
+                    <div class="dash-summary-divider"></div>
+                    <div class="dash-summary-row dash-summary-total">
+                        <span>${netWorth >= 0 ? '✅ صافي المركز المالي' : '📉 صافي المركز المالي'}</span>
+                        <span style="color:${netWorth >= 0 ? '#059669' : '#DC2626'}">${fmt(Math.abs(netWorth))}</span>
+                    </div>
+                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;line-height:1.6">
+                        ⚠️ هذا رقم لحظي (مخزون + خزنة + مديونيات - مستحقات) وليس "ربح أو خسارة" بالمعنى المحاسبي — لحساب الربح الفعلي يلزم مقارنة فترتين، راجع "ملخص ${monthName}" بجانبه.
                     </div>
                 </div>
             </div>
