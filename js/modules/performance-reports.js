@@ -117,10 +117,29 @@ window.prfLoadByProduct = async function () {
             g.cost += (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0);
         });
 
+        // نسبة المؤجل التقديرية لكل صنف — نفس المنطق المستخدم في صفحة الأصناف
+        // (آخر نسبة مؤجل استُخدمت فعلياً في آخر فاتورة شراء مؤكدة تضمنت الصنف)،
+        // عشان الربح المعروض هنا يبقى متسق مع هامش الربح الظاهر تحت كل سعر هناك.
+        const productIds = Object.keys(byProduct);
+        const deferredRateByProduct = {};
+        if (productIds.length) {
+            const { data: piRows } = await sb.from('purchase_items')
+                .select('product_id, deferred_rate, purchases!inner(created_at, status)')
+                .in('product_id', productIds)
+                .eq('purchases.status', 'confirmed');
+            (piRows || []).forEach(r => {
+                const cur = deferredRateByProduct[r.product_id];
+                const rowDate = new Date(r.purchases?.created_at || 0);
+                if (!cur || rowDate > cur.date) deferredRateByProduct[r.product_id] = { rate: Number(r.deferred_rate) || 0, date: rowDate };
+            });
+        }
+
         const rows = Object.entries(byProduct).map(([pid, g]) => {
             const p = _perfProducts.find(x => x.id === pid);
-            const profit = g.revenue - g.cost;
-            return { name: p?.name || 'صنف محذوف', code: p?.code || '', unit: p?.unit || '', qty: g.qty, revenue: g.revenue, profit, marginPct: g.revenue > 0 ? (profit / g.revenue * 100) : 0 };
+            const deferredRate = deferredRateByProduct[pid]?.rate || 0;
+            const netCost = g.cost * (1 - deferredRate / 100);
+            const profit = g.revenue - netCost;
+            return { name: p?.name || 'صنف محذوف', code: p?.code || '', unit: p?.unit || '', qty: g.qty, revenue: g.revenue, profit, deferredRate, marginPct: g.revenue > 0 ? (profit / g.revenue * 100) : 0 };
         }).sort((a, b) => b.revenue - a.revenue);
 
         const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
@@ -137,7 +156,7 @@ window.prfLoadByProduct = async function () {
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
                 <th>الصنف</th><th style="text-align:center">الكمية المباعة</th>
-                <th style="text-align:left">الإيراد</th><th style="text-align:left">الربح</th><th style="text-align:center">هامش الربح</th>
+                <th style="text-align:left">الإيراد</th><th style="text-align:left">الربح</th><th style="text-align:center">هامش الربح</th><th style="text-align:center">مؤجل مخصوم</th>
             </tr></thead><tbody>
                 ${rows.length ? rows.map(r => `<tr>
                     <td><strong>${r.name}</strong>${r.code ? `<div style="font-size:11px;color:#94A3B8">${r.code}</div>` : ''}</td>
@@ -145,7 +164,8 @@ window.prfLoadByProduct = async function () {
                     <td style="text-align:left;font-weight:700">${perfFmt(r.revenue)}</td>
                     <td style="text-align:left;font-weight:700;color:${r.profit >= 0 ? '#059669' : '#DC2626'}">${perfFmt(r.profit)}</td>
                     <td style="text-align:center">${r.marginPct.toFixed(1)}%</td>
-                </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مبيعات في هذه الفترة</td></tr>`}
+                    <td style="text-align:center;color:#94A3B8;font-size:12px">${r.deferredRate > 0 ? r.deferredRate.toFixed(1) + '%' : '—'}</td>
+                </tr>`).join('') : `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد مبيعات في هذه الفترة</td></tr>`}
             </tbody></table>
         </div>`;
     } catch (err) {

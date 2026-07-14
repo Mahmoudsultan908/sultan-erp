@@ -55,16 +55,23 @@ async function renderReports(container) {
         const toDefault = today.toISOString().slice(0,10);
 
         const load = async (from, to) => {
-            const [{ data: sales }, { data: purchases }, { data: expenses }, { data: salesReturns }] = await Promise.all([
+            const [{ data: sales }, { data: purchases }, { data: expenses }, { data: salesReturns }, { data: deferredItems }] = await Promise.all([
                 sb.from('sales').select('total,subtotal').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
                 sb.from('purchases').select('total').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
                 sb.from('expenses').select('amount').eq('status','confirmed').gte('expense_date', from).lte('expense_date', to),
                 sb.from('sales_returns').select('total').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+                // بنود المؤجل: نسبة من قيمة فاتورة الشراء متوقع استردادها من المورد لاحقاً، فمش
+                // بتُحسب كتكلفة فعلية دلوقتي — بنطرحها من إجمالي المشتريات عشان قائمة الدخل تبقى صافية.
+                sb.from('purchase_items').select('line_total, deferred_rate, purchases!inner(created_at, status)')
+                    .eq('purchases.status', 'confirmed')
+                    .gte('purchases.created_at', from).lte('purchases.created_at', to + 'T23:59:59'),
             ]);
             const totalSales = (sales||[]).reduce((s,r)=>s+Number(r.total),0);
             const totalReturns = (salesReturns||[]).reduce((s,r)=>s+Number(r.total),0);
             const netSales = totalSales - totalReturns;
-            const totalPurchases = (purchases||[]).reduce((s,r)=>s+Number(r.total),0);
+            const totalPurchasesGross = (purchases||[]).reduce((s,r)=>s+Number(r.total),0);
+            const totalDeferred = (deferredItems||[]).reduce((s,it)=>s+(Number(it.line_total)||0)*((Number(it.deferred_rate)||0)/100),0);
+            const totalPurchases = totalPurchasesGross - totalDeferred;
             const totalExpenses = (expenses||[]).reduce((s,r)=>s+Number(r.amount),0);
             const netProfit = netSales - totalPurchases - totalExpenses;
             const margin = netSales > 0 ? (netProfit/netSales*100) : 0;
@@ -82,7 +89,8 @@ async function renderReports(container) {
                 <h3 style="margin:0 0 16px;font-size:15px">قائمة الدخل (${from} إلى ${to})</h3>
                 <div class="dash-summary-row"><span>صافي المبيعات</span><span class="dash-s-green">${fmt(netSales)}</span></div>
                 <div class="dash-summary-row" style="font-size:11px;color:#94A3B8"><span>(إجمالي ${fmt(totalSales)} - مرتجعات ${fmt(totalReturns)})</span><span></span></div>
-                <div class="dash-summary-row"><span>(-) إجمالي المشتريات</span><span class="dash-s-red">${fmt(totalPurchases)}</span></div>
+                <div class="dash-summary-row"><span>(-) صافي المشتريات</span><span class="dash-s-red">${fmt(totalPurchases)}</span></div>
+                <div class="dash-summary-row" style="font-size:11px;color:#94A3B8"><span>(إجمالي ${fmt(totalPurchasesGross)} - مؤجل متوقع ${fmt(totalDeferred)})</span><span></span></div>
                 <div class="dash-summary-row"><span>(-) إجمالي المصروفات</span><span class="dash-s-red">${fmt(totalExpenses)}</span></div>
                 <div class="dash-summary-divider"></div>
                 <div class="dash-summary-row dash-summary-total">
