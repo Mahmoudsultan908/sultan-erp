@@ -293,6 +293,9 @@ window.prfLoadByRep = async function () {
         ${!_perfReps.length ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
             ⚠️ لا يوجد مندوبون مسجّلون بعد. أضِف مندوبين من صفحة "🚗 المندوبون" واربطهم بالفواتير عشان يظهروا هنا.
         </div>` : ''}
+        ${e3 ? `<div style="background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
+            ⚠️ <strong>تعذّر جلب بيانات مرتجعات المبيعات (${e3.message || 'خطأ غير معروف'})</strong> — أرقام "صافي المبيعات" و"مرتجعات" أدناه محسوبة من غير خصم أي مرتجع فعلياً حتى لو حصل. غالباً السبب إن عمود <code>sales_returns.rep_id</code> لسه مش موجود — تأكد إن ملف <code>sales_returns_rep_id_migration.sql</code> اتشغّل بنجاح (من غير أي رسالة خطأ) في Supabase SQL Editor.
+        </div>` : ''}
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">🚗</div><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">مندوبون لهم مبيعات</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💰</div><div class="mod-card-val">${perfFmt(attributedTotal)}</div><div class="mod-card-lbl">صافي مبيعات مرتبطة بمندوب (بعد خصم المرتجعات)</div></div>

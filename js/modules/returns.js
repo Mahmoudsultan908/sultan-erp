@@ -123,6 +123,7 @@ async function renderReturns(c) {
     // إعادة ضبط الحالة
     retType = 'sales'; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retRepId = null; retItems = [];
     retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
+    retPriceLevelCode = ''; retAffectsBalance = true;
     const mainWh = RET_DB.warehouses.find(w => w.is_main) || RET_DB.warehouses[0];
     retWarehouseId = mainWh?.id || null;
 
@@ -223,6 +224,7 @@ window.retSwitchType = async function (type) {
     if (retEditingId && !confirm('سيتم إلغاء وضع التعديل الحالي. تبديل نوع المرتجع؟')) return;
     retType = type; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retRepId = null; retItems = [];
     retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
+    retPriceLevelCode = ''; retAffectsBalance = true;
     if (!RET_DB.isOfflineData) await retLoadRecent();
     await retLoadPendingList();
     retRenderScreen(document.getElementById('app-content'));
@@ -377,6 +379,7 @@ function retSearchBarHTML() {
             </div>
             <span class="inv-search-hint"><kbd>Alt+F</kbd> بحث</span>
             <button class="inv-add-row-btn" onclick="retAddRow()">+ سطر يدوي</button>
+            <button class="inv-add-row-btn" onclick="retOpenMultiSelect()">☑️ اختيار أصناف متعددة</button>
         </div>`;
     }
     return `
@@ -457,9 +460,34 @@ function retNotesCardHTML() {
                 <option value="">🚗 بدون مندوب</option>
                 ${RET_DB.reps.map(r => `<option value="${r.id}" ${r.id === retRepId ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
             </select>
-        </div>` : ''}` : ''}
+        </div>` : ''}
+        ${(RET_DB.priceLevels || []).length ? `
+        <div class="mod-form-group" style="margin-top:10px"><label>مستوى السعر (لتحديد سعر إعادة الحساب)</label>
+            <select id="retPriceLevelSelect" class="mod-form-input" onchange="retSetPriceLevel(this.value)">
+                <option value="">الافتراضي (جملة ثم تجزئة)</option>
+                ${RET_DB.priceLevels.map(l => `<option value="${l.code}" ${retPriceLevelCode === l.code ? 'selected' : ''}>💰 ${l.name}</option>`).join('')}
+            </select>
+        </div>` : ''}
+        <div class="mod-form-group" style="margin-top:10px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="retAffectsBalanceChk" ${retAffectsBalance ? 'checked' : ''} onchange="retAffectsBalance=this.checked">
+                خصم من رصيد العميل؟
+            </label>
+            <div style="font-size:11px;color:var(--inv-muted);margin-top:2px">شيل العلامة لو المرتجع مش هيتحاسب عليه العميل (مثلاً بضاعة بترجع للمخزون بس من غير رد فلوس/تعديل حساب)</div>
+        </div>` : ''}
     </div>`;
 }
+
+// تغيير مستوى السعر المستخدم في حساب أسعار مرتجع المبيعات (نفس فكرة
+// invSetPriceLevel في sales.js) — بيعيد حساب سعر كل صنف موجود بالفعل
+// في الفاتورة بالسعر الجديد (الأصناف اليدوية فقط، وضع "مستقل").
+window.retSetPriceLevel = function (code) {
+    retPriceLevelCode = code || '';
+    if (retMode === 'manual') {
+        retItems.forEach(it => { if (it.pid) { const p = RET_DB.products.find(x => x.id === it.pid); if (p) it.price = retGetPrice(p); } });
+        retRenderItems(); retUpdateSummary();
+    }
+};
 
 function retRecentListHTML() {
     const list = [...(RET_DB.pendingList || []), ...(RET_DB.list || [])];
@@ -510,6 +538,10 @@ function retGetStock(pid) {
     return RET_DB.stockMap[retWarehouseId + '|' + pid] || 0;
 }
 function retGetPrice(p) {
+    if (retType === 'sales' && retPriceLevelCode) {
+        const levelPrice = RET_DB.priceMap?.[p.id + '|' + retPriceLevelCode];
+        if (levelPrice != null) return levelPrice;
+    }
     return retType === 'sales' ? (Number(p.wholesale_price) || Number(p.retail_price) || 0) : (Number(p.purchase_price) || 0);
 }
 function retOnWarehouseChange() {
@@ -726,6 +758,60 @@ function retPickProduct(pid) {
     retRenderItems();
     retUpdateSummary();
 }
+// اختيار أصناف متعددة دفعة واحدة (وضع "مستقل" بس) — مودال فيه كل الأصناف
+// مع خانة بحث + checkbox + كمية لكل صنف، وزرار "إضافة المحدد" بيضيفهم
+// كلهم كصفوف مرة واحدة بدل واحد واحد.
+window.retOpenMultiSelect = function () {
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'retMultiModal';
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:560px">
+            <div class="mod-modal-header"><h3>☑️ اختيار أصناف متعددة</h3>
+                <button class="mod-modal-close" onclick="document.getElementById('retMultiModal').remove()">&times;</button></div>
+            <div class="mod-modal-body">
+                <input type="text" id="retMultiSearch" class="mod-form-input" style="margin-bottom:10px" placeholder="🔍 بحث بالاسم/الكود..." oninput="retMultiFilter()" autocomplete="off">
+                <div id="retMultiList" style="max-height:360px;overflow-y:auto"></div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('retMultiModal').remove()">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" onclick="retMultiConfirm()">➕ إضافة المحدد</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    retMultiFilter();
+};
+window.retMultiFilter = function () {
+    const term = (document.getElementById('retMultiSearch')?.value || '').trim().toLowerCase();
+    const list = document.getElementById('retMultiList');
+    if (!list) return;
+    const items = !term ? RET_DB.products : RET_DB.products.filter(p => (p.name || '').toLowerCase().includes(term) || (p.code || '').toLowerCase().includes(term));
+    list.innerHTML = items.map(p => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #F1F5F9">
+            <input type="checkbox" class="ret-multi-chk" value="${p.id}" id="retMultiChk-${p.id}">
+            <label for="retMultiChk-${p.id}" style="flex:1;cursor:pointer">
+                <div style="font-weight:700;font-size:13px">${p.name}</div>
+                <div style="font-size:11px;color:#94A3B8">${p.code || ''} · ${retFmt(retGetPrice(p))}</div>
+            </label>
+            <input type="number" class="mod-form-input ret-multi-qty" data-pid="${p.id}" value="1" min="1" style="width:70px;margin:0" dir="ltr">
+        </div>`).join('') || '<div style="text-align:center;padding:20px;color:#94A3B8">لا توجد أصناف مطابقة</div>';
+};
+window.retMultiConfirm = function () {
+    const checked = document.querySelectorAll('#retMultiList .ret-multi-chk:checked');
+    checked.forEach(chk => {
+        const pid = chk.value;
+        const p = RET_DB.products.find(x => x.id === pid);
+        if (!p) return;
+        const qtyInput = document.querySelector(`.ret-multi-qty[data-pid="${pid}"]`);
+        const qty = Math.max(1, parseInt(qtyInput?.value) || 1);
+        const ex = retItems.findIndex(i => i.pid === pid);
+        if (ex >= 0) retItems[ex].qty = (retItems[ex].qty || 0) + qty;
+        else retItems.push({ id: Date.now() + Math.random(), pid: p.id, name: p.name, code: p.code || '', unit: p.unit || 'قطعة', qty, price: retGetPrice(p), disc: 0, maxQty: null });
+    });
+    document.getElementById('retMultiModal')?.remove();
+    retRenderItems();
+    retUpdateSummary();
+};
 function retAddRow() {
     retItems.push({ id: Date.now() + Math.random(), pid: null, name: '', code: '', unit: 'قطعة', qty: 1, price: 0, disc: 0, maxQty: null });
     retRenderItems();
@@ -951,6 +1037,7 @@ window.retSave = async function () {
                     payment_type: retLinkedDoc?.payment_type || 'cash',
                     treasury_id: treasuryId,
                     rep_id: retNormalizeRepId(retRepId),
+                    affects_customer_balance: retAffectsBalance,
                     subtotal, total, status: 'confirmed',
                     reason: notes,
                     created_by: currentUser?.id || null,
@@ -1003,6 +1090,7 @@ window.retSave = async function () {
                 payment_type: retLinkedDoc?.payment_type || 'cash',
                 treasury_id: treasuryId,
                 rep_id: retNormalizeRepId(retRepId),
+                affects_customer_balance: retAffectsBalance,
                 subtotal, total, status: 'confirmed',
                 reason: notes,
                 created_by: currentUser?.id || null,
@@ -1058,7 +1146,10 @@ window.retSave = async function () {
         } catch {}
         renderReturns(document.getElementById('app-content'));
     } catch (err) {
-        alert('❌ خطأ أثناء حفظ المرتجع: ' + err.message + '\n\nتأكد من تشغيل ملف returns_migration.sql في Supabase.');
+        const missingCol = /affects_customer_balance|rep_id/.test(err.message || '') && /column|does not exist/i.test(err.message || '');
+        alert('❌ خطأ أثناء حفظ المرتجع: ' + err.message + (missingCol
+            ? '\n\nيبدو إن عمود مطلوب لسه مش موجود — تأكد من تشغيل sales_returns_rep_id_migration.sql وsales_returns_affects_balance_migration.sql في Supabase.'
+            : '\n\nتأكد من تشغيل ملف returns_migration.sql في Supabase.'));
         saveBtns.forEach(b => { b.innerHTML = b.dataset._label; b.disabled = false; });
     }
 };
