@@ -176,11 +176,14 @@ window.colOpenAdd = function(presetCustomerId = null) {
                 <button class="mod-modal-close" onclick="colCloseModal('colModal')">&times;</button></div>
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>العميل *</label>
-                    <input type="text" id="colCustFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث بالاسم / الهاتف / الكود" oninput="colFilterCustList('colCustId')" autocomplete="off">
-                    <select id="colCustId" class="mod-form-input" onchange="colOnCustChange()">
-                        <option value="">-- اختر العميل --</option>
-                        ${_colCustomers.map(c => `<option value="${c.id}" ${c.id===presetCustomerId?'selected':''}>${c.name} ${c.balance>0?'(مستحق '+colFmt(c.balance)+')':''}</option>`).join('')}
-                    </select>
+                    <div style="position:relative">
+                        <input type="text" id="colCustSearch" class="mod-form-input" placeholder="🔍 اكتب اسم العميل / الهاتف / الكود..." autocomplete="off"
+                            value="${preset?preset.name:''}"
+                            oninput="colCustSearchInput('add')" onfocus="colCustSearchInput('add')"
+                            onblur="setTimeout(()=>{const ac=document.getElementById('colCustAC'); if(ac) ac.classList.remove('show');},150)">
+                        <input type="hidden" id="colCustId" value="${presetCustomerId||''}">
+                        <div class="inv-ac" id="colCustAC"></div>
+                    </div>
                 </div>
                 <div class="mod-form-group"><label>المبلغ المحصّل (ج.م) *</label>
                     <input type="number" id="colAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="${preset?colFmt(preset.balance):''}" oninput="colPreview()">
@@ -212,25 +215,45 @@ window.colOnCustChange = function() {
     colPreview();
 };
 
-// فلترة قايمة اختيار العميل (بالاسم/الهاتف/الكود) — مستخدمة في مودال
-// الإضافة (colCustId + colCustFilter) ومودال التعديل (colEditCustId +
-// colEditCustFilter)، بنفس الدالة عن طريق تمرير id السيلكت.
-window.colFilterCustList = function(selectId) {
-    selectId = selectId || 'colCustId';
-    const filterId = selectId === 'colCustId' ? 'colCustFilter' : 'colEditCustFilter';
-    const term = (document.getElementById(filterId)?.value || '').trim().toLowerCase();
-    const sel = document.getElementById(selectId);
-    if (!sel) return;
-    const current = sel.value;
-    const list = term
-        ? _colCustomers.filter(c => (c.name||'').toLowerCase().includes(term) || (c.phone||'').includes(term) || (c.code||'').toLowerCase().includes(term))
-        : _colCustomers;
-    sel.innerHTML = `<option value="">-- اختر العميل --</option>` +
-        list.map(c => `<option value="${c.id}" ${c.id===current?'selected':''}>${c.name} ${c.balance>0?'(مستحق '+colFmt(c.balance)+')':''}</option>`).join('');
-    if (current && !list.some(c => c.id === current)) {
-        const kept = _colCustomers.find(c => c.id === current);
-        if (kept) sel.insertAdjacentHTML('beforeend', `<option value="${kept.id}" selected>${kept.name} (مختار حالياً)</option>`);
+// اختيار العميل — Autocomplete حقيقي (زي inv-cust-pick في sales.js) بدل
+// خانة بحث + <select> منفصلين. مودال الإضافة (colCustSearch/colCustId/
+// colCustAC) ومودال التعديل (colEditCustSearch/colEditCustId/colEditCustAC)
+// بيستخدموا نفس الدالتين بتمرير mode ('add'|'edit').
+window.colCustSearchInput = function(mode) {
+    mode = mode || 'add';
+    const searchId = mode === 'edit' ? 'colEditCustSearch' : 'colCustSearch';
+    const acId = mode === 'edit' ? 'colEditCustAC' : 'colCustAC';
+    const ac = document.getElementById(acId);
+    if (!ac) return;
+    const term = (document.getElementById(searchId)?.value || '').trim().toLowerCase();
+    if (!term) { ac.innerHTML = ''; ac.classList.remove('show'); return; }
+    const list = _colCustomers.filter(c =>
+        (c.name||'').toLowerCase().includes(term) || (c.phone||'').includes(term) || (c.code||'').toLowerCase().includes(term)
+    ).slice(0, 20);
+    if (!list.length) {
+        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
+        ac.classList.add('show');
+        return;
     }
+    ac.innerHTML = list.map(c => `<div class="inv-ac-item" onmousedown="event.preventDefault();colPickCust('${c.id}','${mode}')">
+        <div><div class="an">${c.name}</div><div class="as">${c.phone||''}${c.code?' · '+c.code:''}</div></div>
+        <div class="ap"><div class="pr" style="${c.balance>0?'color:#DC2626':''}">${c.balance>0?colFmt(c.balance):''}</div><div class="as">${c.balance>0?'مستحق':''}</div></div>
+    </div>`).join('');
+    ac.classList.add('show');
+};
+
+window.colPickCust = function(id, mode) {
+    mode = mode || 'add';
+    const searchId = mode === 'edit' ? 'colEditCustSearch' : 'colCustSearch';
+    const hiddenId = mode === 'edit' ? 'colEditCustId' : 'colCustId';
+    const acId = mode === 'edit' ? 'colEditCustAC' : 'colCustAC';
+    const c = _colCustomers.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById(hiddenId).value = id;
+    document.getElementById(searchId).value = c.name;
+    const ac = document.getElementById(acId);
+    if (ac) { ac.innerHTML = ''; ac.classList.remove('show'); }
+    if (mode === 'add') colOnCustChange();
 };
 
 window.colPreview = function() {
@@ -339,11 +362,14 @@ window.colOpenEditModal = function(id) {
                     ⚠️ الحفظ هيلغي سند التحصيل القديم تلقائياً (المبلغ يرجع لرصيد العميل والخزنة) ويسجّل سنداً جديداً بالبيانات المعدّلة — حفاظاً على سجل تاريخي كامل، بدل التعديل المباشر.
                 </div>
                 <div class="mod-form-group"><label>العميل *</label>
-                    <input type="text" id="colEditCustFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث بالاسم / الهاتف / الكود" oninput="colFilterCustList('colEditCustId')" autocomplete="off">
-                    <select id="colEditCustId" class="mod-form-input">
-                        <option value="">-- اختر العميل --</option>
-                        ${_colCustomers.map(c => `<option value="${c.id}" ${c.id===p.customer_id?'selected':''}>${c.name} ${c.balance>0?'(مستحق '+colFmt(c.balance)+')':''}</option>`).join('')}
-                    </select>
+                    <div style="position:relative">
+                        <input type="text" id="colEditCustSearch" class="mod-form-input" placeholder="🔍 اكتب اسم العميل / الهاتف / الكود..." autocomplete="off"
+                            value="${p.customers?.name || _colCustomers.find(c=>c.id===p.customer_id)?.name || ''}"
+                            oninput="colCustSearchInput('edit')" onfocus="colCustSearchInput('edit')"
+                            onblur="setTimeout(()=>{const ac=document.getElementById('colEditCustAC'); if(ac) ac.classList.remove('show');},150)">
+                        <input type="hidden" id="colEditCustId" value="${p.customer_id||''}">
+                        <div class="inv-ac" id="colEditCustAC"></div>
+                    </div>
                 </div>
                 <div class="mod-form-group"><label>المبلغ المحصّل (ج.م) *</label>
                     <input type="number" id="colEditAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="${Number(p.amount)||0}">

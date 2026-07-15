@@ -161,11 +161,14 @@ window.payOpenAdd = function(presetSupplierId = null) {
                 <button class="mod-modal-close" onclick="payCloseModal('payModal')">&times;</button></div>
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>المورد *</label>
-                    <input type="text" id="paySuppFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث بالاسم / الهاتف / الكود" oninput="payFilterSuppList('paySuppId')" autocomplete="off">
-                    <select id="paySuppId" class="mod-form-input" onchange="payOnSuppChange()">
-                        <option value="">-- اختر المورد --</option>
-                        ${_paySuppliers.map(s => `<option value="${s.id}" ${s.id===presetSupplierId?'selected':''}>${s.name} ${s.balance>0?'(مستحق '+payFmt(s.balance)+')':''}</option>`).join('')}
-                    </select>
+                    <div style="position:relative">
+                        <input type="text" id="paySuppSearch" class="mod-form-input" placeholder="🔍 اكتب اسم المورد / الهاتف / الكود..." autocomplete="off"
+                            value="${preset?preset.name:''}"
+                            oninput="paySuppSearchInput('add')" onfocus="paySuppSearchInput('add')"
+                            onblur="setTimeout(()=>{const ac=document.getElementById('paySuppAC'); if(ac) ac.classList.remove('show');},150)">
+                        <input type="hidden" id="paySuppId" value="${presetSupplierId||''}">
+                        <div class="inv-ac" id="paySuppAC"></div>
+                    </div>
                 </div>
                 <div class="mod-form-group"><label>المبلغ (ج.م) *</label>
                     <input type="number" id="payAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="${preset?payFmt(preset.balance):''}" oninput="payPreview()">
@@ -198,25 +201,45 @@ window.payOnSuppChange = function() {
     payPreview();
 };
 
-// فلترة قايمة اختيار المورد (بالاسم/الهاتف/الكود) — مستخدمة في مودال
-// الإضافة (paySuppId + paySuppFilter) ومودال التعديل (payEditSuppId +
-// payEditSuppFilter)، بنفس الدالة عن طريق تمرير id السيلكت.
-window.payFilterSuppList = function(selectId) {
-    selectId = selectId || 'paySuppId';
-    const filterId = selectId === 'paySuppId' ? 'paySuppFilter' : 'payEditSuppFilter';
-    const term = (document.getElementById(filterId)?.value || '').trim().toLowerCase();
-    const sel = document.getElementById(selectId);
-    if (!sel) return;
-    const current = sel.value;
-    const list = term
-        ? _paySuppliers.filter(s => (s.name||'').toLowerCase().includes(term) || (s.phone||'').includes(term) || (s.code||'').toLowerCase().includes(term))
-        : _paySuppliers;
-    sel.innerHTML = `<option value="">-- اختر المورد --</option>` +
-        list.map(s => `<option value="${s.id}" ${s.id===current?'selected':''}>${s.name} ${s.balance>0?'(مستحق '+payFmt(s.balance)+')':''}</option>`).join('');
-    if (current && !list.some(s => s.id === current)) {
-        const kept = _paySuppliers.find(s => s.id === current);
-        if (kept) sel.insertAdjacentHTML('beforeend', `<option value="${kept.id}" selected>${kept.name} (مختار حالياً)</option>`);
+// اختيار المورد — Autocomplete حقيقي (زي inv-cust-pick في sales.js) بدل
+// خانة بحث + <select> منفصلين. مودال الإضافة (paySuppSearch/paySuppId/
+// paySuppAC) ومودال التعديل (payEditSuppSearch/payEditSuppId/payEditSuppAC)
+// بيستخدموا نفس الدالتين بتمرير mode ('add'|'edit').
+window.paySuppSearchInput = function(mode) {
+    mode = mode || 'add';
+    const searchId = mode === 'edit' ? 'payEditSuppSearch' : 'paySuppSearch';
+    const acId = mode === 'edit' ? 'payEditSuppAC' : 'paySuppAC';
+    const ac = document.getElementById(acId);
+    if (!ac) return;
+    const term = (document.getElementById(searchId)?.value || '').trim().toLowerCase();
+    if (!term) { ac.innerHTML = ''; ac.classList.remove('show'); return; }
+    const list = _paySuppliers.filter(s =>
+        (s.name||'').toLowerCase().includes(term) || (s.phone||'').includes(term) || (s.code||'').toLowerCase().includes(term)
+    ).slice(0, 20);
+    if (!list.length) {
+        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
+        ac.classList.add('show');
+        return;
     }
+    ac.innerHTML = list.map(s => `<div class="inv-ac-item" onmousedown="event.preventDefault();payPickSupp('${s.id}','${mode}')">
+        <div><div class="an">${s.name}</div><div class="as">${s.phone||''}${s.code?' · '+s.code:''}</div></div>
+        <div class="ap"><div class="pr" style="${s.balance>0?'color:#DC2626':''}">${s.balance>0?payFmt(s.balance):''}</div><div class="as">${s.balance>0?'مستحق':''}</div></div>
+    </div>`).join('');
+    ac.classList.add('show');
+};
+
+window.payPickSupp = function(id, mode) {
+    mode = mode || 'add';
+    const searchId = mode === 'edit' ? 'payEditSuppSearch' : 'paySuppSearch';
+    const hiddenId = mode === 'edit' ? 'payEditSuppId' : 'paySuppId';
+    const acId = mode === 'edit' ? 'payEditSuppAC' : 'paySuppAC';
+    const s = _paySuppliers.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById(hiddenId).value = id;
+    document.getElementById(searchId).value = s.name;
+    const ac = document.getElementById(acId);
+    if (ac) { ac.innerHTML = ''; ac.classList.remove('show'); }
+    if (mode === 'add') payOnSuppChange();
 };
 
 window.payPreview = function() {
@@ -325,11 +348,14 @@ window.payOpenEditModal = function(id) {
                     ⚠️ الحفظ هيلغي سند الصرف القديم تلقائياً (المبلغ يرجع للخزنة ويترحّل على رصيد المورد) ويسجّل سنداً جديداً بالبيانات المعدّلة — حفاظاً على سجل تاريخي كامل، بدل التعديل المباشر.
                 </div>
                 <div class="mod-form-group"><label>المورد *</label>
-                    <input type="text" id="payEditSuppFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث بالاسم / الهاتف / الكود" oninput="payFilterSuppList('payEditSuppId')" autocomplete="off">
-                    <select id="payEditSuppId" class="mod-form-input">
-                        <option value="">-- اختر المورد --</option>
-                        ${_paySuppliers.map(s => `<option value="${s.id}" ${s.id===p.supplier_id?'selected':''}>${s.name} ${s.balance>0?'(مستحق '+payFmt(s.balance)+')':''}</option>`).join('')}
-                    </select>
+                    <div style="position:relative">
+                        <input type="text" id="payEditSuppSearch" class="mod-form-input" placeholder="🔍 اكتب اسم المورد / الهاتف / الكود..." autocomplete="off"
+                            value="${p.suppliers?.name || _paySuppliers.find(s=>s.id===p.supplier_id)?.name || ''}"
+                            oninput="paySuppSearchInput('edit')" onfocus="paySuppSearchInput('edit')"
+                            onblur="setTimeout(()=>{const ac=document.getElementById('payEditSuppAC'); if(ac) ac.classList.remove('show');},150)">
+                        <input type="hidden" id="payEditSuppId" value="${p.supplier_id||''}">
+                        <div class="inv-ac" id="payEditSuppAC"></div>
+                    </div>
                 </div>
                 <div class="mod-form-group"><label>المبلغ (ج.م) *</label>
                     <input type="number" id="payEditAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="${Number(p.amount)||0}">
