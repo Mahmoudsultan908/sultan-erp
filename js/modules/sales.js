@@ -690,9 +690,11 @@ let _custACIdx = -1;
 function invSearchCustomer(val) {
     const ac = document.getElementById('invCustAC');
     if (!ac) return;
-    const m = val.length ? INV_DB.customers.filter(c =>
+    // من غير كتابة: تعرض أول 8 عملاء زي ما هم، عشان القائمة تظهر على طول
+    // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
+    const m = (val.length ? INV_DB.customers.filter(c =>
         (c.name||'').includes(val) || (c.phone||'').includes(val) || (c.code||'').includes(val)
-    ).slice(0,8) : [];
+    ) : INV_DB.customers).slice(0,8);
     if (m.length) {
         ac.innerHTML = m.map((c,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="invSelectCustomer('${c.id}')" onmouseenter="invCustACHover(${i})">
             <div><div class="an">${c.name}</div><div class="as">${c.phone||''}</div></div>
@@ -771,9 +773,11 @@ let _fastIdx = -1;
 function invFastSearch(val) {
     const ac = document.getElementById('invFastAC');
     if (!ac) return;
-    const m = val.length ? INV_DB.products.filter(p =>
+    // من غير كتابة: تعرض أول 8 أصناف زي ما هم، عشان القائمة تظهر على طول
+    // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
+    const m = (val.length ? INV_DB.products.filter(p =>
         (p.name||'').includes(val) || (p.code||'').includes(val) || (p.barcode||'').includes(val)
-    ).slice(0,8) : [];
+    ) : INV_DB.products).slice(0,8);
     if (m.length) {
         ac.innerHTML = m.map((p,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="invPickProduct('${p.id}')" onmouseenter="invFastHover(${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code||''} · ${p.unit||''}</div></div>
@@ -1633,11 +1637,13 @@ function invBindEvents() {
     // بحث العميل
     const cs = document.getElementById('invCustSearch');
     cs?.addEventListener('input', ()=>{ _custACIdx=-1; invSearchCustomer(cs.value); });
+    cs?.addEventListener('focus', ()=>{ _custACIdx=-1; invSearchCustomer(cs.value); });
     cs?.addEventListener('keydown', invCustACKey);
 
     // البحث السريع
     const fs = document.getElementById('invFastSearch');
     fs?.addEventListener('input', ()=>{ _fastIdx=-1; invFastSearch(fs.value); });
+    fs?.addEventListener('focus', ()=>{ _fastIdx=-1; invFastSearch(fs.value); });
     fs?.addEventListener('keydown', invFastKey);
 
     // اختصارات لوحة المفاتيح العامة

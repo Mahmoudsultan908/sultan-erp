@@ -467,9 +467,11 @@ let _purSuppACIdx = -1;
 function purSearchSupplier(val) {
     const ac = document.getElementById('purSuppAC');
     if (!ac) return;
-    const m = val.length ? PUR_DB.suppliers.filter(s =>
+    // من غير كتابة: تعرض أول 8 موردين زي ما هم، عشان القائمة تظهر على طول
+    // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
+    const m = (val.length ? PUR_DB.suppliers.filter(s =>
         (s.name||'').includes(val) || (s.phone||'').includes(val) || (s.code||'').includes(val)
-    ).slice(0,8) : [];
+    ) : PUR_DB.suppliers).slice(0,8);
     if (m.length) {
         ac.innerHTML = m.map((s,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="purSelectSupplier('${s.id}')" onmouseenter="purSuppACHover(${i})">
             <div><div class="an">${s.name}</div><div class="as">${s.phone||''} ${s.code?'· '+s.code:''}</div></div>
@@ -521,9 +523,11 @@ let _purFastIdx = -1;
 function purFastSearch(val) {
     const ac = document.getElementById('purFastAC');
     if (!ac) return;
-    const m = val.length ? PUR_DB.products.filter(p =>
+    // من غير كتابة: تعرض أول 8 أصناف زي ما هم، عشان القائمة تظهر على طول
+    // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
+    const m = (val.length ? PUR_DB.products.filter(p =>
         (p.name||'').includes(val) || (p.code||'').includes(val) || (p.barcode||'').includes(val)
-    ).slice(0,8) : [];
+    ) : PUR_DB.products).slice(0,8);
     if (m.length) {
         ac.innerHTML = m.map((p,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="purPickProduct('${p.id}')" onmouseenter="purFastHover(${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code||''} · ${p.unit||''}</div></div>
@@ -1086,10 +1090,12 @@ function purToast(msg, type='info') {
 function purBindEvents() {
     const ss = document.getElementById('purSuppSearch');
     ss?.addEventListener('input', ()=>{ _purSuppACIdx=-1; purSearchSupplier(ss.value); });
+    ss?.addEventListener('focus', ()=>{ _purSuppACIdx=-1; purSearchSupplier(ss.value); });
     ss?.addEventListener('keydown', purSuppACKey);
 
     const fs = document.getElementById('purFastSearch');
     fs?.addEventListener('input', ()=>{ _purFastIdx=-1; purFastSearch(fs.value); });
+    fs?.addEventListener('focus', ()=>{ _purFastIdx=-1; purFastSearch(fs.value); });
     fs?.addEventListener('keydown', purFastKey);
 
     document.getElementById('app-content').addEventListener('keydown', purGlobalKeys);

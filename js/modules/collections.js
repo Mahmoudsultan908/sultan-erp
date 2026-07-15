@@ -179,7 +179,7 @@ window.colOpenAdd = function(presetCustomerId = null) {
                     <div style="position:relative">
                         <input type="text" id="colCustSearch" class="mod-form-input" placeholder="🔍 اكتب اسم العميل / الهاتف / الكود..." autocomplete="off"
                             value="${preset?preset.name:''}"
-                            oninput="colCustSearchInput('add')" onfocus="colCustSearchInput('add')"
+                            oninput="colCustSearchInput('add')" onfocus="colCustSearchInput('add')" onkeydown="colCustACKey(event,'add')"
                             onblur="setTimeout(()=>{const ac=document.getElementById('colCustAC'); if(ac) ac.classList.remove('show');},150)">
                         <input type="hidden" id="colCustId" value="${presetCustomerId||''}">
                         <div class="inv-ac" id="colCustAC"></div>
@@ -219,27 +219,49 @@ window.colOnCustChange = function() {
 // خانة بحث + <select> منفصلين. مودال الإضافة (colCustSearch/colCustId/
 // colCustAC) ومودال التعديل (colEditCustSearch/colEditCustId/colEditCustAC)
 // بيستخدموا نفس الدالتين بتمرير mode ('add'|'edit').
+let _colCustACIdx = -1;
 window.colCustSearchInput = function(mode) {
     mode = mode || 'add';
     const searchId = mode === 'edit' ? 'colEditCustSearch' : 'colCustSearch';
     const acId = mode === 'edit' ? 'colEditCustAC' : 'colCustAC';
     const ac = document.getElementById(acId);
     if (!ac) return;
+    _colCustACIdx = -1;
     const term = (document.getElementById(searchId)?.value || '').trim().toLowerCase();
-    if (!term) { ac.innerHTML = ''; ac.classList.remove('show'); return; }
-    const list = _colCustomers.filter(c =>
+    // من غير كتابة: تعرض أول 20 عميل زي ما هم، عشان القائمة تظهر على طول
+    // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
+    const list = (term ? _colCustomers.filter(c =>
         (c.name||'').toLowerCase().includes(term) || (c.phone||'').includes(term) || (c.code||'').toLowerCase().includes(term)
-    ).slice(0, 20);
+    ) : _colCustomers).slice(0, 20);
     if (!list.length) {
         ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');
         return;
     }
-    ac.innerHTML = list.map(c => `<div class="inv-ac-item" onmousedown="event.preventDefault();colPickCust('${c.id}','${mode}')">
+    ac.innerHTML = list.map((c,i) => `<div class="inv-ac-item" data-i="${i}" data-id="${c.id}" onmousedown="event.preventDefault();colPickCust('${c.id}','${mode}')" onmouseenter="colCustACHover(${i},'${mode}')">
         <div><div class="an">${c.name}</div><div class="as">${c.phone||''}${c.code?' · '+c.code:''}</div></div>
         <div class="ap"><div class="pr" style="${c.balance>0?'color:#DC2626':''}">${c.balance>0?colFmt(c.balance):''}</div><div class="as">${c.balance>0?'مستحق':''}</div></div>
     </div>`).join('');
     ac.classList.add('show');
+};
+window.colCustACKey = function(e, mode) {
+    mode = mode || 'add';
+    const acId = mode === 'edit' ? 'colEditCustAC' : 'colCustAC';
+    const ac = document.getElementById(acId);
+    if (!ac || !ac.classList.contains('show')) return;
+    const items = ac.querySelectorAll('.inv-ac-item[data-i]');
+    if (e.key === 'ArrowDown') { e.preventDefault(); _colCustACIdx = Math.min(_colCustACIdx+1, items.length-1); colCustACHover(_colCustACIdx, mode); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); _colCustACIdx = Math.max(_colCustACIdx-1, 0); colCustACHover(_colCustACIdx, mode); }
+    else if (e.key === 'Enter') { e.preventDefault(); const id = items[_colCustACIdx]?.dataset.id; if (id) colPickCust(id, mode); }
+    else if (e.key === 'Escape') { ac.classList.remove('show'); _colCustACIdx = -1; }
+};
+window.colCustACHover = function(i, mode) {
+    mode = mode || 'add';
+    _colCustACIdx = i;
+    const acId = mode === 'edit' ? 'colEditCustAC' : 'colCustAC';
+    const items = document.querySelectorAll('#'+acId+' .inv-ac-item[data-i]');
+    items.forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    items[i]?.scrollIntoView({ block: 'nearest' });
 };
 
 window.colPickCust = function(id, mode) {
@@ -378,7 +400,7 @@ window.colOpenEditModal = function(id) {
                     <div style="position:relative">
                         <input type="text" id="colEditCustSearch" class="mod-form-input" placeholder="🔍 اكتب اسم العميل / الهاتف / الكود..." autocomplete="off"
                             value="${p.customers?.name || _colCustomers.find(c=>c.id===p.customer_id)?.name || ''}"
-                            oninput="colCustSearchInput('edit')" onfocus="colCustSearchInput('edit')"
+                            oninput="colCustSearchInput('edit')" onfocus="colCustSearchInput('edit')" onkeydown="colCustACKey(event,'edit')"
                             onblur="setTimeout(()=>{const ac=document.getElementById('colEditCustAC'); if(ac) ac.classList.remove('show');},150)">
                         <input type="hidden" id="colEditCustId" value="${p.customer_id||''}">
                         <div class="inv-ac" id="colEditCustAC"></div>

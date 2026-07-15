@@ -164,7 +164,7 @@ window.payOpenAdd = function(presetSupplierId = null) {
                     <div style="position:relative">
                         <input type="text" id="paySuppSearch" class="mod-form-input" placeholder="🔍 اكتب اسم المورد / الهاتف / الكود..." autocomplete="off"
                             value="${preset?preset.name:''}"
-                            oninput="paySuppSearchInput('add')" onfocus="paySuppSearchInput('add')"
+                            oninput="paySuppSearchInput('add')" onfocus="paySuppSearchInput('add')" onkeydown="paySuppACKey(event,'add')"
                             onblur="setTimeout(()=>{const ac=document.getElementById('paySuppAC'); if(ac) ac.classList.remove('show');},150)">
                         <input type="hidden" id="paySuppId" value="${presetSupplierId||''}">
                         <div class="inv-ac" id="paySuppAC"></div>
@@ -205,27 +205,49 @@ window.payOnSuppChange = function() {
 // خانة بحث + <select> منفصلين. مودال الإضافة (paySuppSearch/paySuppId/
 // paySuppAC) ومودال التعديل (payEditSuppSearch/payEditSuppId/payEditSuppAC)
 // بيستخدموا نفس الدالتين بتمرير mode ('add'|'edit').
+let _paySuppACIdx = -1;
 window.paySuppSearchInput = function(mode) {
     mode = mode || 'add';
     const searchId = mode === 'edit' ? 'payEditSuppSearch' : 'paySuppSearch';
     const acId = mode === 'edit' ? 'payEditSuppAC' : 'paySuppAC';
     const ac = document.getElementById(acId);
     if (!ac) return;
+    _paySuppACIdx = -1;
     const term = (document.getElementById(searchId)?.value || '').trim().toLowerCase();
-    if (!term) { ac.innerHTML = ''; ac.classList.remove('show'); return; }
-    const list = _paySuppliers.filter(s =>
+    // من غير كتابة: تعرض أول 20 مورد زي ما هم، عشان القائمة تظهر على طول
+    // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
+    const list = (term ? _paySuppliers.filter(s =>
         (s.name||'').toLowerCase().includes(term) || (s.phone||'').includes(term) || (s.code||'').toLowerCase().includes(term)
-    ).slice(0, 20);
+    ) : _paySuppliers).slice(0, 20);
     if (!list.length) {
         ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');
         return;
     }
-    ac.innerHTML = list.map(s => `<div class="inv-ac-item" onmousedown="event.preventDefault();payPickSupp('${s.id}','${mode}')">
+    ac.innerHTML = list.map((s,i) => `<div class="inv-ac-item" data-i="${i}" data-id="${s.id}" onmousedown="event.preventDefault();payPickSupp('${s.id}','${mode}')" onmouseenter="paySuppACHover(${i},'${mode}')">
         <div><div class="an">${s.name}</div><div class="as">${s.phone||''}${s.code?' · '+s.code:''}</div></div>
         <div class="ap"><div class="pr" style="${s.balance>0?'color:#DC2626':''}">${s.balance>0?payFmt(s.balance):''}</div><div class="as">${s.balance>0?'مستحق':''}</div></div>
     </div>`).join('');
     ac.classList.add('show');
+};
+window.paySuppACKey = function(e, mode) {
+    mode = mode || 'add';
+    const acId = mode === 'edit' ? 'payEditSuppAC' : 'paySuppAC';
+    const ac = document.getElementById(acId);
+    if (!ac || !ac.classList.contains('show')) return;
+    const items = ac.querySelectorAll('.inv-ac-item[data-i]');
+    if (e.key === 'ArrowDown') { e.preventDefault(); _paySuppACIdx = Math.min(_paySuppACIdx+1, items.length-1); paySuppACHover(_paySuppACIdx, mode); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); _paySuppACIdx = Math.max(_paySuppACIdx-1, 0); paySuppACHover(_paySuppACIdx, mode); }
+    else if (e.key === 'Enter') { e.preventDefault(); const id = items[_paySuppACIdx]?.dataset.id; if (id) payPickSupp(id, mode); }
+    else if (e.key === 'Escape') { ac.classList.remove('show'); _paySuppACIdx = -1; }
+};
+window.paySuppACHover = function(i, mode) {
+    mode = mode || 'add';
+    _paySuppACIdx = i;
+    const acId = mode === 'edit' ? 'payEditSuppAC' : 'paySuppAC';
+    const items = document.querySelectorAll('#'+acId+' .inv-ac-item[data-i]');
+    items.forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    items[i]?.scrollIntoView({ block: 'nearest' });
 };
 
 window.payPickSupp = function(id, mode) {
@@ -364,7 +386,7 @@ window.payOpenEditModal = function(id) {
                     <div style="position:relative">
                         <input type="text" id="payEditSuppSearch" class="mod-form-input" placeholder="🔍 اكتب اسم المورد / الهاتف / الكود..." autocomplete="off"
                             value="${p.suppliers?.name || _paySuppliers.find(s=>s.id===p.supplier_id)?.name || ''}"
-                            oninput="paySuppSearchInput('edit')" onfocus="paySuppSearchInput('edit')"
+                            oninput="paySuppSearchInput('edit')" onfocus="paySuppSearchInput('edit')" onkeydown="paySuppACKey(event,'edit')"
                             onblur="setTimeout(()=>{const ac=document.getElementById('payEditSuppAC'); if(ac) ac.classList.remove('show');},150)">
                         <input type="hidden" id="payEditSuppId" value="${p.supplier_id||''}">
                         <div class="inv-ac" id="payEditSuppAC"></div>

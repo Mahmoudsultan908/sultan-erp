@@ -223,9 +223,11 @@ window.expFilterCatItems = function (val) {
 // اختيار بند المصروف — Autocomplete حقيقي (زي colCustSearchInput في
 // collections.js) بدل خانة بحث + <select> منفصلين اللي كانت محتاجة كليك
 // إضافي على القايمة بعد الكتابة.
+let _expCatACIdx = -1;
 window.expCatSearchInput = function () {
     const ac = document.getElementById('expCatAC');
     if (!ac) return;
+    _expCatACIdx = -1;
     const term = (document.getElementById('expModalCatSearch')?.value || '').trim().toLowerCase();
     const list = term ? _expModalCategories.filter(c => (c.name || '').toLowerCase().includes(term)) : _expModalCategories;
     if (!list.length) {
@@ -233,10 +235,25 @@ window.expCatSearchInput = function () {
         ac.classList.add('show');
         return;
     }
-    ac.innerHTML = list.map(c => `<div class="inv-ac-item" onmousedown="event.preventDefault();expPickCat('${c.id}')">
+    ac.innerHTML = list.map((c,i) => `<div class="inv-ac-item" data-i="${i}" data-id="${c.id}" onmousedown="event.preventDefault();expPickCat('${c.id}')" onmouseenter="expCatACHover(${i})">
         <div><div class="an">${c.name}</div></div>
     </div>`).join('');
     ac.classList.add('show');
+};
+window.expCatACKey = function (e) {
+    const ac = document.getElementById('expCatAC');
+    if (!ac || !ac.classList.contains('show')) return;
+    const items = ac.querySelectorAll('.inv-ac-item[data-i]');
+    if (e.key === 'ArrowDown') { e.preventDefault(); _expCatACIdx = Math.min(_expCatACIdx+1, items.length-1); expCatACHover(_expCatACIdx); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); _expCatACIdx = Math.max(_expCatACIdx-1, 0); expCatACHover(_expCatACIdx); }
+    else if (e.key === 'Enter') { e.preventDefault(); const id = items[_expCatACIdx]?.dataset.id; if (id) expPickCat(id); }
+    else if (e.key === 'Escape') { ac.classList.remove('show'); _expCatACIdx = -1; }
+};
+window.expCatACHover = function (i) {
+    _expCatACIdx = i;
+    const items = document.querySelectorAll('#expCatAC .inv-ac-item[data-i]');
+    items.forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    items[i]?.scrollIntoView({ block: 'nearest' });
 };
 window.expPickCat = function (id) {
     const c = _expModalCategories.find(x => x.id === id);
@@ -298,7 +315,7 @@ window.expOpenAdd = async function() {
                 <div class="mod-form-group"><label>بند المصروف *</label>
                     <div style="position:relative">
                         <input type="text" id="expModalCatSearch" class="mod-form-input" placeholder="🔍 اكتب اسم البند..." autocomplete="off"
-                            oninput="expCatSearchInput()" onfocus="expCatSearchInput()"
+                            oninput="expCatSearchInput()" onfocus="expCatSearchInput()" onkeydown="expCatACKey(event)"
                             onblur="setTimeout(()=>{const ac=document.getElementById('expCatAC'); if(ac) ac.classList.remove('show');},150)">
                         <input type="hidden" id="expCatId" value="">
                         <div class="inv-ac" id="expCatAC"></div>
