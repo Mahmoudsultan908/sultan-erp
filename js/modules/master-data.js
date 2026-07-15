@@ -14,22 +14,26 @@ let _mgCustList = [];
 let _mgCustRegions = [];
 let _mgCustClassifications = [];
 let _mgCustGroups = [];
+let _mgCustReps = [];
 let _mgCustSearch = '';
 let _mgCustEditingId = null;
 
 async function renderCustomersManage(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء...</div>';
     try {
-        const [{ data: customers }, { data: regions }, { data: classifications }, { data: groups }] = await Promise.all([
+        const [{ data: customers }, { data: regions }, { data: classifications }, { data: groups }, repsResult] = await Promise.all([
             sb.from('customers').select('*').order('name'),
             sb.from('customer_regions').select('*').order('name'),
             sb.from('customer_classifications').select('*').order('name'),
             sb.from('customer_groups').select('*, price_levels(name)').order('name'),
+            // اختياري — لو جدول sales_reps لسه ما اتعملش، نتجاهل الخطأ بهدوء (زي sales.js بالظبط)
+            sb.from('sales_reps').select('id,name').eq('is_active', true).order('name').then(r => r, () => ({ data: [] })),
         ]);
         _mgCustList = customers || [];
         _mgCustRegions = regions || [];
         _mgCustClassifications = classifications || [];
         _mgCustGroups = groups || [];
+        _mgCustReps = repsResult?.data || [];
         custRenderPage(c);
 
         // ★ جاي من زرار "تعديل بيانات العميل" في كشف الحساب (customers.js) —
@@ -142,6 +146,12 @@ function custOpenModal(x) {
                                 .map(([v,l])=>`<option value="${v}" ${x?.visit_day===v?'selected':''}>${l}</option>`).join('')}
                         </select></div>
                 </div>
+                ${_mgCustReps.length ? `
+                <div class="mod-form-group"><label>المندوب الأساسي <small style="color:#94A3B8;font-weight:400">(يتنسب تلقائي لأي فاتورة بيع جديدة للعميل ده)</small></label>
+                    <select id="custDefaultRep" class="mod-form-input">
+                        <option value="">بدون مندوب افتراضي</option>
+                        ${_mgCustReps.map(r=>`<option value="${r.id}" ${x?.default_rep_id===r.id?'selected':''}>🚗 ${r.name}</option>`).join('')}
+                    </select></div>` : ''}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>الحد الائتماني (ج.م)</label>
                         <input type="number" id="custCreditLimit" class="mod-form-input" value="${x?.credit_limit||0}" min="0" step="0.01"></div>
@@ -181,17 +191,36 @@ window.custSave = async function() {
         visit_day: document.getElementById('custVisitDay').value || null,
         credit_limit: parseFloat(document.getElementById('custCreditLimit').value) || 0,
         preferred_payment_method: document.getElementById('custPayMethod').value || null,
+        default_rep_id: document.getElementById('custDefaultRep')?.value || null,
     };
 
     const btn = document.querySelector('#custMgModal .mod-btn-primary');
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
     try {
-        if (_mgCustEditingId) {
-            const { error } = await sb.from('customers').update(payload).eq('id', _mgCustEditingId);
-            if (error) throw error;
-        } else {
-            const { error } = await sb.from('customers').insert({ ...payload, balance: 0, created_by: currentUser?.id || null });
-            if (error) throw error;
+        try {
+            if (_mgCustEditingId) {
+                const { error } = await sb.from('customers').update(payload).eq('id', _mgCustEditingId);
+                if (error) throw error;
+            } else {
+                const { error } = await sb.from('customers').insert({ ...payload, balance: 0, created_by: currentUser?.id || null });
+                if (error) throw error;
+            }
+        } catch (err) {
+            // ★ لو عمود default_rep_id لسه مش موجود (customers_default_rep_migration.sql
+            //   لسه ما اتشغلش)، نعيد المحاولة من غيره بدل ما نمنع حفظ العميل بالكامل
+            if (/default_rep_id/i.test(err.message||'')) {
+                const { default_rep_id, ...payloadNoRep } = payload;
+                if (_mgCustEditingId) {
+                    const { error } = await sb.from('customers').update(payloadNoRep).eq('id', _mgCustEditingId);
+                    if (error) throw error;
+                } else {
+                    const { error } = await sb.from('customers').insert({ ...payloadNoRep, balance: 0, created_by: currentUser?.id || null });
+                    if (error) throw error;
+                }
+                console.warn('⚠️ عمود customers.default_rep_id غير موجود بعد — شغّل customers_default_rep_migration.sql.');
+            } else {
+                throw err;
+            }
         }
         document.getElementById('custMgModal').remove();
         renderCustomersManage(document.getElementById('app-content'));

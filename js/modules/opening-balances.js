@@ -12,12 +12,14 @@ async function renderOpeningBalances(container) {
             { data: suppliers },
             { data: products },
             { data: warehouses },
+            { data: treasuries },
         ] = await Promise.all([
             sb.from('opening_balances').select('*').eq('status','confirmed').order('created_at'),
             sb.from('customers').select('id, name, balance').order('name'),
             sb.from('suppliers').select('id, name, balance').order('name'),
             sb.from('products').select('id, name, code, unit').order('name'),
             sb.from('warehouses').select('id, name, is_main'),
+            sb.from('treasuries').select('id, name, is_default').eq('is_active', true).order('is_default', { ascending: false }),
         ]);
 
         const fmt = n => Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -65,19 +67,33 @@ async function renderOpeningBalances(container) {
             const recs = byType(tab);
 
             if (tab === 'cash') {
+                // رصيد افتتاحي مستقل لكل خزنة (لو فيه أكتر من خزنة) — قبل كده كان بيسجّل
+                // رصيد واحد بس بيروح للخزنة الافتراضية دايماً، من غير ما تقدر تختار
                 c.innerHTML = `
-                <div class="dash-card" style="padding:24px;max-width:500px">
+                <div class="dash-card" style="padding:24px;max-width:560px">
                     <h3 style="margin:0 0 20px;font-size:15px;color:#1E293B">💰 رصيد الخزنة الافتتاحي</h3>
-                    ${recs.length ? `<div class="ob-existing"><div class="ob-ex-label">✅ تم إدخال رصيد الخزنة</div>
-                        <div class="ob-ex-val">${fmt(recs[0].amount)} ج.م</div>
-                        <div class="ob-ex-date">${new Date(recs[0].as_of_date).toLocaleDateString('ar-EG')}</div></div>` : ''}
+                    ${recs.length ? `<div style="margin-bottom:16px">
+                        ${recs.map(r => {
+                            const t = (treasuries||[]).find(x=>x.id===r.treasury_id);
+                            return `<div class="ob-existing" style="margin-bottom:8px">
+                                <div class="ob-ex-label">✅ ${t?.name || 'الخزنة الافتراضية'}</div>
+                                <div class="ob-ex-val">${fmt(r.amount)} ج.م</div>
+                                <div class="ob-ex-date">${new Date(r.as_of_date).toLocaleDateString('ar-EG')}</div>
+                            </div>`;
+                        }).join('')}
+                    </div>` : ''}
                     <div class="ob-form">
+                        ${(treasuries||[]).length > 1 ? `
+                        <label class="ob-label">الخزنة</label>
+                        <select id="ob-cash-treasury" class="ob-input">
+                            ${treasuries.map(t=>`<option value="${t.id}" ${t.is_default?'selected':''}>${t.name}</option>`).join('')}
+                        </select>` : ''}
                         <label class="ob-label">المبلغ (ج.م)</label>
-                        <input type="number" id="ob-cash-amount" class="ob-input" placeholder="0.00" min="0" step="0.01" value="${recs[0]?.amount||''}">
+                        <input type="number" id="ob-cash-amount" class="ob-input" placeholder="0.00" min="0" step="0.01">
                         <label class="ob-label">تاريخ الإثبات</label>
-                        <input type="date" id="ob-cash-date" class="ob-input" value="${recs[0]?.as_of_date || new Date().toISOString().slice(0,10)}">
+                        <input type="date" id="ob-cash-date" class="ob-input" value="${new Date().toISOString().slice(0,10)}">
                         <label class="ob-label">ملاحظات</label>
-                        <input type="text" id="ob-cash-notes" class="ob-input" placeholder="اختياري" value="${recs[0]?.notes||''}">
+                        <input type="text" id="ob-cash-notes" class="ob-input" placeholder="اختياري">
                         <button class="ob-save-btn" onclick="obSaveCash()">💾 حفظ رصيد الخزنة</button>
                     </div>
                 </div>`;
@@ -86,11 +102,13 @@ async function renderOpeningBalances(container) {
                     const amount = parseFloat(document.getElementById('ob-cash-amount').value);
                     const as_of_date = document.getElementById('ob-cash-date').value;
                     const notes = document.getElementById('ob-cash-notes').value;
+                    const treasury_id = document.getElementById('ob-cash-treasury')?.value || (treasuries||[]).find(t=>t.is_default)?.id || null;
                     if (!amount || amount <= 0) { alert('أدخل مبلغاً صحيحاً'); return; }
                     if (!as_of_date) { alert('أدخل التاريخ'); return; }
+                    if ((recs||[]).some(r => r.treasury_id === treasury_id)) { alert('تم إدخال رصيد افتتاحي لهذه الخزنة من قبل'); return; }
                     try {
                         const { error } = await sb.from('opening_balances').insert({
-                            balance_type: 'cash', amount, as_of_date, notes,
+                            balance_type: 'cash', amount, as_of_date, notes, treasury_id,
                             created_by: currentUser?.id
                         });
                         if (error) throw error;

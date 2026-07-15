@@ -747,6 +747,13 @@ function invSelectCustomer(id) {
     // تطبيق مستوى السعر الافتراضي لمجموعة العميل تلقائياً (يبقى قابل للتغيير يدوياً بعدها بحرية)
     const defaultLevel = c.group_id ? INV_DB.groupLevelMap?.[c.group_id] : null;
     if (defaultLevel) invSetPriceLevel(defaultLevel, true);
+    // نسب المندوب الأساسي بتاع العميل تلقائياً للفاتورة — بس لو مفيش مندوب متختار
+    // فعلاً (عشان مانكسرش اختيار يدوي سابق)، يقدر المستخدم يغيّره بحرية بعد كده
+    if (c.default_rep_id && !invRepId) {
+        invRepId = c.default_rep_id;
+        const repSel = document.getElementById('invRep');
+        if (repSel) repSel.value = c.default_rep_id;
+    }
     invToast(`👤 تم اختيار: ${c.name}`, 'success');
     setTimeout(()=>document.getElementById('invFastSearch')?.focus(), 50);
 }

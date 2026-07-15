@@ -12,8 +12,13 @@ let _custList = [];
 async function renderCustomers(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء...</div>';
     try {
-        const { data: customers } = await sb.from('customers').select('*').order('name');
+        const [{ data: customers }, { data: regions }] = await Promise.all([
+            sb.from('customers').select('*').order('name'),
+            sb.from('customer_regions').select('id,name'),
+        ]);
         _custList = customers || [];
+        const regionMap = {};
+        (regions || []).forEach(r => { regionMap[r.id] = r.name; });
 
         const totalDebt = _custList.reduce((s,c)=>s+(Number(c.balance)>0?Number(c.balance):0),0);
         const totalCredit = _custList.reduce((s,c)=>s+(Number(c.balance)<0?Math.abs(Number(c.balance)):0),0);
@@ -50,7 +55,7 @@ async function renderCustomers(c) {
                                 </div>
                             </td>
                             <td dir="ltr" style="text-align:right;color:#64748B">${c.phone||'—'}</td>
-                            <td style="color:#64748B">${c.region_id?'—':'—'}</td>
+                            <td style="color:#64748B">${regionMap[c.region_id] || '—'}</td>
                             <td style="text-align:left;font-weight:700;color:${balColor}">${custFmt(bal)}</td>
                             <td style="text-align:center">
                                 <button class="cc-edit" onclick="custShowStatement('${c.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
