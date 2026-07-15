@@ -19,10 +19,6 @@ async function renderCRM(c) {
     csRenderPage(c, '🤝', 'إدارة علاقات العملاء (CRM)',
         'متابعة تفاعلات العملاء، تسجيل المكالمات والزيارات، وتذكيرات المتابعة الدورية.');
 }
-async function renderArchive(c) {
-    csRenderPage(c, '🗄️', 'الأرشيف',
-        'أرشفة رقمية للمستندات والفواتير والعقود، مع بحث سريع واسترجاع فوري.');
-}
 async function renderWhatsAppIntegration(c) {
     csRenderPage(c, '💬', 'تكامل واتساب',
         'إرسال الفواتير وإشعارات التحصيل والتذكيرات للعملاء مباشرة عبر واتساب.');
@@ -47,6 +43,6 @@ async function renderRepAppLink(c) {
 }
 
 Object.assign(window, {
-    renderCRM, renderArchive, renderWhatsAppIntegration,
+    renderCRM, renderWhatsAppIntegration,
     renderAIDashboard, renderEmployeeEvaluation, renderCustomerOrdersLink, renderRepAppLink,
 });

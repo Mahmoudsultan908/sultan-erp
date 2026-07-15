@@ -106,10 +106,10 @@ function buildLayout() {
         <div class="nav-item" data-mod="audit-log" onclick="loadMod(this, 'audit-log')">🔐 سجل التدقيق</div>
         <div class="nav-item" data-mod="trialbalance" onclick="loadMod(this, 'trialbalance')">⚖️ ميزان المراجعة</div>
         <div class="nav-item" data-mod="balancesheet" onclick="loadMod(this, 'balancesheet')">🏦 الميزانية العمومية</div>
+        <div class="nav-item" data-mod="archive" onclick="loadMod(this, 'archive')">🗄️ الأرشيف</div>
 
         <div class="nav-group">🔜 قريباً</div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء</div>
-        <div class="nav-item" data-mod="archive" onclick="loadMod(this, 'archive')">🗄️ الأرشيف</div>
         <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب</div>
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي</div>
         <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
