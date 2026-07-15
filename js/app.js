@@ -90,6 +90,7 @@ function buildLayout() {
 
         <div class="nav-group">المالية والمخزن</div>
         <div class="nav-item" data-mod="expenses" onclick="loadMod(this, 'expenses')">💸 المصروفات</div>
+        <div class="nav-item" data-mod="payroll" onclick="loadMod(this, 'payroll')">👥 الموظفون والرواتب</div>
         <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="balance-transfer" onclick="loadMod(this, 'balance-transfer')">🔀 تحويل أرصدة</div>
         <div class="nav-item" data-mod="stock-transfer" onclick="loadMod(this, 'stock-transfer')">🔄 تحويل مخزون</div>
@@ -194,6 +195,7 @@ window.loadMod = async function(el, modName) {
         'suppliers-manage': 'إدارة الموردين',
         'supplier-import': 'استيراد الموردين من Excel',
         'expenses': 'لوحة تحكم المصروفات',
+        'payroll': 'الموظفون والرواتب',
         'stock-transfer': 'تحويل مخزون',
         'sales': 'فاتورة مبيعات جديدة',
         'quotations': 'عروض الأسعار',
@@ -244,6 +246,7 @@ window.loadMod = async function(el, modName) {
     if (modName === 'suppliers-manage' && typeof renderSuppliersManage === 'function') await renderSuppliersManage(c);
     if (modName === 'supplier-import' && typeof renderSupplierImport === 'function') await renderSupplierImport(c);
     if (modName === 'expenses' && typeof renderExpenses === 'function') await renderExpenses(c);
+    if (modName === 'payroll' && typeof renderPayroll === 'function') await renderPayroll(c);
     if (modName === 'stock-transfer' && typeof renderStockTransfer === 'function') await renderStockTransfer(c);
     if (modName === 'sales' && typeof renderSales === 'function') await renderSales(c);
     if (modName === 'quotations' && typeof renderQuotations === 'function') await renderQuotations(c);
