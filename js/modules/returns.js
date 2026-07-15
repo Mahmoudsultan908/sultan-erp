@@ -461,7 +461,7 @@ function retNotesCardHTML() {
                 ${RET_DB.reps.map(r => `<option value="${r.id}" ${r.id === retRepId ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
             </select>
         </div>` : ''}
-        ${(RET_DB.priceLevels || []).length ? `
+        ${(RET_DB.priceLevels || []).length && retMode === 'manual' ? `
         <div class="mod-form-group" style="margin-top:10px"><label>مستوى السعر (لتحديد سعر إعادة الحساب)</label>
             <select id="retPriceLevelSelect" class="mod-form-input" onchange="retSetPriceLevel(this.value)">
                 <option value="">الافتراضي (جملة ثم تجزئة)</option>

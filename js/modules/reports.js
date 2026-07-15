@@ -428,13 +428,13 @@ async function renderReports(container) {
             }
             body.innerHTML = `
             <div style="font-size:11px;color:#64748B;margin-bottom:8px">حدد البنود اللي المورد استلمها فعلاً (خصم/استرداد) ثم اضغط "تأكيد استلام المحدد".</div>
-            <table class="mod-table"><thead><tr><th></th><th>الصنف</th><th>الكمية</th><th>النسبة%</th><th>الاستحقاق</th><th>المبلغ المتوقع</th></tr></thead>
+            <table class="mod-table"><thead><tr><th></th><th>الصنف</th><th>الكمية</th><th>المؤجل/وحدة</th><th>الاستحقاق</th><th>المبلغ المتوقع</th></tr></thead>
             <tbody>
                 ${pending.map(p => `<tr>
                     <td><input type="checkbox" class="repDefRecvChk" value="${p.id}"></td>
                     <td>${p.product_name || '—'}</td>
                     <td>${p.qty}</td>
-                    <td>${p.rate}%</td>
+                    <td>${fmt(p.rate)}</td>
                     <td>${p.due_date || '—'}</td>
                     <td>${fmt(p.expected_amount)}</td>
                 </tr>`).join('')}

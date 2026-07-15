@@ -220,19 +220,32 @@ window.expFilterCatItems = function (val) {
     if (noMatch) noMatch.style.display = (q && visibleCount === 0) ? '' : 'none';
 };
 
-// فلترة قايمة "بند المصروف" جوه مودال تسجيل مصروف جديد (نفس فكرة colFilterCustList)
-window.expFilterCatSelect = function () {
-    const term = (document.getElementById('expCatFilter')?.value || '').trim().toLowerCase();
-    const sel = document.getElementById('expCatId');
-    if (!sel) return;
-    const current = sel.value;
+// اختيار بند المصروف — Autocomplete حقيقي (زي colCustSearchInput في
+// collections.js) بدل خانة بحث + <select> منفصلين اللي كانت محتاجة كليك
+// إضافي على القايمة بعد الكتابة.
+window.expCatSearchInput = function () {
+    const ac = document.getElementById('expCatAC');
+    if (!ac) return;
+    const term = (document.getElementById('expCatSearch')?.value || '').trim().toLowerCase();
     const list = term ? _expModalCategories.filter(c => (c.name || '').toLowerCase().includes(term)) : _expModalCategories;
-    sel.innerHTML = `<option value="">-- اختر البند --</option>` +
-        list.map(c => `<option value="${c.id}" data-limit="${c.monthly_limit || 0}" ${c.id === current ? 'selected' : ''}>${c.name}</option>`).join('');
-    if (current && !list.some(c => c.id === current)) {
-        const kept = _expModalCategories.find(c => c.id === current);
-        if (kept) sel.insertAdjacentHTML('beforeend', `<option value="${kept.id}" data-limit="${kept.monthly_limit||0}" selected>${kept.name} (مختار حالياً)</option>`);
+    if (!list.length) {
+        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
+        ac.classList.add('show');
+        return;
     }
+    ac.innerHTML = list.map(c => `<div class="inv-ac-item" onmousedown="event.preventDefault();expPickCat('${c.id}')">
+        <div><div class="an">${c.name}</div></div>
+    </div>`).join('');
+    ac.classList.add('show');
+};
+window.expPickCat = function (id) {
+    const c = _expModalCategories.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('expCatId').value = id;
+    document.getElementById('expCatSearch').value = c.name;
+    const ac = document.getElementById('expCatAC');
+    if (ac) { ac.innerHTML = ''; ac.classList.remove('show'); }
+    expCheckLimit();
 };
 
 // ════════════════════════════════════════════════════════════
@@ -283,11 +296,13 @@ window.expOpenAdd = async function() {
                 <button class="mod-modal-close" onclick="expCloseModal('expModal')">&times;</button></div>
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>بند المصروف *</label>
-                    <input type="text" id="expCatFilter" class="mod-form-input" style="margin-bottom:6px" placeholder="🔍 بحث عن بند..." oninput="expFilterCatSelect()" autocomplete="off">
-                    <select id="expCatId" class="mod-form-input" onchange="expCheckLimit()">
-                        <option value="">-- اختر البند --</option>
-                        ${categories.map(c => `<option value="${c.id}" data-limit="${c.monthly_limit||0}">${c.name}</option>`).join('')}
-                    </select>
+                    <div style="position:relative">
+                        <input type="text" id="expCatSearch" class="mod-form-input" placeholder="🔍 اكتب اسم البند..." autocomplete="off"
+                            oninput="expCatSearchInput()" onfocus="expCatSearchInput()"
+                            onblur="setTimeout(()=>{const ac=document.getElementById('expCatAC'); if(ac) ac.classList.remove('show');},150)">
+                        <input type="hidden" id="expCatId" value="">
+                        <div class="inv-ac" id="expCatAC"></div>
+                    </div>
                 </div>
                 <div class="mod-form-group"><label>المبلغ (ج.م) *</label>
                     <input type="number" id="expAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" oninput="expCheckLimit()">
@@ -374,8 +389,9 @@ window.expCheckLimit = async function() {
         .gte('expense_date', _expMonthStart())
         .lt('expense_date', _expMonthEnd());
 
-    const catName = document.getElementById('expCatId').selectedOptions[0].text;
-    const catLimit = parseFloat(document.getElementById('expCatId').selectedOptions[0].dataset.limit) || 0;
+    const cat = _expModalCategories.find(c => c.id === catId);
+    const catName = cat?.name || '';
+    const catLimit = parseFloat(cat?.monthly_limit) || 0;
     const used = (monthExp || []).reduce((s, e) => s + (e.amount || 0), 0);
 
     // استهلاك الشهر كله (للحد الإجمالي)
