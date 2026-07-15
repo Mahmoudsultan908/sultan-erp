@@ -1000,6 +1000,10 @@ async function retReverseOldForEdit() {
 window.retSave = async function () {
     const filled = retItems.filter(it => it.pid && (it.qty || 0) > 0);
     if (!filled.length) { retToast('⚠️ أضف صنفاً واحداً على الأقل بكمية أكبر من صفر', 'error'); return; }
+    if (!retEntityId) {
+        retToast(retType === 'sales' ? '⚠️ اختر العميل قبل حفظ المرتجع' : '⚠️ اختر المورد قبل حفظ المرتجع', 'error');
+        return;
+    }
 
     const offline = typeof isOnline === 'function' && !isOnline();
     if (offline && retType === 'purchase') {

@@ -11,6 +11,7 @@
 
 let _repList = [];
 let _repSales = [];      // كل فواتير sales اللي ليها rep_id (للتقارير هنا فقط)
+let _repReturns = [];    // مرتجعات مبيعات ليها نفس rep_id — بتتطرح من مبيعات/عمولة المندوب
 let _repSearch = '';
 let _repEditingId = null;
 let _repTableMissing = false;
@@ -38,6 +39,16 @@ async function renderSalesReps(c) {
             .not('rep_id', 'is', null);
         _repSales = (sales || []).filter(s => s.status === 'confirmed');
 
+        // مرتجعات مبيعات مربوطة بمندوب — لازم تتطرح من إجمالي مبيعاته وعمولته
+        // (راجع sales_returns_rep_id_migration.sql)، وإلا مرتجع باسم المندوب
+        // مايأثرش على أرقامه هنا خالص.
+        try {
+            const { data: returns } = await sb.from('sales_returns')
+                .select('id, total, rep_id, status, created_at')
+                .not('rep_id', 'is', null);
+            _repReturns = (returns || []).filter(r => r.status === 'confirmed');
+        } catch { _repReturns = []; }
+
         repRenderPage(c);
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
@@ -46,7 +57,8 @@ async function renderSalesReps(c) {
 
 function repStatsFor(repId) {
     const rows = _repSales.filter(s => s.rep_id === repId);
-    const total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
+    const returns = _repReturns.filter(r => r.rep_id === repId);
+    const total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0) - returns.reduce((s, r) => s + (Number(r.total) || 0), 0);
     return { count: rows.length, total };
 }
 
@@ -58,6 +70,10 @@ function repTopThisMonth() {
         if (!String(s.created_at || '').startsWith(ym)) return;
         byRep[s.rep_id] = (byRep[s.rep_id] || 0) + (Number(s.total) || 0);
     });
+    _repReturns.forEach(r => {
+        if (!String(r.created_at || '').startsWith(ym)) return;
+        byRep[r.rep_id] = (byRep[r.rep_id] || 0) - (Number(r.total) || 0);
+    });
     let bestId = null, bestVal = 0;
     Object.entries(byRep).forEach(([id, v]) => { if (v > bestVal) { bestVal = v; bestId = id; } });
     const rep = bestId ? _repList.find(r => r.id === bestId) : null;
@@ -66,7 +82,7 @@ function repTopThisMonth() {
 
 function repRenderPage(c) {
     const activeReps = _repList.filter(r => r.is_active !== false);
-    const totalSalesAll = _repSales.reduce((s, r) => s + (Number(r.total) || 0), 0);
+    const totalSalesAll = _repSales.reduce((s, r) => s + (Number(r.total) || 0), 0) - _repReturns.reduce((s, r) => s + (Number(r.total) || 0), 0);
     const top = repTopThisMonth();
 
     c.innerHTML = `
@@ -229,12 +245,20 @@ window.repShowStatement = async function (repId) {
     document.body.appendChild(modal);
 
     try {
-        const { data: sales } = await sb.from('sales')
-            .select('invoice_no, total, payment_type, status, created_at, customers(name)')
-            .eq('rep_id', repId).order('created_at', { ascending: false }).limit(200);
+        const [{ data: sales }, { data: returns }] = await Promise.all([
+            sb.from('sales')
+                .select('invoice_no, total, payment_type, status, created_at, customers(name)')
+                .eq('rep_id', repId).order('created_at', { ascending: false }).limit(200),
+            sb.from('sales_returns')
+                .select('return_no, total, status, created_at, customers(name)')
+                .eq('rep_id', repId).order('created_at', { ascending: false }).limit(200),
+        ]);
 
         const rows = (sales || []).filter(s => s.status === 'confirmed');
-        const total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
+        const retRows = (returns || []).filter(r => r.status === 'confirmed');
+        const salesTotal = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
+        const returnsTotal = retRows.reduce((s, r) => s + (Number(r.total) || 0), 0);
+        const total = salesTotal - returnsTotal;
         const commission = total * (Number(rep.commission_pct) || 0) / 100;
 
         document.getElementById('repStmtBody').innerHTML = `
@@ -244,7 +268,7 @@ window.repShowStatement = async function (repId) {
                     <div style="font-size:22px;font-weight:800">${rows.length}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">إجمالي المبيعات</div>
+                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">صافي المبيعات (بعد ${repFmt(returnsTotal)} مرتجعات)</div>
                     <div style="font-size:22px;font-weight:800;color:#0F172A">${repFmt(total)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
@@ -257,13 +281,20 @@ window.repShowStatement = async function (repId) {
                     <th>رقم الفاتورة</th><th>العميل</th><th>نوع الدفع</th><th>التاريخ</th><th style="text-align:left">الإجمالي</th>
                 </tr></thead>
                 <tbody>
-                    ${rows.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد فواتير مرتبطة بهذا المندوب.</td></tr>` :
-                    rows.map(s => `<tr>
+                    ${rows.length === 0 && retRows.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد فواتير مرتبطة بهذا المندوب.</td></tr>` : ''}
+                    ${rows.map(s => `<tr>
                         <td><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace">${s.invoice_no}</span></td>
                         <td>${s.customers?.name || 'نقدي'}</td>
                         <td>${s.payment_type === 'cash' ? '💵 نقدي' : '📋 آجل'}</td>
                         <td style="font-size:12px">${new Date(s.created_at).toLocaleDateString('ar-EG')}</td>
                         <td style="text-align:left;font-weight:700">${repFmt(s.total)}</td>
+                    </tr>`).join('')}
+                    ${retRows.map(r => `<tr>
+                        <td><span style="background:#FEF2F2;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace">${r.return_no}</span></td>
+                        <td>${r.customers?.name || 'نقدي'}</td>
+                        <td>↩️ مرتجع</td>
+                        <td style="font-size:12px">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
+                        <td style="text-align:left;font-weight:700;color:#DC2626">-${repFmt(r.total)}</td>
                     </tr>`).join('')}
                 </tbody></table>
             </div>`;
