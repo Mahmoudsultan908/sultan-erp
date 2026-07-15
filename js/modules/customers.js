@@ -57,8 +57,9 @@ async function renderCustomers(c) {
                             <td dir="ltr" style="text-align:right;color:#64748B">${c.phone||'—'}</td>
                             <td style="color:#64748B">${regionMap[c.region_id] || '—'}</td>
                             <td style="text-align:left;font-weight:700;color:${balColor}">${custFmt(bal)}</td>
-                            <td style="text-align:center">
+                            <td style="text-align:center;white-space:nowrap">
                                 <button class="cc-edit" onclick="custShowStatement('${c.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
+                                ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenAdd('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="تسجيل تفاعل سريع">📞</button>` : ''}
                             </td>
                         </tr>`;
                     }).join('')}
