@@ -457,6 +457,7 @@ function invSearchBarHTML() {
             <button onclick="invSetDensity('cozy')"    id="invDCozy"    class="${cur==='cozy'?'active':''}">عادي <kbd>2</kbd></button>
             <button onclick="invSetDensity('comfort')" id="invDComfort" class="${cur==='comfort'?'active':''}">واسع <kbd>3</kbd></button>
         </div>
+        <button class="inv-add-row-btn" onclick="invOpenMultiPick()">☑️ اختيار أصناف متعددة</button>
         <button class="inv-add-row-btn" onclick="invAddRow()">+ سطر يدوي</button>
     </div>`;
 }
@@ -869,6 +870,99 @@ function invOnCode(idx, val) {
     invItems[idx].code = val;
     const p = INV_DB.products.find(x=>x.code===val);
     if (p) invPickInline(idx, p.id);
+}
+
+// ── اختيار أصناف متعددة دفعة واحدة (مودال: بحث + checkbox + كمية) ──
+// ★ نسخة مستقلة خاصة بفاتورة المبيعات — مش بتشارك كود مع أي مودال مشابه
+//   في ملفات تانية (زي returns.js)، بنفس منطق invGetSellPrice/invPriceLevelCode
+//   المستخدم في باقي الفاتورة.
+let _invMultiSelected = {}; // { productId: qty }
+function invOpenMultiPick() {
+    document.getElementById('invMultiModal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'invMultiModal';
+    m.className = 'mod-modal-bg active';
+    m.innerHTML = `
+    <div class="mod-modal" style="max-width:640px">
+        <div class="mod-modal-header"><h3>☑️ اختيار أصناف متعددة</h3>
+            <button class="mod-modal-close" onclick="invCloseMultiPick()">✕</button></div>
+        <div class="mod-modal-body">
+            <input type="text" class="mod-form-input" id="invMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="invRenderMultiPickList(this.value)">
+            <div id="invMultiPickList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="inv-btn inv-btn-print" onclick="invCloseMultiPick()">إلغاء</button>
+            <button class="inv-btn inv-btn-save" onclick="invAddMultiPicked()">➕ إضافة المحدد</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+    _invMultiSelected = {};
+    invRenderMultiPickList('');
+    setTimeout(()=>document.getElementById('invMultiSearch')?.focus(), 50);
+}
+function invCloseMultiPick() {
+    document.getElementById('invMultiModal')?.remove();
+    _invMultiSelected = {};
+}
+function invRenderMultiPickList(val) {
+    const box = document.getElementById('invMultiPickList');
+    if (!box) return;
+    const v = (val||'').trim();
+    const list = v ? INV_DB.products.filter(p => (p.name||'').includes(v) || (p.code||'').includes(v)) : INV_DB.products;
+    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
+    box.innerHTML = list.slice(0, 200).map(p => {
+        const sel = _invMultiSelected[p.id];
+        const checked = sel != null;
+        const qty = sel ?? 1;
+        return `<label class="inv-multi-row" data-pid="${p.id}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
+            <input type="checkbox" ${checked?'checked':''} onchange="invMultiToggle('${p.id}',this.checked)">
+            <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code||''} · ${p.unit||''}</small></span>
+            <span style="font-size:11px;color:#94A3B8">مخزون: ${invGetStock(p.id)}</span>
+            <span style="font-size:12px;color:#0F172A;font-weight:600">${invFmt(invGetSellPrice(p))}</span>
+            <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="0.001" style="width:76px;padding:6px 8px"
+                onclick="event.stopPropagation()" oninput="invMultiSetQty('${p.id}',this.value)">
+        </label>`;
+    }).join('');
+}
+function invMultiToggle(pid, checked) {
+    if (checked) { if (_invMultiSelected[pid] == null) _invMultiSelected[pid] = 1; }
+    else delete _invMultiSelected[pid];
+}
+function invMultiSetQty(pid, val) {
+    const q = parseFloat(val) || 0;
+    if (q <= 0) return;
+    _invMultiSelected[pid] = q;
+    const cb = document.querySelector(`.inv-multi-row[data-pid="${pid}"] input[type=checkbox]`);
+    if (cb && !cb.checked) cb.checked = true;
+}
+function invAddMultiPicked() {
+    const ids = Object.keys(_invMultiSelected);
+    if (!ids.length) { invToast('⚠️ لم يتم اختيار أي صنف', 'error'); return; }
+    let added = 0;
+    ids.forEach(pid => {
+        const p = INV_DB.products.find(x => x.id === pid);
+        if (!p) return;
+        const qty = _invMultiSelected[pid] || 1;
+        const ex = invItems.findIndex(i => i.pid === pid);
+        if (ex >= 0) {
+            invItems[ex].qty = (invItems[ex].qty || 0) + qty;
+        } else {
+            const sell = invGetSellPrice(p);
+            const last = invItems[invItems.length-1];
+            if (last && !last.pid) {
+                last.pid = p.id; last.name = p.name; last.code = p.code||'';
+                last.unit = p.unit||''; last.price = sell; last.qty = qty; last.upc = p.units_per_carton||1;
+            } else {
+                invItems.push({ id: Date.now()+added, pid: p.id, name: p.name, code: p.code||'', qty, price: sell, disc: 0, free: 0, unit: p.unit||'', upc: p.units_per_carton||1 });
+            }
+        }
+        added++;
+    });
+    invEnsureNewRow();
+    invRenderItems();
+    invUpdateSummary();
+    invCloseMultiPick();
+    invToast(`➕ تمت إضافة ${added} صنف دفعة واحدة`, 'success');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1589,6 +1683,7 @@ function invGlobalKeys(e) {
         if (open) { open.classList.remove('show'); return; }
         const modal = document.getElementById('invShortcutsModal');
         if (modal?.classList.contains('active')) { invCloseShortcuts(); return; }
+        if (document.getElementById('invMultiModal')) { invCloseMultiPick(); return; }
     }
 }
 
@@ -1635,6 +1730,7 @@ Object.assign(window, {
     invRestoreDraft, invDeleteDraft, invRenderDrafts,
     invExportXls, invImportXls,
     invOnWarehouseChange, invOnRepChange,
+    invOpenMultiPick, invCloseMultiPick, invRenderMultiPickList, invMultiToggle, invMultiSetQty, invAddMultiPicked,
 });
 
 // ════════════════════════════════════════════════════════════

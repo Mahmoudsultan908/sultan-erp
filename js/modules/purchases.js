@@ -217,11 +217,22 @@ function purHeaderHTML() {
             <button class="x" onclick="purClearSupplier()">✕</button>
         </div>
         <div class="inv-header-spacer"></div>
+        <button class="inv-top-btn inv-top-help" onclick="purShowShortcuts()" title="الاختصارات (F1)">⌨️</button>
+        <button class="inv-top-btn" id="purFullscreenBtn" onclick="purToggleFullscreen()" title="إخفاء القائمة والشريط العلوي">${document.body.classList.contains('inv-fullscreen') ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة'}</button>
         <button class="inv-top-btn inv-top-save" onclick="purSave(false)" style="background:#16A34A;box-shadow:0 3px 10px rgba(22,163,74,0.4)">💾 حفظ <kbd>F4</kbd></button>
         <button class="inv-top-btn inv-top-new" onclick="purSave(true)">➕ جديدة <kbd>Alt+N</kbd></button>
         <button class="inv-top-btn inv-top-close" onclick="purClose()">✕</button>
     </div>`;
 }
+
+// وضع ملء الشاشة: نفس منطق invToggleFullscreen في sales.js بالحرف —
+// بيخفي القائمة الجانبية والشريط العلوي عشان فاتورة الشراء تاخد المساحة
+// كلها. بيتصفّر تلقائياً عند أي تنقّل لصفحة تانية (راجع loadMod في app.js).
+window.purToggleFullscreen = function() {
+    const on = document.body.classList.toggle('inv-fullscreen');
+    const btn = document.getElementById('purFullscreenBtn');
+    if (btn) btn.textContent = on ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة';
+};
 
 function purSearchBarHTML() {
     return `
@@ -232,6 +243,7 @@ function purSearchBarHTML() {
             <div class="inv-ac" id="purFastAC" style="top:calc(100% + 4px)"></div>
         </div>
         <span class="inv-search-hint"><kbd>Alt+F</kbd> بحث</span>
+        <button class="inv-add-row-btn" onclick="purOpenMultiPick()">☑️ اختيار أصناف متعددة</button>
         <button class="inv-add-row-btn" onclick="purAddRow()">+ سطر يدوي</button>
     </div>`;
 }
@@ -602,6 +614,102 @@ function purOnCode(idx, val) {
     if (p) purPickInline(idx, p.id);
 }
 
+// ── اختيار أصناف متعددة دفعة واحدة (مودال: بحث + checkbox + كمية) ──
+// ★ نسخة مستقلة خاصة بفاتورة المشتريات — مش بتشارك كود مع أي مودال مشابه
+//   في ملفات تانية (زي returns.js) ولا مع invOpenMultiPick في sales.js،
+//   بنفس منطق purGetBuyPrice المستخدم في باقي الفاتورة.
+let _purMultiSelected = {}; // { productId: qty }
+function purOpenMultiPick() {
+    document.getElementById('purMultiModal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'purMultiModal';
+    m.className = 'mod-modal-bg active';
+    m.innerHTML = `
+    <div class="mod-modal" style="max-width:640px">
+        <div class="mod-modal-header"><h3>☑️ اختيار أصناف متعددة</h3>
+            <button class="mod-modal-close" onclick="purCloseMultiPick()">✕</button></div>
+        <div class="mod-modal-body">
+            <input type="text" class="mod-form-input" id="purMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="purRenderMultiPickList(this.value)">
+            <div id="purMultiPickList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="inv-btn inv-btn-print" onclick="purCloseMultiPick()">إلغاء</button>
+            <button class="inv-btn inv-btn-save" onclick="purAddMultiPicked()" style="background:linear-gradient(135deg,#16A34A,#22C55E)">➕ إضافة المحدد</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+    _purMultiSelected = {};
+    purRenderMultiPickList('');
+    setTimeout(()=>document.getElementById('purMultiSearch')?.focus(), 50);
+}
+function purCloseMultiPick() {
+    document.getElementById('purMultiModal')?.remove();
+    _purMultiSelected = {};
+}
+function purRenderMultiPickList(val) {
+    const box = document.getElementById('purMultiPickList');
+    if (!box) return;
+    const v = (val||'').trim();
+    const list = v ? PUR_DB.products.filter(p => (p.name||'').includes(v) || (p.code||'').includes(v)) : PUR_DB.products;
+    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
+    box.innerHTML = list.slice(0, 200).map(p => {
+        const sel = _purMultiSelected[p.id];
+        const checked = sel != null;
+        const qty = sel ?? 1;
+        return `<label class="pur-multi-row" data-pid="${p.id}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
+            <input type="checkbox" ${checked?'checked':''} onchange="purMultiToggle('${p.id}',this.checked)">
+            <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code||''} · ${p.unit||''}</small></span>
+            <span style="font-size:11px;color:#94A3B8">مخزون: ${purGetStock(p.id)}</span>
+            <span style="font-size:12px;color:#0F172A;font-weight:600">${purFmt(purGetBuyPrice(p))}</span>
+            <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="0.001" style="width:76px;padding:6px 8px"
+                onclick="event.stopPropagation()" oninput="purMultiSetQty('${p.id}',this.value)">
+        </label>`;
+    }).join('');
+}
+function purMultiToggle(pid, checked) {
+    if (checked) { if (_purMultiSelected[pid] == null) _purMultiSelected[pid] = 1; }
+    else delete _purMultiSelected[pid];
+}
+function purMultiSetQty(pid, val) {
+    const q = parseFloat(val) || 0;
+    if (q <= 0) return;
+    _purMultiSelected[pid] = q;
+    const cb = document.querySelector(`.pur-multi-row[data-pid="${pid}"] input[type=checkbox]`);
+    if (cb && !cb.checked) cb.checked = true;
+}
+function purAddMultiPicked() {
+    const ids = Object.keys(_purMultiSelected);
+    if (!ids.length) { purToast('⚠️ لم يتم اختيار أي صنف', 'error'); return; }
+    let added = 0;
+    let lastPickedProduct = null;
+    ids.forEach(pid => {
+        const p = PUR_DB.products.find(x => x.id === pid);
+        if (!p) return;
+        const qty = _purMultiSelected[pid] || 1;
+        const ex = purItems.findIndex(i => i.pid === pid);
+        if (ex >= 0) {
+            purItems[ex].qty = (purItems[ex].qty || 0) + qty;
+        } else {
+            const buy = purGetBuyPrice(p);
+            const last = purItems[purItems.length-1];
+            if (last && !last.pid) {
+                last.pid = p.id; last.name = p.name; last.code = p.code||'';
+                last.unit = p.unit||''; last.price = buy; last.qty = qty; last.upc = p.units_per_carton||1;
+            } else {
+                purItems.push({ id: Date.now()+added, pid: p.id, name: p.name, code: p.code||'', qty, price: buy, disc: 0, free: 0, unit: p.unit||'', upc: p.units_per_carton||1, deferredRate: 0, deferredDate: '' });
+            }
+        }
+        lastPickedProduct = p;
+        added++;
+    });
+    if (lastPickedProduct) purAutoFillSupplierFromProduct(lastPickedProduct);
+    purEnsureNewRow();
+    purRenderItems();
+    purUpdateSummary();
+    purCloseMultiPick();
+    purToast(`➕ تمت إضافة ${added} صنف دفعة واحدة`, 'success');
+}
+
 // ════════════════════════════════════════════════════════════
 // 6) التحكم في السطور
 // ════════════════════════════════════════════════════════════
@@ -641,9 +749,12 @@ function purMoveNextField(idx, field) {
 // ════════════════════════════════════════════════════════════
 function purSetPayType(t) {
     purPayType = t;
+    const sel = document.getElementById('purPayType');
+    if (sel) sel.value = t;
     document.getElementById('purCashPanel').classList.toggle('show', t==='cash');
     if (t==='cash') setTimeout(()=>document.getElementById('purCashPaid')?.focus(),50);
 }
+function purTogglePayType() { purSetPayType(purPayType === 'cash' ? 'credit' : 'cash'); }
 function purSetExactCash() {
     const { net } = purCalcNet();
     document.getElementById('purCashPaid').value = net.toFixed(2);
@@ -936,6 +1047,11 @@ function purBindEvents() {
 
     document.getElementById('app-content').addEventListener('keydown', purGlobalKeys);
 }
+// نفس اختصارات فاتورة المبيعات بالحرف (راجع invGlobalKeys في sales.js) —
+// بعد ما كانت فاتورة المشتريات فيها Alt+S/N/D/F وF4/F8 بس، من غير باقي
+// اختصارات فاتورة المبيعات (F1 المساعدة، F2 بحث المورد، F9 المبلغ بالضبط،
+// Alt+T تبديل نقدي/آجل، Alt+C نقدي، Insert سطر جديد). Alt+P (طباعة) اتسابت
+// عمداً — فاتورة المشتريات مفيهاش خاصية طباعة أصلاً.
 function purGlobalKeys(e) {
     const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
     // اختصارات Alt+ (بدل Ctrl+S/Ctrl+N اللي بتتصادم مع اختصارات كروم المحجوزة)
@@ -945,15 +1061,55 @@ function purGlobalKeys(e) {
         if (k === 'n') { e.preventDefault(); purSave(true); return; }          // Alt+N فاتورة جديدة
         if (k === 'd') { e.preventDefault(); purDraft(); return; }             // Alt+D تعليق
         if (k === 'f') { e.preventDefault(); document.getElementById('purFastSearch')?.focus(); return; }  // Alt+F بحث صنف
+        if (k === 't') { e.preventDefault(); purTogglePayType(); return; }     // Alt+T تبديل نقدي/آجل
+        if (k === 'c') { e.preventDefault(); purSetPayType('cash'); return; }  // Alt+C نقدي
         return;
     }
-    // F4/F8 فقط (F3=بحث الصفحة وF5=تحديث محجوزين في كروم ولا يمكن منعهما فعلياً)
-    if (e.key === 'F4') { e.preventDefault(); purSave(false); }
-    else if (e.key === 'F8') { e.preventDefault(); purDraft(); }
-    else if (e.key === 'Escape') {
+    // F-keys الآمنة (غير محجوزة في أي متصفح) — F3=بحث الصفحة وF5=تحديث محجوزين في كروم
+    if (e.key === 'F1') { e.preventDefault(); purShowShortcuts(); return; }    // لوحة المساعدة
+    if (e.key === 'F2') { e.preventDefault(); document.getElementById('purSuppSearch')?.focus(); return; }
+    if (e.key === 'F4') { e.preventDefault(); purSave(false); return; }
+    if (e.key === 'F8') { e.preventDefault(); purDraft(); return; }
+    if (e.key === 'F9') { e.preventDefault(); purSetExactCash(); document.getElementById('purCashPaid')?.focus(); return; }
+
+    if (!inField && e.key === 'Insert') { e.preventDefault(); purAddRow(); return; }
+
+    if (e.key === 'Escape') {
         const open = document.querySelector('.inv-ac.show');
-        if (open) open.classList.remove('show');
+        if (open) { open.classList.remove('show'); return; }
+        const shortcutsModal = document.getElementById('purShortcutsModal');
+        if (shortcutsModal?.classList.contains('active')) { purCloseShortcuts(); return; }
+        if (document.getElementById('purMultiModal')) { purCloseMultiPick(); return; }
     }
+}
+
+function purShowShortcuts() {
+    let m = document.getElementById('purShortcutsModal');
+    if (!m) {
+        m = document.createElement('div');
+        m.id = 'purShortcutsModal'; m.className = 'mod-modal-bg';
+        m.innerHTML = `<div class="mod-modal" style="max-width:560px">
+            <div class="mod-modal-header"><h3>⌨️ اختصارات لوحة المفاتيح</h3>
+                <button class="mod-modal-close" onclick="purCloseShortcuts()">✕</button></div>
+            <div class="mod-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;font-size:13px">
+                ${purShortcutList().map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #F1F5F9"><span style="color:#475569">${s.d}</span><kbd style="background:#0F172A;color:#4ADE80;border-radius:5px;padding:2px 8px;font-size:11px;font-family:inherit">${s.k}</kbd></div>`).join('')}
+            </div></div>`;
+        document.body.appendChild(m);
+    }
+    m.classList.add('active');
+}
+function purCloseShortcuts() { document.getElementById('purShortcutsModal')?.classList.remove('active'); }
+function purShortcutList() {
+    return [
+        {d:'بحث مورد', k:'F2'}, {d:'بحث صنف سريع', k:'Alt+F'},
+        {d:'حفظ الفاتورة', k:'F4 / Alt+S'}, {d:'حفظ + فاتورة جديدة', k:'Alt+N'},
+        {d:'تبديل نقدي/آجل', k:'Alt+T'}, {d:'نقدي', k:'Alt+C'},
+        {d:'تعليق (مسودة)', k:'F8 / Alt+D'}, {d:'المبلغ بالضبط', k:'F9'},
+        {d:'هذه اللوحة', k:'F1'}, {d:'طي القائمة الجانبية', k:'Alt+H'},
+        {d:'سطر جديد', k:'Insert'}, {d:'تنقل بين النتائج', k:'↑ ↓'},
+        {d:'اختيار من القائمة', k:'Enter'}, {d:'إغلاق القائمة', k:'Esc'},
+        {d:'الحقل التالي', k:'Tab'},
+    ];
 }
 
 Object.assign(window, {
