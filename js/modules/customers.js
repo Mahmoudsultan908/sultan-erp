@@ -102,6 +102,7 @@ window.custShowStatement = async function(customerId) {
             { data: sales },
             { data: payments },
             { data: returns },
+            docsResult,
         ] = await Promise.all([
             sb.from('sales').select('invoice_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }),
@@ -109,7 +110,12 @@ window.custShowStatement = async function(customerId) {
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
             sb.from('sales_returns').select('return_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
+            // اختياري — لو جدول archive_documents لسه ما اتعملش، نتجاهل الخطأ بهدوء
+            sb.from('archive_documents').select('id,title,file_url,category,created_at')
+                .eq('linked_type', 'customer').eq('linked_id', customerId)
+                .order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
         ]);
+        const docs = docsResult?.data || [];
 
         // دمج الحركات في timeline واحد + حساب الرصيد المتحرك
         const moves = [];
@@ -198,6 +204,14 @@ window.custShowStatement = async function(customerId) {
                     <td style="text-align:left">${custFmt(balNow)}</td>
                 </tr></tfoot>` : ''}
                 </table>
+            </div>
+
+            <div style="margin-top:16px">
+                <div style="font-size:13px;font-weight:800;color:#1E293B;margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
+                ${docs.length === 0 ? `<div style="font-size:12.5px;color:#94A3B8">لا توجد مستندات مرتبطة بهذا العميل في الأرشيف.</div>` :
+                `<div style="display:flex;flex-wrap:wrap;gap:8px">
+                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:#D97706;text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
+                </div>`}
             </div>`;
     } catch (err) {
         document.getElementById('custStmtBody').innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
