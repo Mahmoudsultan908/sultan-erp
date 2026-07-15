@@ -62,7 +62,7 @@ async function renderReports(container) {
                 sb.from('sales_returns').select('total').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
                 // بنود المؤجل: نسبة من قيمة فاتورة الشراء متوقع استردادها من المورد لاحقاً، فمش
                 // بتُحسب كتكلفة فعلية دلوقتي — بنطرحها من إجمالي المشتريات عشان قائمة الدخل تبقى صافية.
-                sb.from('purchase_items').select('line_total, deferred_rate, purchases!inner(created_at, status)')
+                sb.from('purchase_items').select('qty, deferred_rate, purchases!inner(created_at, status)')
                     .eq('purchases.status', 'confirmed')
                     .gte('purchases.created_at', from).lte('purchases.created_at', to + 'T23:59:59'),
             ]);
@@ -70,7 +70,10 @@ async function renderReports(container) {
             const totalReturns = (salesReturns||[]).reduce((s,r)=>s+Number(r.total),0);
             const netSales = totalSales - totalReturns;
             const totalPurchasesGross = (purchases||[]).reduce((s,r)=>s+Number(r.total),0);
-            const totalDeferred = (deferredItems||[]).reduce((s,it)=>s+(Number(it.line_total)||0)*((Number(it.deferred_rate)||0)/100),0);
+            // deferred_rate بقى مبلغ فعلي للوحدة (مش نسبة %) — راجع purchases.js
+            // purSave: أي % بيتحوّل لمبلغ للوحدة وقت الحفظ عشان يطابق صيغة
+            // deferred_rebates.expected_amount = qty*rate في القاعدة.
+            const totalDeferred = (deferredItems||[]).reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.deferred_rate)||0),0);
             const totalPurchases = totalPurchasesGross - totalDeferred;
             const totalExpenses = (expenses||[]).reduce((s,r)=>s+Number(r.amount),0);
             const netProfit = netSales - totalPurchases - totalExpenses;

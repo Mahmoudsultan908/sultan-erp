@@ -198,7 +198,7 @@ window.poConvertToPurchase = async function(orderId) {
                 pid: it.product_id, name: it.products?.name || '', code: it.products?.code || '',
                 qty: it.qty, price: it.unit_price, disc: 0, free: 0,
                 unit: it.products?.unit || '', upc: it.products?.units_per_carton || 1,
-                deferredRate: 0, deferredDate: '',
+                deferredRate: 0, deferredDate: '', deferredType: 'percent',
             })),
         };
 

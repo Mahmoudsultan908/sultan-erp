@@ -330,6 +330,19 @@ window.paySave = async function() {
 // UPDATE الواحد، يعني ذرّي من غير حاجة لـ RPC إضافية) وبعدين نسجّل سند
 // جديد بالبيانات المعدّلة (نفس مسار الحفظ العادي).
 // ════════════════════════════════════════════════════════════
+// supplier_payments.ref عمود unique — السند الملغي بيفضل شاغل قيمته،
+// فلو المستخدم سايب المرجع زي ما هو وقت التعديل الـ insert بيتصادم معاه
+// (supplier_payments_ref_key). بنضيف -2, -3.. لحد ما نلاقي قيمة فاضية.
+async function payUniqueRef(base) {
+    let candidate = base;
+    let n = 2;
+    while (true) {
+        const { data } = await sb.from('supplier_payments').select('id').eq('ref', candidate).limit(1);
+        if (!data || !data.length) return candidate;
+        candidate = `${base}-${n}`;
+        n++;
+    }
+}
 window.payOpenEditModal = function(id) {
     const p = _payList.find(x => x.id === id);
     if (!p) return alert('تعذّر العثور على سند الصرف');
@@ -402,8 +415,13 @@ window.paySaveEdit = async function() {
         if (cancelErr) throw cancelErr;
 
         // 2) تسجيل سند جديد بالبيانات المعدّلة (نفس مسار paySave العادي)
+        //    ref عمود unique على مستوى الجدول كله (حتى لو السند القديم
+        //    اتلغى) — والمودال بيعرض ref القديم كقيمة افتراضية، فلو
+        //    المستخدم سابه زي ما هو هيتصادم مع السند القديم نفسه.
+        //    payUniqueRef بتضيف لاحقة -2, -3.. لحد ما تلاقي قيمة فاضية.
+        const finalRef = await payUniqueRef(ref || 'PAY-' + Date.now());
         const { error: insErr } = await sb.from('supplier_payments').insert({
-            ref: ref || 'PAY-' + Date.now(),
+            ref: finalRef,
             supplier_id: suppId,
             amount,
             status: 'confirmed',

@@ -136,8 +136,11 @@ window.prfLoadByProduct = async function () {
 
         const rows = Object.entries(byProduct).map(([pid, g]) => {
             const p = _perfProducts.find(x => x.id === pid);
+            // deferredRate بقى مبلغ فعلي للوحدة (مش نسبة %) — راجع purchases.js
+            // purSave: أي % بيتحوّل لمبلغ للوحدة وقت الحفظ عشان يطابق صيغة
+            // deferred_rebates.expected_amount = qty*rate في القاعدة.
             const deferredRate = deferredRateByProduct[pid]?.rate || 0;
-            const netCost = g.cost * (1 - deferredRate / 100);
+            const netCost = g.cost - deferredRate * g.qty;
             const profit = g.revenue - netCost;
             return { name: p?.name || 'صنف محذوف', code: p?.code || '', unit: p?.unit || '', qty: g.qty, revenue: g.revenue, profit, deferredRate, marginPct: g.revenue > 0 ? (profit / g.revenue * 100) : 0 };
         }).sort((a, b) => b.revenue - a.revenue);
@@ -164,7 +167,7 @@ window.prfLoadByProduct = async function () {
                     <td style="text-align:left;font-weight:700">${perfFmt(r.revenue)}</td>
                     <td style="text-align:left;font-weight:700;color:${r.profit >= 0 ? '#059669' : '#DC2626'}">${perfFmt(r.profit)}</td>
                     <td style="text-align:center">${r.marginPct.toFixed(1)}%</td>
-                    <td style="text-align:center;color:#94A3B8;font-size:12px">${r.deferredRate > 0 ? r.deferredRate.toFixed(1) + '%' : '—'}</td>
+                    <td style="text-align:center;color:#94A3B8;font-size:12px">${r.deferredRate > 0 ? perfFmt(r.deferredRate) + '/وحدة' : '—'}</td>
                 </tr>`).join('') : `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد مبيعات في هذه الفترة</td></tr>`}
             </tbody></table>
         </div>`;

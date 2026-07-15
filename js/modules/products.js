@@ -14,9 +14,12 @@ let _prodSuppliers = [];
 let _prodSearch = '';
 let _prodFilterCat = '';
 let _prodEditingId = null;
-// نسبة المؤجل التقديرية المستخدمة في حساب هامش الربح داخل مودال التعديل الحالي
-// (آخر نسبة مؤجل اتسجلت لهذا الصنف في فواتير الشراء — راجع prodOpenModal)
+// المؤجل التقديري (مبلغ فعلي للوحدة) المستخدم في حساب هامش الربح داخل مودال
+// التعديل الحالي (آخر مؤجل اتسجل لهذا الصنف في فواتير الشراء — راجع prodOpenModal)
 let _prodModalDeferredRate = 0;
+// النوع الحالي لـ"المؤجل الافتراضي" جوه المودال المفتوح (percent|fixed) —
+// state بسيط بره الـ DOM عشان زرار التبديل يقدر يغيّر label/max الحقل
+let _prodModalDefaultDeferredType = 'percent';
 
 function prodFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -207,6 +210,7 @@ async function prodOpenModal(p) {
     // فاتورة شراء تضمنت الصنف ده، كأفضل تقدير متاح).
     let existingPrices = {};
     _prodModalDeferredRate = 0;
+    _prodModalDefaultDeferredType = p?.default_deferred_type || 'percent';
     if (p) {
         const [{ data }, { data: piRows }] = await Promise.all([
             sb.from('product_prices').select('price_level_id, price').eq('product_id', p.id),
@@ -275,10 +279,18 @@ async function prodOpenModal(p) {
                     <div class="mod-form-group"><label>حد الطلب (تنبيه نقص)</label>
                         <input type="number" id="prodReorderPoint" class="mod-form-input" value="${p?.reorder_point||0}" min="0" step="1"></div>
                 </div>
+                <div class="mod-form-group">
+                    <label>المؤجل الافتراضي <small style="color:#94A3B8;font-weight:400">(يتسحب تلقائي عند إضافة الصنف لفاتورة شراء جديدة)</small></label>
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <input type="number" id="prodDefaultDeferredRate" class="mod-form-input" value="${p?.default_deferred_rate||0}"
+                            min="0" ${_prodModalDefaultDeferredType==='percent'?'max="100"':''} step="0.1" style="background:#F5F3FF;color:#7C3AED">
+                        <button type="button" id="prodDefaultDeferredTypeBtn" class="mod-btn" style="background:#EDE9FE;color:#7C3AED;white-space:nowrap" onclick="prodToggleDefaultDeferredType()">${_prodModalDefaultDeferredType==='percent'?'٪ نسبة':'ثابت/وحدة'}</button>
+                    </div>
+                </div>
                 ${_prodModalDeferredRate > 0 ? `
                 <p style="font-size:11px;color:#94A3B8;margin-top:-4px">
-                    ℹ️ هامش الربح تحت محسوب بعد خصم نسبة مؤجل تقديرية ${prodFmt(_prodModalDeferredRate)}%
-                    (آخر نسبة مؤجل مسجّلة لهذا الصنف من فواتير الشراء).
+                    ℹ️ هامش الربح تحت محسوب بعد خصم مؤجل تقديري ${prodFmt(_prodModalDeferredRate)} ج.م/وحدة
+                    (آخر مؤجل مسجّل لهذا الصنف من فواتير الشراء).
                 </p>` : ''}
 
                 <div class="mod-form-group" style="margin-top:6px">
@@ -306,12 +318,29 @@ async function prodOpenModal(p) {
 
 window.prodCloseModal = function() { document.getElementById('prodModal')?.remove(); };
 
+// تبديل نوع المؤجل الافتراضي (٪ / ثابت) — تعديل مباشر للـ DOM بدل إعادة رسم
+// المودال كله، عشان مايضيعش أي حقول تانية اتكتبت فعلاً جوه المودال
+window.prodToggleDefaultDeferredType = function() {
+    _prodModalDefaultDeferredType = _prodModalDefaultDeferredType === 'percent' ? 'fixed' : 'percent';
+    const input = document.getElementById('prodDefaultDeferredRate');
+    const btn = document.getElementById('prodDefaultDeferredTypeBtn');
+    if (input) {
+        input.value = '0'; // زي فاتورة المشتريات بالظبط: تبديل النوع بيصفّر الرقم عشان مايتفسّرش غلط
+        if (_prodModalDefaultDeferredType === 'percent') input.setAttribute('max', '100');
+        else input.removeAttribute('max');
+    }
+    if (btn) btn.textContent = _prodModalDefaultDeferredType === 'percent' ? '٪ نسبة' : 'ثابت/وحدة';
+};
+
 // هامش الربح % تحت كل مستوى سعر = (سعر المستوى - التكلفة الفعلية بعد خصم
 // نسبة المؤجل التقديرية) / سعر المستوى × 100. بيتحدّث لحظياً مع أي تعديل
 // في سعر الشراء أو أي مستوى سعر جوه المودال (من غير أي fetch جديد).
 window.prodUpdateMargins = function() {
     const purchasePrice = parseFloat(document.getElementById('prodPurchasePrice')?.value) || 0;
-    const effectiveCost = purchasePrice * (1 - (_prodModalDeferredRate||0) / 100);
+    // _prodModalDeferredRate بقى دايماً مبلغ فعلي للوحدة (مش نسبة %) — راجع
+    // purchases.js purSave: أي % بيتحوّل لمبلغ للوحدة وقت الحفظ عشان يطابق
+    // صيغة deferred_rebates.expected_amount = qty*rate في القاعدة.
+    const effectiveCost = purchasePrice - (_prodModalDeferredRate||0);
     document.querySelectorAll('.prod-price-lvl').forEach(input => {
         const levelId = input.dataset.levelId;
         const marginEl = document.getElementById('prodMarginLvl-' + levelId);
@@ -435,6 +464,8 @@ window.prodSave = async function() {
     const units_per_carton = parseFloat(document.getElementById('prodUnitsPerCarton').value) || 1;
     const purchase_price = parseFloat(document.getElementById('prodPurchasePrice').value) || 0;
     const reorder_point = parseFloat(document.getElementById('prodReorderPoint').value) || 0;
+    const default_deferred_rate = parseFloat(document.getElementById('prodDefaultDeferredRate')?.value) || 0;
+    const default_deferred_type = _prodModalDefaultDeferredType;
 
     if (!name) return alert('اسم الصنف مطلوب');
     if (purchase_price <= 0) return alert('سعر الشراء يجب أن يكون أكبر من صفر');
@@ -454,6 +485,7 @@ window.prodSave = async function() {
             name, code: code || null, barcode: barcode || null,
             category_id, company_id, supplier_id, purchase_unit, sale_unit, unit: sale_unit,
             units_per_carton, purchase_price, reorder_point,
+            default_deferred_rate, default_deferred_type,
         };
         // مزامنة wholesale_price/retail_price (أعمدة WorkFlow Hub القديمة) من أول مستويين — للتوافق مع sales.js
         if (_prodPriceLevels[0]) payload.wholesale_price = levelPrices.find(lp=>lp.levelId===_prodPriceLevels[0].id)?.price || 0;
@@ -474,6 +506,13 @@ window.prodSave = async function() {
                 const r = await prodSaveProductRow(payloadNoSupplier, _prodEditingId);
                 savedRow = r.data; productId = r.productId;
                 console.warn('⚠️ عمود products.supplier_id غير موجود بعد — شغّل products_supplier_migration.sql. تم حفظ باقي بيانات الصنف بدون المورّد.');
+            } else if (/default_deferred_(rate|type)/i.test(err.message||'')) {
+                // products_default_deferred_migration.sql لسه ما اتشغلش — نحفظ باقي
+                // بيانات الصنف بدون المؤجل الافتراضي بدل ما نمنع الحفظ بالكامل.
+                const { default_deferred_rate, default_deferred_type, ...payloadNoDeferred } = payload;
+                const r = await prodSaveProductRow(payloadNoDeferred, _prodEditingId);
+                savedRow = r.data; productId = r.productId;
+                console.warn('⚠️ أعمدة المؤجل الافتراضي غير موجودة بعد — شغّل products_default_deferred_migration.sql.');
             } else {
                 throw err;
             }

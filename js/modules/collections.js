@@ -344,6 +344,19 @@ window.colSave = async function() {
 // الـ UPDATE الواحد، يعني ذرّي من غير حاجة لـ RPC إضافية) وبعدين نسجّل
 // سند جديد بالبيانات المعدّلة (نفس مسار الحفظ العادي).
 // ════════════════════════════════════════════════════════════
+// customer_payments.ref عمود unique — السند الملغي بيفضل شاغل قيمته،
+// فلو المستخدم سايب المرجع زي ما هو وقت التعديل الـ insert بيتصادم معاه
+// (customer_payments_ref_key). بنضيف -2, -3.. لحد ما نلاقي قيمة فاضية.
+async function colUniqueRef(base) {
+    let candidate = base;
+    let n = 2;
+    while (true) {
+        const { data } = await sb.from('customer_payments').select('id').eq('ref', candidate).limit(1);
+        if (!data || !data.length) return candidate;
+        candidate = `${base}-${n}`;
+        n++;
+    }
+}
 window.colOpenEditModal = function(id) {
     const p = _colList.find(x => x.id === id);
     if (!p) return alert('تعذّر العثور على سند التحصيل');
@@ -416,8 +429,9 @@ window.colSaveEdit = async function() {
         if (cancelErr) throw cancelErr;
 
         // 2) تسجيل سند جديد بالبيانات المعدّلة (نفس مسار colSave العادي)
+        const finalRef = await colUniqueRef(ref || 'COL-' + Date.now());
         const { error: insErr } = await sb.from('customer_payments').insert({
-            ref: ref || 'COL-' + Date.now(),
+            ref: finalRef,
             customer_id: custId,
             amount,
             status: 'confirmed',

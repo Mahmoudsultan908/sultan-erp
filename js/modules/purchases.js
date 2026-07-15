@@ -1,7 +1,9 @@
 /* ════════════════════════════════════════════════════════════
    فاتورة المشتريات — تخطيط ثنائي / هوية كحلي + ذهبي
    مربوطة بـ Supabase (products / suppliers / inventory_stock)
-   + نظام المؤجل (deferred_rate + deferred_due_date)
+   + نظام المؤجل (deferred_rate + deferred_type + deferred_due_date؛
+     deferred_rate بيتخزّن دايماً كمبلغ فعلي للوحدة — لو المستخدم اختار
+     % بنحوّلها لمبلغ وقت الحفظ، راجع purSave)
    ════════════════════════════════════════════════════════════ */
 
 // ── بيانات حية من Supabase ──
@@ -87,7 +89,7 @@ async function renderPurchases(c) {
         return;
     }
 
-    purItems = [{ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' }];
+    purItems = [{ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '', deferredType: 'percent' }];
     purSupplierId = null;
     purPayType = 'cash';
     purTreasuryId = PUR_DB.treasuries?.find(t => t.is_default)?.id || null;
@@ -116,9 +118,13 @@ async function renderPurchases(c) {
                     name: it.products?.name || '', code: it.products?.code || '',
                     qty: Number(it.qty) || 0, price: Number(it.unit_price) || 0,
                     disc: 0, free: 0, unit: it.products?.unit || '', upc: 1,
+                    // deferred_rate المحفوظ فعلياً دايماً مبلغ ثابت للوحدة (راجع
+                    // purSave) بصرف النظر إن كان المستخدم أصلاً اختار % وقت الإدخال —
+                    // فبنعيد عرضه هنا كـ "ثابت" دايماً، مش بنحاول نرجّع النسبة الأصلية.
                     deferredRate: Number(it.deferred_rate) || 0, deferredDate: it.deferred_due_date || '',
+                    deferredType: 'fixed',
                 }));
-                purItems.push({ id: Date.now() + Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' });
+                purItems.push({ id: Date.now() + Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '', deferredType: 'percent' });
                 purSupplierId = oldPur.supplier_id;
                 purPayType = oldPur.payment_type || 'cash';
                 if (oldPur.warehouse_id) purWarehouseId = oldPur.warehouse_id;
@@ -134,7 +140,7 @@ async function renderPurchases(c) {
         window._pendingPOConversion = null;
         if (pending.items && pending.items.length) {
             purItems = pending.items.map(it => ({ id: Date.now()+Math.random(), ...it }));
-            purItems.push({ id: Date.now()+Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' });
+            purItems.push({ id: Date.now()+Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '', deferredType: 'percent' });
         }
         if (pending.supplierId) purSupplierId = pending.supplierId;
         // هيتعلّم "تم الاستلام" في purSave بس لو الحفظ نجح فعلاً — راجع التعليق في purchase-orders.js
@@ -354,7 +360,8 @@ function purRenderItems() {
         const prod = it.pid ? PUR_DB.products.find(p => p.id === it.pid) : null;
         const liveStock = it.pid ? purGetStock(it.pid) : 0;
         const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
-        const deferredAmt = lineTotal * ((it.deferredRate||0) / 100);
+        const deferredType = it.deferredType || 'percent';
+        const deferredAmt = deferredType === 'fixed' ? (it.qty||0) * (it.deferredRate||0) : lineTotal * ((it.deferredRate||0) / 100);
         const isNew = !it.pid && idx === purItems.length - 1;
         const cls = isNew ? 'is-new-row' : '';
         return `<tr class="${cls}">
@@ -389,8 +396,13 @@ function purRenderItems() {
                     oninput="purItems[${idx}].disc=parseFloat(this.value)||0;purUpdateRowTotal(${idx});purUpdateSummary()">
             </td>
             <td>
-                <input type="number" class="inv-cell-input is-num" value="${it.deferredRate||0}" min="0" max="100" step="0.1" title="نسبة المؤجل %"
-                    style="background:#F5F3FF;color:#7C3AED" oninput="purItems[${idx}].deferredRate=parseFloat(this.value)||0;purUpdateSummary()">
+                <div style="display:flex;align-items:center;gap:3px">
+                    <input type="number" class="inv-cell-input is-num" value="${it.deferredRate||0}"
+                        min="0" ${deferredType==='percent'?'max="100"':''} step="0.1" title="${deferredType==='percent'?'نسبة المؤجل %':'مبلغ المؤجل ثابت للوحدة'}"
+                        style="background:#F5F3FF;color:#7C3AED" oninput="purItems[${idx}].deferredRate=parseFloat(this.value)||0;purUpdateSummary()">
+                    <button type="button" class="inv-del-btn" style="font-size:10px;padding:2px 5px;background:#EDE9FE;color:#7C3AED" title="تبديل % / مبلغ ثابت"
+                        onclick="purToggleDeferredType(${idx})">${deferredType==='percent'?'٪':'ثابت'}</button>
+                </div>
             </td>
             <td class="inv-cell-total" id="purRowTotal-${idx}">${purFmt(lineTotal)}</td>
             <td class="inv-cell-del">
@@ -398,6 +410,17 @@ function purRenderItems() {
             </td>
         </tr>`;
     }).join('');
+}
+
+// تبديل نوع المؤجل بين نسبة % ومبلغ ثابت للوحدة — بيصفّر الرقم المدخل
+// عشان مايتفسّرش غلط (5% مش نفس معنى 5 جنيه للوحدة)
+function purToggleDeferredType(idx) {
+    const it = purItems[idx];
+    if (!it) return;
+    it.deferredType = (it.deferredType||'percent') === 'percent' ? 'fixed' : 'percent';
+    it.deferredRate = 0;
+    purRenderItems();
+    purUpdateSummary();
 }
 
 // تحديث إجمالي سطر واحد فوراً (بدون إعادة رسم الصف كله)
@@ -415,6 +438,7 @@ function purCalcNet() {
     const rowsDisc = purItems.reduce((s,i)=>s+(i.qty||0)*(i.price||0)*(i.disc||0)/100,0);
     const extra = parseFloat(document.getElementById('purDiscExtra')?.value)||0;
     const deferred = purItems.reduce((s,i) => {
+        if ((i.deferredType||'percent') === 'fixed') return s + (i.qty||0)*(i.deferredRate||0);
         const lt = (i.qty||0)*(i.price||0)*(1-(i.disc||0)/100);
         return s + lt*((i.deferredRate||0)/100);
     }, 0);
@@ -523,6 +547,13 @@ function purFastHover(i) {
     items.forEach((el,idx)=>el.classList.toggle('active', idx===i));
     items[i]?.scrollIntoView({ block: 'nearest' });
 }
+// المؤجل الافتراضي المسجّل على كارت الصنف نفسه (products.default_deferred_rate/
+// default_deferred_type) — بيتسحب تلقائي أول ما الصنف يتضاف لفاتورة شراء
+// جديدة، بدل ما يتكتب يدوياً كل مرة. لو الصنف مالوش مؤجل افتراضي، بيرجع صفر
+// زي السلوك القديم بالظبط.
+function purDeferredDefaults(p) {
+    return { rate: Number(p?.default_deferred_rate) || 0, type: p?.default_deferred_type || 'percent' };
+}
 function purPickProduct(pid) {
     const p = PUR_DB.products.find(x=>x.id===pid);
     if (!p) return;
@@ -531,12 +562,14 @@ function purPickProduct(pid) {
         purItems[ex].qty = (purItems[ex].qty||1) + 1;
     } else {
         const buy = purGetBuyPrice(p);
+        const dd = purDeferredDefaults(p);
         const last = purItems[purItems.length-1];
         if (last && !last.pid) {
             last.pid = p.id; last.name = p.name; last.code = p.code||'';
             last.unit = p.unit||''; last.price = buy; last.upc = p.units_per_carton||1;
+            last.deferredRate = dd.rate; last.deferredType = dd.type;
         } else {
-            purItems.push({ id: Date.now(), pid: p.id, name: p.name, code: p.code||'', qty: 1, price: buy, disc: 0, free: 0, unit: p.unit||'', upc: p.units_per_carton||1, deferredRate: 0, deferredDate: '' });
+            purItems.push({ id: Date.now(), pid: p.id, name: p.name, code: p.code||'', qty: 1, price: buy, disc: 0, free: 0, unit: p.unit||'', upc: p.units_per_carton||1, deferredRate: dd.rate, deferredDate: '', deferredType: dd.type });
         }
         purEnsureNewRow();
         purAutoFillSupplierFromProduct(p);
@@ -566,7 +599,7 @@ function purAutoFillSupplierFromProduct(product) {
 function purEnsureNewRow() {
     const last = purItems[purItems.length-1];
     if (!last || last.pid) {
-        purItems.push({ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' });
+        purItems.push({ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '', deferredType: 'percent' });
     }
 }
 
@@ -602,7 +635,11 @@ function purPickInline(idx, pid) {
     const p = PUR_DB.products.find(x=>x.id===pid);
     if (!p) return;
     const buy = purGetBuyPrice(p);
-    purItems[idx] = { id: purItems[idx].id, pid: p.id, name: p.name, code: p.code||'', qty: purItems[idx].qty||1, price: buy, disc: 0, free: purItems[idx].free||0, unit: p.unit||'', upc: p.units_per_carton||1, deferredRate: purItems[idx].deferredRate||0, deferredDate: '' };
+    const hasManualDeferred = (purItems[idx].deferredRate||0) > 0;
+    const dd = purDeferredDefaults(p);
+    purItems[idx] = { id: purItems[idx].id, pid: p.id, name: p.name, code: p.code||'', qty: purItems[idx].qty||1, price: buy, disc: 0, free: purItems[idx].free||0, unit: p.unit||'', upc: p.units_per_carton||1,
+        deferredRate: hasManualDeferred ? purItems[idx].deferredRate : dd.rate, deferredDate: '',
+        deferredType: hasManualDeferred ? (purItems[idx].deferredType||'percent') : dd.type };
     purAutoFillSupplierFromProduct(p);
     purEnsureNewRow();
     purRenderItems(); purUpdateSummary();
@@ -691,12 +728,14 @@ function purAddMultiPicked() {
             purItems[ex].qty = (purItems[ex].qty || 0) + qty;
         } else {
             const buy = purGetBuyPrice(p);
+            const dd = purDeferredDefaults(p);
             const last = purItems[purItems.length-1];
             if (last && !last.pid) {
                 last.pid = p.id; last.name = p.name; last.code = p.code||'';
                 last.unit = p.unit||''; last.price = buy; last.qty = qty; last.upc = p.units_per_carton||1;
+                last.deferredRate = dd.rate; last.deferredType = dd.type;
             } else {
-                purItems.push({ id: Date.now()+added, pid: p.id, name: p.name, code: p.code||'', qty, price: buy, disc: 0, free: 0, unit: p.unit||'', upc: p.units_per_carton||1, deferredRate: 0, deferredDate: '' });
+                purItems.push({ id: Date.now()+added, pid: p.id, name: p.name, code: p.code||'', qty, price: buy, disc: 0, free: 0, unit: p.unit||'', upc: p.units_per_carton||1, deferredRate: dd.rate, deferredDate: '', deferredType: dd.type });
             }
         }
         lastPickedProduct = p;
@@ -719,7 +758,7 @@ function purAddRow() {
         purFocusRow(purItems.length-1, 1);
         return;
     }
-    purItems.push({ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '' });
+    purItems.push({ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '', deferredType: 'percent' });
     purRenderItems(); purUpdateSummary();
     purFocusRow(purItems.length-1, 1);
 }
@@ -728,7 +767,7 @@ function purFocusRow(idx, inputIdx) {
 }
 function purRemoveRow(idx) {
     purItems.splice(idx,1);
-    if (!purItems.length) purItems.push({ id: Date.now(), pid: null, name:'',code:'',qty:1,price:0,disc:0,free:0,unit:'',upc:1,deferredRate:0,deferredDate:'' });
+    if (!purItems.length) purItems.push({ id: Date.now(), pid: null, name:'',code:'',qty:1,price:0,disc:0,free:0,unit:'',upc:1,deferredRate:0,deferredDate:'',deferredType:'percent' });
     purRenderItems(); purUpdateSummary();
 }
 function purRowKey(e, idx, field) {
@@ -831,14 +870,22 @@ async function purSave(andNew) {
         const itemsToInsert = filled.map(it => {
             const prod = PUR_DB.products.find(p=>p.id===it.pid);
             const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
+            // deferred_rebates.expected_amount في القاعدة = qty * rate (generated
+            // column ثابت)، يعني "rate" لازم يوصل دايماً كمبلغ فعلي للوحدة —
+            // لو المستخدم اختار % هنا بنحوّلها لمبلغ للوحدة *قبل* الحفظ، بحيث
+            // qty*rate في القاعدة يطابق بالظبط اللي شايفه في إجمالي الفاتورة.
+            const deferredPerUnit = (it.deferredType||'percent') === 'fixed'
+                ? (it.deferredRate || 0)
+                : (it.price||0) * (1 - (it.disc||0)/100) * (it.deferredRate||0) / 100;
             return {
                 purchase_id: purchaseId,
                 product_id: it.pid,
                 qty: it.qty,
                 unit_price: it.price,
                 line_total: lineTotal,
-                deferred_rate: it.deferredRate || 0,
-                deferred_due_date: it.deferredRate > 0 ? (document.getElementById('purDate')?.value || null) : null,
+                deferred_rate: deferredPerUnit,
+                deferred_type: it.deferredType || 'percent',
+                deferred_due_date: deferredPerUnit > 0 ? (document.getElementById('purDate')?.value || null) : null,
                 units_per_carton_snapshot: prod?.units_per_carton || 1,
             };
         });
