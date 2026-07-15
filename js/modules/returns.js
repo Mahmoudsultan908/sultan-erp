@@ -451,17 +451,17 @@ function retActionsCardHTML() {
 }
 
 function retNotesCardHTML() {
+    const entityLabel = retType === 'sales' ? 'العميل' : 'المورد';
     return `
     <div class="inv-card">
         <div class="inv-card-title">📝 ملاحظات / سبب المرتجع</div>
         <textarea class="inv-notes" id="ret-notes" rows="2" placeholder="اختياري..."></textarea>
-        ${retType === 'sales' ? `
         <div class="mod-form-group" style="margin-top:10px">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                 <input type="checkbox" id="retPayCashChk" ${retPayCash ? 'checked' : ''} onchange="retTogglePayCash(this.checked)">
                 💵 دفع نقدًا للمرتجع الآن (من الخزنة)؟
             </label>
-            <div style="font-size:11px;color:var(--inv-muted);margin-top:2px">مستقل تمامًا عن طريقة دفع الفاتورة الأصلية. لو مش مفعّلة (الافتراضي): المرتجع بيتسجل كرصيد (خصم/إضافة) في حساب العميل بدل الكاش، لأنك لسه ما دفعتش فلوس فعلياً.</div>
+            <div style="font-size:11px;color:var(--inv-muted);margin-top:2px">مستقل تمامًا عن طريقة دفع الفاتورة الأصلية. لو مش مفعّلة (الافتراضي): المرتجع بيتسجل كرصيد (خصم/إضافة) في حساب ${entityLabel} بدل الكاش، لأنك لسه ما دفعتش/استلمتش فلوس فعلياً.</div>
         </div>
         <div id="retTreasuryWrap" style="${retPayCash?'':'display:none'}">
             <div class="mod-form-group" style="margin-top:10px"><label>الخزنة</label>
@@ -470,14 +470,14 @@ function retNotesCardHTML() {
                 </select>
             </div>
         </div>
-        ${(RET_DB.reps || []).length ? `
+        ${retType === 'sales' && (RET_DB.reps || []).length ? `
         <div class="mod-form-group" style="margin-top:10px"><label>المندوب (يُخصم المرتجع من إجمالي مبيعاته)</label>
             <select id="retRepId" class="mod-form-input" onchange="retOnRepChange()">
                 <option value="">🚗 بدون مندوب</option>
                 ${RET_DB.reps.map(r => `<option value="${r.id}" ${r.id === retRepId ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
             </select>
         </div>` : ''}
-        ${(RET_DB.priceLevels || []).length && retMode === 'manual' ? `
+        ${retType === 'sales' && (RET_DB.priceLevels || []).length && retMode === 'manual' ? `
         <div class="mod-form-group" style="margin-top:10px"><label>مستوى السعر (لتحديد سعر إعادة الحساب)</label>
             <select id="retPriceLevelSelect" class="mod-form-input" onchange="retSetPriceLevel(this.value)">
                 <option value="">الافتراضي (جملة ثم تجزئة)</option>
@@ -488,11 +488,11 @@ function retNotesCardHTML() {
             <div class="mod-form-group" style="margin-top:10px">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                     <input type="checkbox" id="retAffectsBalanceChk" ${retAffectsBalance ? 'checked' : ''} onchange="retAffectsBalance=this.checked">
-                    خصم من رصيد العميل؟
+                    خصم من رصيد ${entityLabel}؟
                 </label>
-                <div style="font-size:11px;color:var(--inv-muted);margin-top:2px">شيل العلامة لو المرتجع مش هيتحاسب عليه العميل (مثلاً بضاعة بترجع للمخزون بس من غير رد فلوس/تعديل حساب)</div>
+                <div style="font-size:11px;color:var(--inv-muted);margin-top:2px">شيل العلامة لو المرتجع مش هيتحاسب عليه ${entityLabel} (مثلاً بضاعة بترجع للمخزون بس من غير رد فلوس/تعديل حساب)</div>
             </div>
-        </div>` : ''}
+        </div>
     </div>`;
 }
 
@@ -1149,6 +1149,11 @@ window.retSave = async function () {
                 supplier_id: retEntityId || null,
                 purchase_id: retLinkedDoc?.id || retEditingLinkId || null,
                 warehouse_id: retWarehouseId,
+                // مستقل تمامًا عن نوع دفع فاتورة الشراء الأصلية — نفس فكرة مرتجع
+                // المبيعات بالظبط، راجع retPayCash/retAffectsBalance فوق
+                payment_type: retPayCash ? 'cash' : 'credit',
+                treasury_id: treasuryId,
+                affects_supplier_balance: retAffectsBalance,
                 subtotal, total, status: 'confirmed',
                 reason: notes,
                 created_by: currentUser?.id || null,
