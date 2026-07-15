@@ -35,6 +35,13 @@ let retPriceLevelCode = '';
 //   القاعدة (fn_sales_return_balance) لازم يتحقق منه قبل ما يعدّل رصيد
 //   العميل — راجع sales_returns_affects_balance_migration.sql.
 let retAffectsBalance = true;
+// ★ "دفع نقدًا للمرتجع الآن؟" — اختيار مستقل تماماً عن نوع دفع الفاتورة
+//   الأصلية (كان قبل كده بيتوارث منها مباشرة، وده غلط: مرتجع لفاتورة
+//   آجلة ممكن برضو يتحاسب نقدي دلوقتي، والعكس). افتراضياً false يعني
+//   "لم أدفع فلوس فعلياً الآن" → البند الأساسي هو خصم/إضافة رصيد للعميل
+//   (حسب retAffectsBalance فوق). لو اتفعّل: cash فعلي من الخزنة، ورصيد
+//   العميل مايتلمّسش خالص (فعلاً استرد فلوسه). راجع fn_sales_return_status_change.
+let retPayCash = false;
 // ★ تعديل مرتجع قديم (قادم من صفحة "مراجعة الفواتير" — invoice-review.js) —
 //   نفس فلسفة invEditingId/purEditingId بالضبط: المرتجع القديم بيتلغي
 //   تلقائياً (عكس أثره على المخزون/الرصيد عبر RPC) ويتسجّل مرتجع جديد
@@ -123,7 +130,7 @@ async function renderReturns(c) {
     // إعادة ضبط الحالة
     retType = 'sales'; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retRepId = null; retItems = [];
     retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
-    retPriceLevelCode = ''; retAffectsBalance = true;
+    retPriceLevelCode = ''; retAffectsBalance = true; retPayCash = false;
     const mainWh = RET_DB.warehouses.find(w => w.is_main) || RET_DB.warehouses[0];
     retWarehouseId = mainWh?.id || null;
 
@@ -224,7 +231,7 @@ window.retSwitchType = async function (type) {
     if (retEditingId && !confirm('سيتم إلغاء وضع التعديل الحالي. تبديل نوع المرتجع؟')) return;
     retType = type; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retRepId = null; retItems = [];
     retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
-    retPriceLevelCode = ''; retAffectsBalance = true;
+    retPriceLevelCode = ''; retAffectsBalance = true; retPayCash = false;
     if (!RET_DB.isOfflineData) await retLoadRecent();
     await retLoadPendingList();
     retRenderScreen(document.getElementById('app-content'));
@@ -449,10 +456,19 @@ function retNotesCardHTML() {
         <div class="inv-card-title">📝 ملاحظات / سبب المرتجع</div>
         <textarea class="inv-notes" id="ret-notes" rows="2" placeholder="اختياري..."></textarea>
         ${retType === 'sales' ? `
-        <div class="mod-form-group" style="margin-top:10px"><label>الخزنة (لو الاسترداد نقدي)</label>
-            <select id="retTreasuryId" class="mod-form-input">
-                ${(RET_DB.treasuries||[]).map(t => `<option value="${t.id}" ${t.is_default?'selected':''}>${t.name}</option>`).join('')}
-            </select>
+        <div class="mod-form-group" style="margin-top:10px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="retPayCashChk" ${retPayCash ? 'checked' : ''} onchange="retTogglePayCash(this.checked)">
+                💵 دفع نقدًا للمرتجع الآن (من الخزنة)؟
+            </label>
+            <div style="font-size:11px;color:var(--inv-muted);margin-top:2px">مستقل تمامًا عن طريقة دفع الفاتورة الأصلية. لو مش مفعّلة (الافتراضي): المرتجع بيتسجل كرصيد (خصم/إضافة) في حساب العميل بدل الكاش، لأنك لسه ما دفعتش فلوس فعلياً.</div>
+        </div>
+        <div id="retTreasuryWrap" style="${retPayCash?'':'display:none'}">
+            <div class="mod-form-group" style="margin-top:10px"><label>الخزنة</label>
+                <select id="retTreasuryId" class="mod-form-input">
+                    ${(RET_DB.treasuries||[]).map(t => `<option value="${t.id}" ${t.is_default?'selected':''}>${t.name}</option>`).join('')}
+                </select>
+            </div>
         </div>
         ${(RET_DB.reps || []).length ? `
         <div class="mod-form-group" style="margin-top:10px"><label>المندوب (يُخصم المرتجع من إجمالي مبيعاته)</label>
@@ -468,15 +484,28 @@ function retNotesCardHTML() {
                 ${RET_DB.priceLevels.map(l => `<option value="${l.code}" ${retPriceLevelCode === l.code ? 'selected' : ''}>💰 ${l.name}</option>`).join('')}
             </select>
         </div>` : ''}
-        <div class="mod-form-group" style="margin-top:10px">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                <input type="checkbox" id="retAffectsBalanceChk" ${retAffectsBalance ? 'checked' : ''} onchange="retAffectsBalance=this.checked">
-                خصم من رصيد العميل؟
-            </label>
-            <div style="font-size:11px;color:var(--inv-muted);margin-top:2px">شيل العلامة لو المرتجع مش هيتحاسب عليه العميل (مثلاً بضاعة بترجع للمخزون بس من غير رد فلوس/تعديل حساب)</div>
+        <div id="retAffectsBalanceWrap" style="${retPayCash?'display:none':''}">
+            <div class="mod-form-group" style="margin-top:10px">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" id="retAffectsBalanceChk" ${retAffectsBalance ? 'checked' : ''} onchange="retAffectsBalance=this.checked">
+                    خصم من رصيد العميل؟
+                </label>
+                <div style="font-size:11px;color:var(--inv-muted);margin-top:2px">شيل العلامة لو المرتجع مش هيتحاسب عليه العميل (مثلاً بضاعة بترجع للمخزون بس من غير رد فلوس/تعديل حساب)</div>
+            </div>
         </div>` : ''}
     </div>`;
 }
+
+// تبديل "دفع نقدًا للمرتجع الآن؟" — بيظهر/يخفي خانة الخزنة وcheckbox خصم
+// رصيد العميل (الاتنين متضادين منطقياً: لو دفعت كاش، رصيد العميل ملوش
+// داعي يتلمس خالص، فمفيش معنى نعرض خيار "خصم من رصيد العميل؟" وقتها).
+window.retTogglePayCash = function (checked) {
+    retPayCash = checked;
+    const tw = document.getElementById('retTreasuryWrap');
+    const aw = document.getElementById('retAffectsBalanceWrap');
+    if (tw) tw.style.display = checked ? '' : 'none';
+    if (aw) aw.style.display = checked ? 'none' : '';
+};
 
 // تغيير مستوى السعر المستخدم في حساب أسعار مرتجع المبيعات (نفس فكرة
 // invSetPriceLevel في sales.js) — بيعيد حساب سعر كل صنف موجود بالفعل
@@ -1038,7 +1067,8 @@ window.retSave = async function () {
                     customer_id: retEntityId || null,
                     sale_id: retLinkedDoc?.id || null,
                     warehouse_id: retWarehouseId,
-                    payment_type: retLinkedDoc?.payment_type || 'cash',
+                    // مستقل تمامًا عن نوع دفع الفاتورة الأصلية — راجع retPayCash فوق
+                    payment_type: retPayCash ? 'cash' : 'credit',
                     treasury_id: treasuryId,
                     rep_id: retNormalizeRepId(retRepId),
                     affects_customer_balance: retAffectsBalance,
@@ -1091,7 +1121,8 @@ window.retSave = async function () {
                 customer_id: retEntityId || null,
                 sale_id: retLinkedDoc?.id || retEditingLinkId || null,
                 warehouse_id: retWarehouseId,
-                payment_type: retLinkedDoc?.payment_type || 'cash',
+                // مستقل تمامًا عن نوع دفع الفاتورة الأصلية — راجع retPayCash فوق
+                payment_type: retPayCash ? 'cash' : 'credit',
                 treasury_id: treasuryId,
                 rep_id: retNormalizeRepId(retRepId),
                 affects_customer_balance: retAffectsBalance,
