@@ -226,7 +226,7 @@ window.expFilterCatItems = function (val) {
 window.expCatSearchInput = function () {
     const ac = document.getElementById('expCatAC');
     if (!ac) return;
-    const term = (document.getElementById('expCatSearch')?.value || '').trim().toLowerCase();
+    const term = (document.getElementById('expModalCatSearch')?.value || '').trim().toLowerCase();
     const list = term ? _expModalCategories.filter(c => (c.name || '').toLowerCase().includes(term)) : _expModalCategories;
     if (!list.length) {
         ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
@@ -242,7 +242,7 @@ window.expPickCat = function (id) {
     const c = _expModalCategories.find(x => x.id === id);
     if (!c) return;
     document.getElementById('expCatId').value = id;
-    document.getElementById('expCatSearch').value = c.name;
+    document.getElementById('expModalCatSearch').value = c.name;
     const ac = document.getElementById('expCatAC');
     if (ac) { ac.innerHTML = ''; ac.classList.remove('show'); }
     expCheckLimit();
@@ -297,7 +297,7 @@ window.expOpenAdd = async function() {
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>بند المصروف *</label>
                     <div style="position:relative">
-                        <input type="text" id="expCatSearch" class="mod-form-input" placeholder="🔍 اكتب اسم البند..." autocomplete="off"
+                        <input type="text" id="expModalCatSearch" class="mod-form-input" placeholder="🔍 اكتب اسم البند..." autocomplete="off"
                             oninput="expCatSearchInput()" onfocus="expCatSearchInput()"
                             onblur="setTimeout(()=>{const ac=document.getElementById('expCatAC'); if(ac) ac.classList.remove('show');},150)">
                         <input type="hidden" id="expCatId" value="">
