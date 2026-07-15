@@ -125,7 +125,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="users" onclick="loadMod(this, 'users')">👥 المستخدمون</div>
         <div class="nav-item" data-mod="advanced-permissions" onclick="loadMod(this, 'advanced-permissions')">🔐 الصلاحيات المتقدمة</div>
         
-        <div class="sidebar-footer"><span>© 2026 Sultan Food</span><span style="color:#3B82F6">v2.0</span></div>
+        <div class="sidebar-footer"><span>© 2026 Sultan Food</span><span style="color:var(--inv-gold-light)">v2.0</span></div>
       </aside>
       <div class="main">
         <div class="topbar">

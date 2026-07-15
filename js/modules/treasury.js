@@ -34,9 +34,9 @@ async function renderTreasury(c) {
 
         <div class="mod-grid">
             ${_tsyList.map(t => `<div class="mod-card">
-                <div class="mod-card-icon" style="background:${t.is_default?'#DBEAFE':'#F1F5F9'};color:${t.is_default?'#2563EB':'#475569'}">🏦</div>
+                <div class="mod-card-icon" style="background:${t.is_default?'#FFFBEB':'#F1F5F9'};color:${t.is_default?'#D97706':'#475569'}">🏦</div>
                 <div class="mod-card-val">${tsyFmt(t.balance)}</div>
-                <div class="mod-card-lbl">${t.treasury_name} ${t.is_default ? '<span style="background:#DBEAFE;color:#2563EB;font-size:10px;padding:2px 6px;border-radius:5px;margin-right:4px">افتراضية</span>' : ''}</div>
+                <div class="mod-card-lbl">${t.treasury_name} ${t.is_default ? '<span style="background:#FFFBEB;color:#D97706;font-size:10px;padding:2px 6px;border-radius:5px;margin-right:4px">افتراضية</span>' : ''}</div>
                 ${!t.is_default ? `<button class="cc-edit" style="margin-top:8px;background:#FEE2E2;color:#DC2626" onclick="tsyToggleActive('${t.treasury_id}', true)">تعطيل الخزنة</button>` : ''}
             </div>`).join('')}
         </div>

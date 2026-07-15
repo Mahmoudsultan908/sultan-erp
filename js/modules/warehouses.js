@@ -54,13 +54,13 @@ function whRenderPage(c, stockByWh) {
                         </div>
                         <div style="display:flex;gap:4px">
                             <button class="cc-edit" onclick="whOpenEdit('${w.id}')">✏️</button>
-                            ${!w.is_main ? `<button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="whSetMain('${w.id}')" title="تعيين كمخزن رئيسي">⭐</button>` : ''}
+                            ${!w.is_main ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="whSetMain('${w.id}')" title="تعيين كمخزن رئيسي">⭐</button>` : ''}
                         </div>
                     </div>
                     <div class="dash-summary-row"><span>عدد الأصناف</span><span style="font-weight:700">${s.items}</span></div>
                     <div class="dash-summary-row"><span>إجمالي الكمية</span><span style="font-weight:700">${whFmt(s.qty)}</span></div>
                     <div class="dash-summary-divider"></div>
-                    <div class="dash-summary-row dash-summary-total"><span>قيمة المخزون</span><span style="color:#2563EB">${whFmt(s.value)}</span></div>
+                    <div class="dash-summary-row dash-summary-total"><span>قيمة المخزون</span><span style="color:#D97706">${whFmt(s.value)}</span></div>
                 </div>`;
             }).join('') || '<div class="dash-card" style="text-align:center;padding:40px;color:#94A3B8">لا توجد مخازن بعد — أضف أول مخزن</div>'}
         </div>`;

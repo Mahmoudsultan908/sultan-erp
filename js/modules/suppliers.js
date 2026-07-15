@@ -51,7 +51,7 @@ async function renderSuppliers(c) {
                             <td dir="ltr" style="text-align:right;color:#64748B">${s.phone||'—'}</td>
                             <td style="text-align:left;font-weight:700;color:${balColor}">${supFmt(Math.abs(bal))}</td>
                             <td style="text-align:center">
-                                <button class="cc-edit" onclick="supShowStatement('${s.id}')" style="background:#EFF6FF;color:#2563EB">📄 كشف حساب</button>
+                                <button class="cc-edit" onclick="supShowStatement('${s.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -77,7 +77,7 @@ window.supShowStatement = async function(supplierId) {
         <div class="mod-modal" style="max-width:820px">
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${sup.name}</h3>
                 <div style="display:flex;align-items:center;gap:10px">
-                    <button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="supGoEditProfile('${sup.id}')">✏️ تعديل بيانات المورد</button>
+                    <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="supGoEditProfile('${sup.id}')">✏️ تعديل بيانات المورد</button>
                     <button class="mod-modal-close" onclick="supCloseModal('supStmtModal')">&times;</button>
                 </div></div>
             <div class="mod-modal-body" id="supStmtBody">

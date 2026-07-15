@@ -157,7 +157,7 @@ function revRenderTable(rows) {
                     <td style="white-space:nowrap">
                         <button class="cc-edit" onclick="revViewDetails('${r.id}')">👁️ عرض</button>
                         ${cfg.canPrint ? `<button class="cc-edit" style="background:#ECFDF5;color:#059669" onclick="revPrintInvoice('${r.id}')">🖨️ طباعة</button>` : ''}
-                        ${r.status==='confirmed' && cfg.canEdit ? `<button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="revEditInvoice('${r.id}')">✏️ تعديل</button>` : ''}
+                        ${r.status==='confirmed' && cfg.canEdit ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="revEditInvoice('${r.id}')">✏️ تعديل</button>` : ''}
                     </td>
                 </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:24px;color:#94A3B8">لا توجد نتائج</td></tr>`}
             </tbody>

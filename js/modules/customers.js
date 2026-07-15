@@ -53,7 +53,7 @@ async function renderCustomers(c) {
                             <td style="color:#64748B">${c.region_id?'—':'—'}</td>
                             <td style="text-align:left;font-weight:700;color:${balColor}">${custFmt(bal)}</td>
                             <td style="text-align:center">
-                                <button class="cc-edit" onclick="custShowStatement('${c.id}')" style="background:#EFF6FF;color:#2563EB">📄 كشف حساب</button>
+                                <button class="cc-edit" onclick="custShowStatement('${c.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -79,7 +79,7 @@ window.custShowStatement = async function(customerId) {
         <div class="mod-modal" style="max-width:820px">
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${cust.name}</h3>
                 <div style="display:flex;align-items:center;gap:10px">
-                    <button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
+                    <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
                     <button class="mod-modal-close" onclick="custCloseModal('custStmtModal')">&times;</button>
                 </div></div>
             <div class="mod-modal-body" id="custStmtBody">

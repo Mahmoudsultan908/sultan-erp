@@ -93,7 +93,7 @@ async function renderPayments(c) {
                     <td>${p._queue
                         ? (p.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
                         : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:#94A3B8;font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
-                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#DBEAFE;color:#2563EB" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button>` : ''}`}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
