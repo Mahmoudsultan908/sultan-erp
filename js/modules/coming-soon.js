@@ -15,10 +15,6 @@ function csRenderPage(c, icon, title, description) {
 }
 
 // ── موديولات V16 الكبيرة (لم تُبنَ إطلاقاً) ──
-async function renderCRM(c) {
-    csRenderPage(c, '🤝', 'إدارة علاقات العملاء (CRM)',
-        'متابعة تفاعلات العملاء، تسجيل المكالمات والزيارات، وتذكيرات المتابعة الدورية.');
-}
 async function renderWhatsAppIntegration(c) {
     csRenderPage(c, '💬', 'تكامل واتساب',
         'إرسال الفواتير وإشعارات التحصيل والتذكيرات للعملاء مباشرة عبر واتساب.');
@@ -43,6 +39,6 @@ async function renderRepAppLink(c) {
 }
 
 Object.assign(window, {
-    renderCRM, renderWhatsAppIntegration,
+    renderWhatsAppIntegration,
     renderAIDashboard, renderEmployeeEvaluation, renderCustomerOrdersLink, renderRepAppLink,
 });

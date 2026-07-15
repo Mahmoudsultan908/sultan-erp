@@ -103,6 +103,7 @@ window.custShowStatement = async function(customerId) {
             { data: payments },
             { data: returns },
             docsResult,
+            interactionsResult,
         ] = await Promise.all([
             sb.from('sales').select('invoice_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }),
@@ -114,8 +115,13 @@ window.custShowStatement = async function(customerId) {
             sb.from('archive_documents').select('id,title,file_url,category,created_at')
                 .eq('linked_type', 'customer').eq('linked_id', customerId)
                 .order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
+            // اختياري — لو جدول customer_interactions لسه ما اتعملش، نتجاهل الخطأ بهدوء
+            sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done')
+                .eq('customer_id', customerId)
+                .order('interaction_date', { ascending: false }).then(r => r, () => ({ data: [] })),
         ]);
         const docs = docsResult?.data || [];
+        const interactions = interactionsResult?.data || [];
 
         // دمج الحركات في timeline واحد + حساب الرصيد المتحرك
         const moves = [];
@@ -212,6 +218,14 @@ window.custShowStatement = async function(customerId) {
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
                     ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:#D97706;text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
                 </div>`}
+            </div>
+
+            <div style="margin-top:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <div style="font-size:13px;font-weight:800;color:#1E293B">🤝 سجل التفاعلات (${interactions.length})</div>
+                    ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="crmOpenAdd('${customerId}','${(cust.name||'').replace(/'/g,"\\'")}')">+ تسجيل تفاعل</button>` : ''}
+                </div>
+                <div id="custInteractionsWrap">${custInteractionsHTML(interactions)}</div>
             </div>`;
     } catch (err) {
         document.getElementById('custStmtBody').innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
@@ -231,6 +245,35 @@ window.custGoEditProfile = function(customerId) {
 };
 
 // ════════════════════════════════════════════════════════════
-// 3) أدوات مساعدة
+// 3) سجل التفاعلات (CRM) داخل كشف الحساب — تحديث جزئي بدون
+//    إعادة تحميل الكشف كله بعد ما تسجّل تفاعل جديد من crm.js
+// ════════════════════════════════════════════════════════════
+function custInteractionsHTML(interactions) {
+    if (!interactions.length) return `<div style="font-size:12.5px;color:#94A3B8">لا توجد تفاعلات مسجّلة لهذا العميل.</div>`;
+    const typeLabels = { call: '📞 مكالمة', visit: '🚶 زيارة', complaint: '⚠️ شكوى', note: '📝 ملاحظة' };
+    return `<div class="mod-table-wrap"><table class="mod-table"><thead><tr>
+        <th>النوع</th><th>التاريخ</th><th>ملاحظات</th><th>المتابعة القادمة</th>
+    </tr></thead><tbody>
+        ${interactions.map(x => `<tr>
+            <td>${typeLabels[x.type] || x.type}</td>
+            <td style="font-size:12px">${new Date(x.interaction_date).toLocaleDateString('ar-EG')}</td>
+            <td style="color:#64748B">${x.notes || '—'}</td>
+            <td style="font-size:12px">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') + (x.is_done ? ' ✅' : '') : '—'}</td>
+        </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+window.custRefreshInteractions = async function (customerId) {
+    const wrap = document.getElementById('custInteractionsWrap');
+    if (!wrap) return;
+    try {
+        const { data } = await sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done')
+            .eq('customer_id', customerId).order('interaction_date', { ascending: false });
+        wrap.innerHTML = custInteractionsHTML(data || []);
+    } catch {}
+};
+
+// ════════════════════════════════════════════════════════════
+// 4) أدوات مساعدة
 // ════════════════════════════════════════════════════════════
 function custFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }

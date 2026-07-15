@@ -76,6 +76,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
         <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="customers" onclick="loadMod(this, 'customers')">📇 كشف حساب عميل</div>
+        <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء</div>
         <div class="nav-item" data-mod="sales-reps" onclick="loadMod(this, 'sales-reps')">🚗 المندوبون</div>
 
         <div class="nav-group">المشتريات والموردين</div>
@@ -109,7 +110,6 @@ function buildLayout() {
         <div class="nav-item" data-mod="archive" onclick="loadMod(this, 'archive')">🗄️ الأرشيف</div>
 
         <div class="nav-group">🔜 قريباً</div>
-        <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء</div>
         <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب</div>
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي</div>
         <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
