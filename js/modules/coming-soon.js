@@ -23,10 +23,6 @@ async function renderAIDashboard(c) {
     csRenderPage(c, '🤖', 'لوحة الذكاء الاصطناعي',
         'تحليلات ذكية وتوصيات تلقائية لتحسين المبيعات وإدارة المخزون بناءً على بيانات النظام.');
 }
-async function renderEmployeeEvaluation(c) {
-    csRenderPage(c, '⭐', 'تقييم الموظفين',
-        'نظام تقييم دوري لأداء الموظفين، الأهداف، والملاحظات الإدارية.');
-}
 
 // ── ربط الأنظمة الخارجية ──
 async function renderCustomerOrdersLink(c) {
@@ -40,5 +36,5 @@ async function renderRepAppLink(c) {
 
 Object.assign(window, {
     renderWhatsAppIntegration,
-    renderAIDashboard, renderEmployeeEvaluation, renderCustomerOrdersLink, renderRepAppLink,
+    renderAIDashboard, renderCustomerOrdersLink, renderRepAppLink,
 });
