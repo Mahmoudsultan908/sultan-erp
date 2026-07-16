@@ -138,8 +138,9 @@ window.eevDelete = async function (id) {
 // ════════════════════════════════════════════════════════════
 // 2) تسجيل تقييم جديد
 // ════════════════════════════════════════════════════════════
-window.eevOpenAdd = function () {
+window.eevOpenAdd = function (presetEmployeeId = null) {
     if (!_eevEmployees.length) return alert('لا يوجد موظفون نشطون. أضف موظفاً أولاً من صفحة "الموظفون والرواتب".');
+    const selectedId = presetEmployeeId || _eevFilterEmp || '';
 
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
@@ -152,7 +153,7 @@ window.eevOpenAdd = function () {
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>الموظف *</label>
                         <select id="eevEmpId" class="mod-form-input">
-                            ${_eevEmployees.map(e => `<option value="${e.id}" ${_eevFilterEmp === e.id ? 'selected' : ''}>${e.name}${e.job_title ? ' — ' + e.job_title : ''}</option>`).join('')}
+                            ${_eevEmployees.map(e => `<option value="${e.id}" ${selectedId === e.id ? 'selected' : ''}>${e.name}${e.job_title ? ' — ' + e.job_title : ''}</option>`).join('')}
                         </select></div>
                     <div class="mod-form-group"><label>تاريخ التقييم</label>
                         <input type="date" id="eevDate" class="mod-form-input" value="${new Date().toISOString().slice(0, 10)}"></div>

@@ -14,6 +14,15 @@
 let _prlList = [];
 let _prlEditingId = null;
 let _prlTableMissing = false;
+let _prlLastEvalMap = {}; // employee_id -> { date, avg }
+
+function prlEvalColor(avg) {
+    if (avg >= 9) return { color: '#059669', bg: '#F0FDF4' };
+    if (avg >= 7) return { color: '#2563EB', bg: '#EFF6FF' };
+    if (avg >= 5) return { color: '#D97706', bg: '#FFFBEB' };
+    if (avg >= 3) return { color: '#EA580C', bg: '#FFF7ED' };
+    return { color: '#DC2626', bg: '#FEF2F2' };
+}
 
 function prlFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -32,6 +41,19 @@ async function renderPayroll(c) {
             _prlTableMissing = true;
             _prlList = [];
         }
+
+        // آخر تقييم لكل موظف — اختياري، لو جدول employee_evaluations لسه ما اتعملش نتجاهل الخطأ بهدوء
+        const evalResult = await sb.from('employee_evaluations')
+            .select('employee_id, evaluation_date, attendance_score, quality_score, teamwork_score, initiative_score, compliance_score')
+            .then(r => r, () => ({ data: [] }));
+        _prlLastEvalMap = {};
+        (evalResult?.data || []).forEach(x => {
+            if (!_prlLastEvalMap[x.employee_id] || x.evaluation_date > _prlLastEvalMap[x.employee_id].date) {
+                const avg = (Number(x.attendance_score) + Number(x.quality_score) + Number(x.teamwork_score) + Number(x.initiative_score) + Number(x.compliance_score)) / 5;
+                _prlLastEvalMap[x.employee_id] = { date: x.evaluation_date, avg };
+            }
+        });
+
         prlRenderPage(c);
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
@@ -58,22 +80,27 @@ function prlRenderPage(c) {
 
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>الموظف</th><th>الوظيفة</th><th>الهاتف</th>
+                <th>الموظف</th><th>الوظيفة</th><th>الهاتف</th><th>آخر تقييم</th>
                 <th style="text-align:left">الراتب الأساسي</th><th style="text-align:center">الحالة</th><th style="text-align:center">إجراءات</th>
             </tr></thead>
             <tbody>
-                ${_prlList.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>👥</span>لا يوجد موظفون بعد.</td></tr>` :
-                _prlList.map(e => `<tr>
+                ${_prlList.length === 0 ? `<tr><td colspan="7" class="empty-state"><span>👥</span>لا يوجد موظفون بعد.</td></tr>` :
+                _prlList.map(e => {
+                    const lastEval = _prlLastEvalMap[e.id];
+                    return `<tr>
                     <td style="font-weight:600">${e.name}</td>
                     <td style="color:#64748B">${e.job_title || '—'}</td>
                     <td dir="ltr" style="color:#64748B">${e.phone || '—'}</td>
+                    <td style="font-size:12px">${lastEval ? `${new Date(lastEval.date).toLocaleDateString('ar-EG')} <span style="background:${prlEvalColor(lastEval.avg).bg};color:${prlEvalColor(lastEval.avg).color};padding:1px 8px;border-radius:10px;font-weight:700;margin-right:4px">${lastEval.avg.toFixed(1)}</span>` : '<span style="color:#94A3B8">—</span>'}</td>
                     <td style="text-align:left;font-weight:700">${prlFmt(e.base_salary)}</td>
                     <td style="text-align:center">${e.is_active !== false ? '<span style="color:#059669;font-weight:600">✅ نشط</span>' : '<span style="color:#94A3B8;font-weight:600">🚫 غير نشط</span>'}</td>
                     <td style="text-align:center;white-space:nowrap">
                         <button class="cc-edit" onclick="prlOpenEdit('${e.id}')">✏️</button>
                         <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="prlShowStatement('${e.id}')">📄 كشف حساب</button>
+                        ${typeof eevOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FEF9C3;color:#B45309" onclick="eevOpenAdd('${e.id}')" title="تقييم سريع">⭐</button>` : ''}
                     </td>
-                </tr>`).join('')}
+                </tr>`;
+                }).join('')}
             </tbody></table>
         </div>`;
 }
