@@ -138,7 +138,16 @@ window.eevDelete = async function (id) {
 // ════════════════════════════════════════════════════════════
 // 2) تسجيل تقييم جديد
 // ════════════════════════════════════════════════════════════
-window.eevOpenAdd = function (presetEmployeeId = null) {
+window.eevOpenAdd = async function (presetEmployeeId = null) {
+    // بيتفتح أحياناً من payroll.js (زرار التقييم السريع) من غير ما
+    // renderEmployeeEvaluation يكون جري خالص — نجيب الموظفين لو القائمة لسه فاضية
+    if (!_eevEmployees.length) {
+        try {
+            const { data, error } = await sb.from('employees').select('id,name,job_title').eq('is_active', true).order('name');
+            if (error) throw error;
+            _eevEmployees = data || [];
+        } catch (e) { _eevEmployees = []; }
+    }
     if (!_eevEmployees.length) return alert('لا يوجد موظفون نشطون. أضف موظفاً أولاً من صفحة "الموظفون والرواتب".');
     const selectedId = presetEmployeeId || _eevFilterEmp || '';
 
