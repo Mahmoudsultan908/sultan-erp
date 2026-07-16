@@ -12,13 +12,22 @@ let _custList = [];
 async function renderCustomers(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء...</div>';
     try {
-        const [{ data: customers }, { data: regions }] = await Promise.all([
+        const [{ data: customers }, { data: regions }, interactionsResult] = await Promise.all([
             sb.from('customers').select('*').order('name'),
             sb.from('customer_regions').select('id,name'),
+            // اختياري — لو جدول customer_interactions لسه ما اتعملش، نتجاهل الخطأ بهدوء
+            sb.from('customer_interactions').select('customer_id, interaction_date').then(r => r, () => ({ data: [] })),
         ]);
         _custList = customers || [];
         const regionMap = {};
         (regions || []).forEach(r => { regionMap[r.id] = r.name; });
+        // آخر تفاعل لكل عميل — أحدث interaction_date من customer_interactions
+        const lastInteractionMap = {};
+        (interactionsResult?.data || []).forEach(x => {
+            if (!lastInteractionMap[x.customer_id] || x.interaction_date > lastInteractionMap[x.customer_id]) {
+                lastInteractionMap[x.customer_id] = x.interaction_date;
+            }
+        });
 
         const totalDebt = _custList.reduce((s,c)=>s+(Number(c.balance)>0?Number(c.balance):0),0);
         const totalCredit = _custList.reduce((s,c)=>s+(Number(c.balance)<0?Math.abs(Number(c.balance)):0),0);
@@ -38,15 +47,16 @@ async function renderCustomers(c) {
 
             <div class="mod-table-wrap" style="margin-top:16px">
                 <table class="mod-table"><thead><tr>
-                    <th>العميل</th><th>الهاتف</th><th>المنطقة</th>
+                    <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>آخر تفاعل</th>
                     <th style="text-align:left">الرصيد</th>
                     <th style="text-align:center">إجراءات</th>
                 </tr></thead>
                 <tbody>
-                    ${_custList.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>👥</span>لا يوجد عملاء.</td></tr>` :
+                    ${_custList.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>👥</span>لا يوجد عملاء.</td></tr>` :
                     _custList.map(c => {
                         const bal = Number(c.balance)||0;
                         const balColor = bal > 0 ? '#DC2626' : bal < 0 ? '#059669' : '#64748B';
+                        const lastInt = lastInteractionMap[c.id];
                         return `<tr>
                             <td>
                                 <div style="display:flex;align-items:center;gap:8px">
@@ -56,6 +66,7 @@ async function renderCustomers(c) {
                             </td>
                             <td dir="ltr" style="text-align:right;color:#64748B">${c.phone||'—'}</td>
                             <td style="color:#64748B">${regionMap[c.region_id] || '—'}</td>
+                            <td style="font-size:12px;color:#94A3B8">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
                             <td style="text-align:left;font-weight:700;color:${balColor}">${custFmt(bal)}</td>
                             <td style="text-align:center;white-space:nowrap">
                                 <button class="cc-edit" onclick="custShowStatement('${c.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
@@ -117,7 +128,7 @@ window.custShowStatement = async function(customerId) {
                 .eq('linked_type', 'customer').eq('linked_id', customerId)
                 .order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
             // اختياري — لو جدول customer_interactions لسه ما اتعملش، نتجاهل الخطأ بهدوء
-            sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done')
+            sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done,sales_reps(name),archive_documents(title,file_url)')
                 .eq('customer_id', customerId)
                 .order('interaction_date', { ascending: false }).then(r => r, () => ({ data: [] })),
         ]);
@@ -253,12 +264,13 @@ function custInteractionsHTML(interactions) {
     if (!interactions.length) return `<div style="font-size:12.5px;color:#94A3B8">لا توجد تفاعلات مسجّلة لهذا العميل.</div>`;
     const typeLabels = { call: '📞 مكالمة', visit: '🚶 زيارة', complaint: '⚠️ شكوى', note: '📝 ملاحظة' };
     return `<div class="mod-table-wrap"><table class="mod-table"><thead><tr>
-        <th>النوع</th><th>التاريخ</th><th>ملاحظات</th><th>المتابعة القادمة</th>
+        <th>النوع</th><th>المندوب</th><th>التاريخ</th><th>ملاحظات</th><th>المتابعة القادمة</th>
     </tr></thead><tbody>
         ${interactions.map(x => `<tr>
             <td>${typeLabels[x.type] || x.type}</td>
+            <td style="color:#64748B">${x.sales_reps?.name || '—'}</td>
             <td style="font-size:12px">${new Date(x.interaction_date).toLocaleDateString('ar-EG')}</td>
-            <td style="color:#64748B">${x.notes || '—'}</td>
+            <td style="color:#64748B">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:#D97706">📎 ${x.archive_documents.title}</a>` : ''}</td>
             <td style="font-size:12px">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') + (x.is_done ? ' ✅' : '') : '—'}</td>
         </tr>`).join('')}
     </tbody></table></div>`;
@@ -268,7 +280,7 @@ window.custRefreshInteractions = async function (customerId) {
     const wrap = document.getElementById('custInteractionsWrap');
     if (!wrap) return;
     try {
-        const { data } = await sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done')
+        const { data } = await sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done,sales_reps(name),archive_documents(title,file_url)')
             .eq('customer_id', customerId).order('interaction_date', { ascending: false });
         wrap.innerHTML = custInteractionsHTML(data || []);
     } catch {}

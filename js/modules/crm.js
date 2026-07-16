@@ -8,6 +8,7 @@
 
 let _crmList = [];
 let _crmCustomers = [];
+let _crmReps = [];
 let _crmFilter = 'due'; // 'due' | 'all'
 let _crmTableMissing = false;
 
@@ -22,15 +23,20 @@ async function renderCRM(c) {
     try {
         try {
             const { data, error } = await sb.from('customer_interactions')
-                .select('*, customers(name)').order('interaction_date', { ascending: false });
+                .select('*, customers(name), sales_reps(name), archive_documents(title,file_url)').order('interaction_date', { ascending: false });
             if (error) throw error;
             _crmList = data || [];
         } catch (e) {
             _crmTableMissing = true;
             _crmList = [];
         }
-        const { data: customers } = await sb.from('customers').select('id,name').order('name');
+        const [{ data: customers }, repsResult] = await Promise.all([
+            sb.from('customers').select('id,name').order('name'),
+            // اختياري — لو جدول sales_reps لسه ما اتعملش، نتجاهل الخطأ بهدوء
+            sb.from('sales_reps').select('id,name').eq('is_active', true).order('name').then(r => r, () => ({ data: [] })),
+        ]);
         _crmCustomers = customers || [];
+        _crmReps = repsResult?.data || [];
         crmRenderPage(c);
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
@@ -74,17 +80,18 @@ function crmRenderPage(c) {
 
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>العميل</th><th>النوع</th><th>تاريخ التفاعل</th><th>ملاحظات</th><th>المتابعة القادمة</th><th style="text-align:center">إجراءات</th>
+                <th>العميل</th><th>النوع</th><th>المندوب</th><th>تاريخ التفاعل</th><th>ملاحظات</th><th>المتابعة القادمة</th><th style="text-align:center">إجراءات</th>
             </tr></thead>
             <tbody>
-                ${list.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>🤝</span>لا توجد تفاعلات مطابقة.</td></tr>` :
+                ${list.length === 0 ? `<tr><td colspan="7" class="empty-state"><span>🤝</span>لا توجد تفاعلات مطابقة.</td></tr>` :
                 list.map(x => {
                     const overdueRow = !x.is_done && x.next_follow_up_date && x.next_follow_up_date < today;
                     return `<tr style="${overdueRow ? 'background:#FEF2F2' : ''}">
                         <td style="font-weight:600">${x.customers?.name || '—'}</td>
                         <td>${CRM_TYPE_LABELS[x.type] || x.type}</td>
+                        <td style="color:#64748B">${x.sales_reps?.name || '—'}</td>
                         <td style="font-size:12px">${new Date(x.interaction_date).toLocaleDateString('ar-EG')}</td>
-                        <td style="color:#64748B;max-width:260px">${x.notes || '—'}</td>
+                        <td style="color:#64748B;max-width:220px">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:#D97706">📎 ${x.archive_documents.title}</a>` : ''}</td>
                         <td style="font-size:12px;${overdueRow ? 'color:#DC2626;font-weight:700' : ''}">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') : '—'}</td>
                         <td style="text-align:center;white-space:nowrap">
                             ${x.is_done ? '<span style="color:#059669;font-weight:600;font-size:12px">✅ تمّت</span>' :
@@ -122,8 +129,21 @@ window.crmDelete = async function (id) {
 // ════════════════════════════════════════════════════════════
 let _crmAddCustId = null;
 
-window.crmOpenAdd = function (presetCustomerId = null, presetCustomerName = '') {
+window.crmOpenAdd = async function (presetCustomerId = null, presetCustomerName = '') {
     _crmAddCustId = presetCustomerId;
+    // بتتفتح أحياناً من customers.js من غير ما renderCRM يكون جري خالص —
+    // نجيب العملاء والمندوبين لو القوائم لسه فاضية
+    if (!_crmCustomers.length) {
+        const { data } = await sb.from('customers').select('id,name').order('name');
+        _crmCustomers = data || [];
+    }
+    if (!_crmReps.length) {
+        try {
+            const { data } = await sb.from('sales_reps').select('id,name').eq('is_active', true).order('name');
+            _crmReps = data || [];
+        } catch { _crmReps = []; }
+    }
+
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'crmModal';
@@ -142,10 +162,18 @@ window.crmOpenAdd = function (presetCustomerId = null, presetCustomerName = '') 
                         <div class="inv-ac" id="crmCustAC"></div>
                     </div>
                 </div>
-                <div class="mod-form-group"><label>نوع التفاعل</label>
-                    <select id="crmType" class="mod-form-input">
-                        ${Object.entries(CRM_TYPE_LABELS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
-                    </select></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="mod-form-group"><label>نوع التفاعل</label>
+                        <select id="crmType" class="mod-form-input">
+                            ${Object.entries(CRM_TYPE_LABELS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+                        </select></div>
+                    ${_crmReps.length ? `
+                    <div class="mod-form-group"><label>المندوب</label>
+                        <select id="crmRep" class="mod-form-input">
+                            <option value="">بدون مندوب</option>
+                            ${_crmReps.map(r => `<option value="${r.id}">🚗 ${r.name}</option>`).join('')}
+                        </select></div>` : ''}
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>تاريخ التفاعل</label>
                         <input type="date" id="crmDate" class="mod-form-input" value="${new Date().toISOString().slice(0,10)}"></div>
@@ -154,6 +182,9 @@ window.crmOpenAdd = function (presetCustomerId = null, presetCustomerName = '') 
                 </div>
                 <div class="mod-form-group"><label>ملاحظات</label>
                     <textarea id="crmNotes" class="mod-form-input" rows="3" placeholder="اختياري"></textarea></div>
+                <div class="mod-form-group"><label>مرفق (اختياري)</label>
+                    <input type="file" id="crmFile" class="mod-form-input">
+                    <div style="font-size:11px;color:#94A3B8;margin-top:2px">هيتحفظ في الأرشيف تلقائياً ومربوط بالعميل ده</div></div>
             </div>
             <div class="mod-modal-footer">
                 <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('crmModal').remove()">إلغاء</button>
@@ -189,17 +220,39 @@ window.crmPickCust = function (id, name) {
 window.crmSave = async function () {
     const customer_id = document.getElementById('crmCustId').value;
     const type = document.getElementById('crmType').value;
+    const rep_id = document.getElementById('crmRep')?.value || null;
     const interaction_date = document.getElementById('crmDate').value;
     const next_follow_up_date = document.getElementById('crmFollowUp').value || null;
     const notes = document.getElementById('crmNotes').value.trim() || null;
+    const file = document.getElementById('crmFile')?.files[0] || null;
     if (!customer_id) return alert('اختر العميل');
     if (!interaction_date) return alert('أدخل تاريخ التفاعل');
 
     const btn = document.querySelector('#crmModal .mod-btn-primary');
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
     try {
+        // لو فيه مرفق، ننشئه في الأرشيف الأول ونربط تفاعلنا بيه (نفس مسار
+        // archive.js arcSaveUpload بالحرف)
+        let document_id = null;
+        if (file) {
+            const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+            const path = `${Date.now()}_${safeName}`;
+            const { error: upErr } = await sb.storage.from('archive-documents').upload(path, file);
+            if (upErr) throw upErr;
+            const { data: pub } = sb.storage.from('archive-documents').getPublicUrl(path);
+            const custName = _crmCustomers.find(c => c.id === customer_id)?.name || '';
+            const { data: docRow, error: docErr } = await sb.from('archive_documents').insert({
+                title: `مرفق تفاعل — ${custName} — ${new Date(interaction_date).toLocaleDateString('ar-EG')}`,
+                file_path: path, file_url: pub.publicUrl, file_type: file.type || '',
+                category: 'CRM', linked_type: 'customer', linked_id: customer_id,
+                uploaded_by: currentUser?.id || null,
+            }).select().single();
+            if (docErr) throw docErr;
+            document_id = docRow.id;
+        }
+
         const { error } = await sb.from('customer_interactions').insert({
-            customer_id, type, interaction_date, next_follow_up_date, notes,
+            customer_id, type, rep_id, interaction_date, next_follow_up_date, notes, document_id,
             created_by: currentUser?.id || null,
         });
         if (error) throw error;
@@ -212,7 +265,9 @@ window.crmSave = async function () {
             renderCRM(document.getElementById('app-content'));
         }
     } catch (err) {
-        alert('❌ خطأ: ' + err.message + (_crmTableMissing ? '\n\nتأكد من تشغيل crm_migration.sql في Supabase.' : ''));
+        const extraHint = _crmTableMissing ? '\n\nتأكد من تشغيل crm_migration.sql في Supabase.'
+            : /rep_id|document_id/i.test(err.message||'') ? '\n\nتأكد من تشغيل crm_enhancements_migration.sql في Supabase.' : '';
+        alert('❌ خطأ: ' + err.message + extraHint);
         btn.innerText = '💾 حفظ'; btn.disabled = false;
     }
 };

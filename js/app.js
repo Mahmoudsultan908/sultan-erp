@@ -76,7 +76,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
         <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="customers" onclick="loadMod(this, 'customers')">📇 كشف حساب عميل</div>
-        <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء</div>
+        <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء <span id="crmOverdueBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         <div class="nav-item" data-mod="sales-reps" onclick="loadMod(this, 'sales-reps')">🚗 المندوبون</div>
 
         <div class="nav-group">المشتريات والموردين</div>
@@ -167,6 +167,16 @@ async function setupApp() {
         const el = document.getElementById('topbarCash');
         if (el) el.textContent = '💰 0.00 ج.م';
     });
+
+    // ★ عداد متابعات CRM المتأخرة في القائمة الجانبية — نفس فكرة رصيد
+    //   الخزينة فوق، بيجري في الخلفية من غير ما يأخر تحميل الصفحة. لو
+    //   جدول customer_interactions لسه ما اتعملش، بيتجاهل الخطأ بهدوء.
+    sb.from('customer_interactions').select('id', { count: 'exact', head: true })
+        .eq('is_done', false).lt('next_follow_up_date', new Date().toISOString().slice(0,10))
+        .then(({ count }) => {
+            const el = document.getElementById('crmOverdueBadge');
+            if (el && count) { el.textContent = count; el.style.display = 'inline-block'; }
+        }).catch(() => {});
 
     loadMod(document.querySelector('[data-mod="dashboard"]'), 'dashboard');
 }
