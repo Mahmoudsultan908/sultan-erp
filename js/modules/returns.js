@@ -1113,64 +1113,70 @@ window.retSave = async function () {
         const prefix = retType === 'sales' ? 'RS' : 'RP';
         const { data: counterRow } = await sb.from('app_settings').select('value').eq('key', counterKey).maybeSingle();
         const counter = parseInt(counterRow?.value) || 1;
-        const returnNo = prefix + '-' + String(counter).padStart(4, '0');
+        let returnNo = prefix + '-' + String(counter).padStart(4, '0');
 
         if (retType === 'sales') {
-            const { data: retRows, error: retErr } = await sb.from('sales_returns').insert({
-                return_no: returnNo,
-                customer_id: retEntityId || null,
-                sale_id: retLinkedDoc?.id || retEditingLinkId || null,
-                warehouse_id: retWarehouseId,
-                // مستقل تمامًا عن نوع دفع الفاتورة الأصلية — راجع retPayCash فوق
-                payment_type: retPayCash ? 'cash' : 'credit',
-                treasury_id: treasuryId,
-                rep_id: retNormalizeRepId(retRepId),
-                affects_customer_balance: retAffectsBalance,
-                subtotal, total, status: 'confirmed',
-                reason: notes,
-                created_by: currentUser?.id || null,
-            }).select();
-            if (retErr) throw retErr;
-            const returnId = retRows[0].id;
-
-            const itemRows = filled.map(it => ({
-                return_id: returnId, product_id: it.pid, qty: it.qty,
+            // ★ نفس فكرة مرتجع الشراء بالظبط (راجع تعليق fn_create_purchase_return
+            //   تحت) — هيدر + بنود + عداد جوه ترانزاكشن واحدة عبر fn_create_sales_return
+            //   بدل 3 خطوات منفصلة ممكن يسيب هيدر "confirmed" معلّق لو خطوة
+            //   البنود فشلت بعد ما التريجر يكون رحّل القيد وأثّر على رصيد العميل
+            const itemsPayload = filled.map(it => ({
+                product_id: it.pid, qty: it.qty,
                 unit_price: it.price, discount_pct: it.disc || 0,
                 line_total: (it.qty || 0) * (it.price || 0) * (1 - (it.disc || 0) / 100),
                 unit_name: it.unit || 'قطعة',
             }));
-            const { error: itemsErr } = await sb.from('sale_return_items').insert(itemRows);
-            if (itemsErr) throw itemsErr;
-
-            await sb.from('app_settings').upsert({ key: counterKey, value: String(counter + 1), updated_at: new Date().toISOString() });
+            const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_sales_return', {
+                p_customer_id: retEntityId || null,
+                p_sale_id: retLinkedDoc?.id || retEditingLinkId || null,
+                p_warehouse_id: retWarehouseId,
+                // مستقل تمامًا عن نوع دفع الفاتورة الأصلية — راجع retPayCash فوق
+                p_payment_type: retPayCash ? 'cash' : 'credit',
+                p_treasury_id: treasuryId,
+                p_rep_id: retNormalizeRepId(retRepId),
+                p_affects_customer_balance: retAffectsBalance,
+                p_subtotal: subtotal, p_total: total,
+                p_reason: notes,
+                p_created_by: currentUser?.id || null,
+                p_items: itemsPayload,
+            });
+            if (rpcErr) throw rpcErr;
+            if (rpcRows?.[0]?.return_no) returnNo = rpcRows[0].return_no;
         } else {
-            const { data: retRows, error: retErr } = await sb.from('purchase_returns').insert({
-                return_no: returnNo,
-                supplier_id: retEntityId || null,
-                purchase_id: retLinkedDoc?.id || retEditingLinkId || null,
-                warehouse_id: retWarehouseId,
-                // مستقل تمامًا عن نوع دفع فاتورة الشراء الأصلية — نفس فكرة مرتجع
-                // المبيعات بالظبط، راجع retPayCash/retAffectsBalance فوق
-                payment_type: retPayCash ? 'cash' : 'credit',
-                treasury_id: treasuryId,
-                affects_supplier_balance: retAffectsBalance,
-                subtotal, total, status: 'confirmed',
-                reason: notes,
-                created_by: currentUser?.id || null,
-            }).select();
-            if (retErr) throw retErr;
-            const returnId = retRows[0].id;
-
-            const itemRows = filled.map(it => ({
-                return_id: returnId, product_id: it.pid, qty: it.qty,
+            // ★ إنشاء الهيدر + البنود + زيادة العداد كلهم في ترانزاكشن واحدة
+            //   عبر fn_create_purchase_return (Postgres RPC) — بدل 3 خطوات
+            //   منفصلة من الفرونت إند. السبب: لو حصل أي فشل بين إدراج الهيدر
+            //   وإدراج البنود (كان بيحصل فعليًا بسبب عمود unit_name الناقص من
+            //   جدول purchase_return_items)، كان بيفضل هيدر "confirmed" معلّق
+            //   وقيد يومية مسجّل ورصيد مورد متأثر من غير بنود ومن غير ما العداد
+            //   يتحرك — فأي محاولة تانية كانت بتتصادم على return_no القديم
+            //   نفسه وعلى ref قيد اليومية نفسه. الدالة دلوقتي بترجع كل حاجة
+            //   تلقائيًا لو أي خطوة فشلت، فمفيش إمكانية لهيدر يتيم تاني.
+            const itemsPayload = filled.map(it => ({
+                product_id: it.pid, qty: it.qty,
                 unit_price: it.price,
                 line_total: (it.qty || 0) * (it.price || 0),
                 unit_name: it.unit || 'قطعة',
             }));
-            const { error: itemsErr } = await sb.from('purchase_return_items').insert(itemRows);
-            if (itemsErr) throw itemsErr;
-
-            await sb.from('app_settings').upsert({ key: counterKey, value: String(counter + 1), updated_at: new Date().toISOString() });
+            const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_purchase_return', {
+                p_supplier_id: retEntityId || null,
+                p_purchase_id: retLinkedDoc?.id || retEditingLinkId || null,
+                p_warehouse_id: retWarehouseId,
+                // مستقل تمامًا عن نوع دفع فاتورة الشراء الأصلية — نفس فكرة مرتجع
+                // المبيعات بالظبط، راجع retPayCash/retAffectsBalance فوق
+                p_payment_type: retPayCash ? 'cash' : 'credit',
+                p_treasury_id: treasuryId,
+                p_affects_supplier_balance: retAffectsBalance,
+                p_subtotal: subtotal, p_total: total,
+                p_reason: notes,
+                p_created_by: currentUser?.id || null,
+                p_items: itemsPayload,
+            });
+            if (rpcErr) throw rpcErr;
+            // العداد بيتقفل ويتحرك جوه الـ RPC نفسها (سباق بين مستخدمين
+            // في نفس اللحظة ممكن يخلي التخمين المحلي فوق مش دقيق) — نعتمد
+            // على return_no اللي الدالة رجّعته فعليًا كمصدر وحيد للحقيقة
+            if (rpcRows?.[0]?.return_no) returnNo = rpcRows[0].return_no;
         }
 
         if (retEditingId) {

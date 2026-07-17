@@ -184,34 +184,13 @@ async function invApplyPendingEstimates() {
 
 // رقم فاتورة مؤقت وقت الأوفلاين — بادئ بمعرّف الجهاز عشان يفضل فريد حتى
 // لو أكتر من جهاز شغال أوفلاين في نفس الوقت. بيتستبدل برقم رسمي حقيقي
-// (INV-XXXX) وقت نجاح المزامنة — راجع invAllocateRealInvoiceNo.
+// (INV-XXXX) وقت نجاح المزامنة عبر fn_create_sale — راجع sync handler تحت.
 function invNextOfflineInvoiceNo() {
     const key = 'inv_offline_seq';
     let seq = (parseInt(localStorage.getItem(key) || '0', 10) || 0) + 1;
     localStorage.setItem(key, String(seq));
     const deviceId = typeof offlineGetDeviceId === 'function' ? offlineGetDeviceId() : 'DEV';
     return `OFFLINE-${deviceId}-${seq}`;
-}
-
-// تخصيص رقم فاتورة رسمي حي وقت المزامنة (نفس منطق invLoadData/invSave
-// الأونلاين) + حماية من تصادم الرقم لو أكتر من جهاز زامن في نفس اللحظة تقريباً.
-async function invAllocateRealInvoiceNo() {
-    let counter;
-    const { data: invCounterRow } = await sb.from('app_settings').select('value').eq('key', 'invoice_counter').maybeSingle();
-    counter = parseInt(invCounterRow?.value);
-    if (!counter || isNaN(counter)) {
-        const { data: lastSale } = await sb.from('sales').select('invoice_no').order('created_at', { ascending: false }).limit(1);
-        const last = lastSale?.[0]?.invoice_no || 'INV-0001';
-        const m = String(last).match(/(\d+)/);
-        counter = m ? parseInt(m[1]) + 1 : 1;
-    }
-    for (let attempt = 0; attempt < 5; attempt++) {
-        const invoiceNo = 'INV-' + String(counter).padStart(4, '0');
-        const { data: dupCheck } = await sb.from('sales').select('id').eq('invoice_no', invoiceNo).maybeSingle();
-        if (!dupCheck) return { invoiceNo, counter };
-        counter++;
-    }
-    return { invoiceNo: 'INV-' + String(counter).padStart(4, '0') + '-' + Date.now().toString().slice(-4), counter };
 }
 
 // ── سعر بيع صنف حسب مستوى السعر ──
@@ -1213,7 +1192,7 @@ async function invSave(andNew) {
     if (!filled.length) { invToast('⚠️ الفاتورة فارغة — أضف أصنافاً أولاً', 'error'); return { ok: false }; }
 
     const { subtotal, rowsDisc, extra, net } = invCalcNet();
-    const invoiceNo = 'INV-' + String(INV_DB.invoiceNo).padStart(4, '0');
+    let invoiceNo = 'INV-' + String(INV_DB.invoiceNo).padStart(4, '0');
 
     // فحص المخزون المتاح في المخزن المختار
     if (invWarehouseId) {
@@ -1248,7 +1227,7 @@ async function invSave(andNew) {
     try {
         // ★ أوفلاين: بدل الحفظ الحي، سجّل الفاتورة في طابور المزامنة برقم
         //   مؤقت + تقدير محلي (مخزون/رصيد عميل) — الحقيقة الفعلية بتتحدد
-        //   وقت المزامنة (invAllocateRealInvoiceNo + sync handler تحت).
+        //   وقت المزامنة (fn_create_sale RPC + sync handler تحت).
         if (offline) {
             const stockDeltas = filled.map(it => {
                 const key = invWarehouseId + '|' + it.pid;
@@ -1346,60 +1325,46 @@ async function invSave(andNew) {
         }
         console.log('[invSave] rep_id قبل الإرسال (بعد التحقق الحي):', repIdToSend, '— typeof:', typeof repIdToSend);
 
-        // ★ تشخيص إضافي: لو الخطأ مش من rep_id فعلياً، ده أكتر سبب محتمل تاني
-        //   للـ 409 — invoice_no مكرر (لو المستخدم عمل محاولات حفظ فاشلة
-        //   متكررة، عداد app_settings.invoice_counter مبيتزودش إلا بعد نجاح
-        //   الإدراج، فأي رقم اتحسب سابقاً ولسه موجود كصف حقيقي هيفشل هنا).
-        const { data: dupCheck } = await sb.from('sales').select('id').eq('invoice_no', invoiceNo).maybeSingle();
-        console.log('[invSave] فحص تكرار رقم الفاتورة:', { invoiceNo, dupCheck });
-        if (dupCheck) {
-            console.warn('[invSave] رقم الفاتورة ده موجود فعلاً في قاعدة البيانات — مش مشكلة rep_id، المشكلة في invoice_no المكرر:', invoiceNo);
-        }
-
-        // 1) INSERT في جدول sales
-        const { data: saleRows, error: saleErr } = await sb.from('sales').insert({
-            invoice_no: invoiceNo,
-            customer_id: invCustId || null,
-            payment_type: invPayType,
-            subtotal,
-            vat_amount: 0,
-            total: net,
-            discount: extra,
-            status: 'confirmed',
-            warehouse_id: invWarehouseId,
-            rep_id: repIdToSend,
-            treasury_id: invPayType === 'cash' ? (document.getElementById('invTreasuryId')?.value || invTreasuryId || null) : null,
-            source_app: 'erp',
-            created_by: currentUser?.id || null,
-        }).select();
-        if (saleErr) throw saleErr;
-        const saleId = saleRows[0].id;
-
-        // 2) INSERT بنود الفاتورة في sale_items + خصم المخزون
-        const itemsToInsert = [];
-        for (const it of filled) {
-            const prod = INV_DB.products.find(p=>p.id===it.pid);
-            const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
-            itemsToInsert.push({
-                sale_id: saleId,
-                product_id: it.pid,
-                qty: it.qty,
-                unit_price: it.price,
-                line_total: lineTotal,
-                unit_type: 'sale_unit',
-                units_per_carton_snapshot: prod?.units_per_carton || 1,
-                discount_pct: it.disc || 0,
-                free_qty: it.free || 0,
+        // ★ إنشاء الهيدر + البنود + زيادة العداد كلهم في ترانزاكشن واحدة عبر
+        //   fn_create_sale (Postgres RPC) — بدل 4 خطوات منفصلة من الفرونت
+        //   إند. السبب: fn_sale_status_change (تريجر AFTER INSERT على sales)
+        //   بيرحّل قيد اليومية ويأثّر على رصيد العميل فور INSERT الهيدر —
+        //   قبل ما البنود تتسجل أصلاً. لو إدراج البنود فشل لأي سبب، كان
+        //   بيفضل هيدر "confirmed" معلّق بقيد وبرصيد متأثر من غير بنود،
+        //   والعداد (invoice_counter) ميترفعش، فأي محاولة تانية كانت هتتصادم
+        //   على نفس invoice_no (كان فيه تعليق قديم هنا بيوصف الاحتمالية دي
+        //   بالظبط، والفحص اللي كان موجود كان بس بيكتشف التصادم من غير ما
+        //   يمنعه). الدالة دلوقتي بترجع كل حاجة تلقائيًا لو أي خطوة فشلت.
+        const itemsPayload = filled.map(it => {
+            const prod = INV_DB.products.find(p => p.id === it.pid);
+            const lineTotal = (it.qty || 0) * (it.price || 0) * (1 - (it.disc || 0) / 100);
+            return {
+                product_id: it.pid, qty: it.qty, unit_price: it.price, line_total: lineTotal,
+                unit_type: 'sale_unit', units_per_carton_snapshot: prod?.units_per_carton || 1,
+                discount_pct: it.disc || 0, free_qty: it.free || 0,
                 cost_price_snapshot: prod ? invGetBuyPrice(prod) : 0,
                 unit_name: prod?.unit || it.unit || 'قطعة',
-            });
-        }
-        const { error: itemsErr } = await sb.from('sale_items').insert(itemsToInsert);
-        if (itemsErr) throw itemsErr;
+            };
+        });
+        const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_sale', {
+            p_customer_id: invCustId || null,
+            p_payment_type: invPayType,
+            p_subtotal: subtotal,
+            p_vat_amount: 0,
+            p_total: net,
+            p_discount: extra,
+            p_warehouse_id: invWarehouseId,
+            p_rep_id: repIdToSend,
+            p_treasury_id: invPayType === 'cash' ? (document.getElementById('invTreasuryId')?.value || invTreasuryId || null) : null,
+            p_source_app: 'erp',
+            p_created_by: currentUser?.id || null,
+            p_items: itemsPayload,
+        });
+        if (rpcErr) throw rpcErr;
+        if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
 
-        // 3) تحديث الـ cache المحلي للمخزون فقط
-        //    (الخصم الفعلي في قاعدة البيانات بيقوم بيه الـ trigger تلقائياً عند INSERT في sale_items)
-        //    القاعدة الذهبية #2: لا تكرار في عمليات المخزون/الفلوس
+        // تحديث الـ cache المحلي للمخزون فقط
+        // (الخصم الفعلي في قاعدة البيانات بيقوم بيه الـ trigger تلقائياً عند INSERT في sale_items)
         if (invWarehouseId) {
             for (const it of filled) {
                 const need = (it.qty||0) + (it.free||0);
@@ -1407,14 +1372,11 @@ async function invSave(andNew) {
                 INV_DB.stockMap[key] = (INV_DB.stockMap[key] || 0) - need;
             }
         }
-
-        // 4) زِد رقم الفاتورة في app_settings
-        await sb.from('app_settings').upsert({
-            key: 'invoice_counter',
-            value: String(INV_DB.invoiceNo + 1),
-            updated_at: new Date().toISOString(),
-        });
-        INV_DB.invoiceNo++;
+        // العداد بيتقفل ويتحرك جوه الـ RPC نفسها — نطابق العرض المحلي على
+        // الرقم الحقيقي اللي الدالة رجّعته (مش تخمين قديم ممكن يكون بعيد
+        // عن الحقيقة تحت سباق مستخدمين متزامنين)
+        const invoiceNoMatch = invoiceNo.match(/(\d+)$/);
+        if (invoiceNoMatch) INV_DB.invoiceNo = parseInt(invoiceNoMatch[1], 10) + 1;
 
         // ★ لو الفاتورة دي جاية من تحويل عرض سعر، اتعلّم "تم التحويل" دلوقتي
         //   بس — بعد ما فاتورة البيع الحقيقية اتسجّلت بنجاح فعلاً (راجع
@@ -1766,25 +1728,28 @@ if (typeof registerSyncHandler === 'function') {
                 } catch {}
             }
 
-            const { invoiceNo, counter } = await invAllocateRealInvoiceNo();
-
-            const { data: saleRows, error: saleErr } = await sb.from('sales').insert({
-                ...saleRow, rep_id: repId, invoice_no: invoiceNo,
-            }).select();
-            if (saleErr) return { ok: false, error: saleErr.message, summary: `فاتورة ${tempInvoiceNo}` };
-            const saleId = saleRows[0].id;
-
-            const itemsToInsert = items.map(it => ({ ...it, sale_id: saleId }));
-            const { error: itemsErr } = await sb.from('sale_items').insert(itemsToInsert);
-            if (itemsErr) {
-                // فشل إدراج البنود بعد نجاح رأس الفاتورة — نلغي الرأس عشان ما تفضلش فاتورة فاضية معلّقة في القاعدة
-                await sb.from('sales').delete().eq('id', saleId);
-                return { ok: false, error: itemsErr.message, summary: `فاتورة ${tempInvoiceNo}` };
-            }
-
-            await sb.from('app_settings').upsert({
-                key: 'invoice_counter', value: String(counter + 1), updated_at: new Date().toISOString(),
+            // ★ نفس فكرة invSave الأونلاين بالظبط (راجع تعليقها) — هيدر + بنود
+            //   + عداد جوه ترانزاكشن واحدة عبر fn_create_sale. الكود القديم هنا
+            //   كان بيعمل DELETE للهيدر لو فشلت البنود (محاولة "رجوع" يدوية)،
+            //   لكن ده مكنش كافي: مسح الصف من غير ما يرجّع أثر التريجر (قيد
+            //   يومية + رصيد عميل اتسجلوا فور INSERT الهيدر) كان بيسيب نفس
+            //   فخ return_no/journal_entries المكرر اللي اتصلح النهاردة.
+            const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_sale', {
+                p_customer_id: saleRow.customer_id,
+                p_payment_type: saleRow.payment_type,
+                p_subtotal: saleRow.subtotal,
+                p_vat_amount: saleRow.vat_amount,
+                p_total: saleRow.total,
+                p_discount: saleRow.discount,
+                p_warehouse_id: saleRow.warehouse_id,
+                p_rep_id: repId,
+                p_treasury_id: saleRow.treasury_id,
+                p_source_app: saleRow.source_app,
+                p_created_by: saleRow.created_by,
+                p_items: items,
             });
+            if (rpcErr) return { ok: false, error: rpcErr.message, summary: `فاتورة ${tempInvoiceNo}` };
+            const invoiceNo = rpcRows[0].invoice_no;
 
             // لو الفاتورة دي جاية أصلاً من تحويل عرض سعر، اتعلّم "تم التحويل"
             // دلوقتي بس — بعد ما فاتورة البيع اتزامنت فعلياً على السيرفر.

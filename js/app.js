@@ -60,36 +60,47 @@ function buildLayout() {
             <div class="logo-icon">🏪</div>
             <div class="logo-text"><h1>Sultan ERP</h1><span>SMART EDITION V2.0</span></div>
         </div>
-        <div class="nav-group">لوحة التحكم</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>لوحة التحكم</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item active" data-mod="dashboard" onclick="loadMod(this, 'dashboard')">🏠 الرئيسية</div>
+        </div>
 
-        <div class="nav-group">البيانات الأساسية</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>البيانات الأساسية</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="products" onclick="loadMod(this, 'products')">🏷️ الأصناف</div>
         <div class="nav-item" data-mod="product-import" onclick="loadMod(this, 'product-import')">📥 استيراد أصناف Excel</div>
         <div class="nav-item" data-mod="customers-manage" onclick="loadMod(this, 'customers-manage')">👤 إدارة العملاء</div>
         <div class="nav-item" data-mod="customer-import" onclick="loadMod(this, 'customer-import')">📥 استيراد عملاء Excel</div>
         <div class="nav-item" data-mod="suppliers-manage" onclick="loadMod(this, 'suppliers-manage')">🏭 إدارة الموردين</div>
         <div class="nav-item" data-mod="supplier-import" onclick="loadMod(this, 'supplier-import')">📥 استيراد موردين Excel</div>
+        </div>
 
-        <div class="nav-group">المبيعات والعملاء</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>المبيعات والعملاء</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="sales" onclick="loadMod(this, 'sales')">🧾 فاتورة المبيعات</div>
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
         <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="customers" onclick="loadMod(this, 'customers')">📇 كشف حساب عميل</div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء <span id="crmOverdueBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         <div class="nav-item" data-mod="sales-reps" onclick="loadMod(this, 'sales-reps')">🚗 المندوبون</div>
+        </div>
 
-        <div class="nav-group">المشتريات والموردين</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>المشتريات والموردين</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="purchases" onclick="loadMod(this, 'purchases')">📥 فاتورة المشتريات</div>
         <div class="nav-item" data-mod="purchase-orders" onclick="loadMod(this, 'purchase-orders')">📋 أوامر الشراء</div>
         <div class="nav-item" data-mod="payments" onclick="loadMod(this, 'payments')">💸 دفع الموردين</div>
         <div class="nav-item" data-mod="suppliers" onclick="loadMod(this, 'suppliers')">📇 كشف حساب مورد</div>
+        </div>
 
-        <div class="nav-group">المراجعة والمرتجعات</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>المراجعة والمرتجعات</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="invoice-review" onclick="loadMod(this, 'invoice-review')">🔍 مراجعة الفواتير</div>
         <div class="nav-item" data-mod="returns" onclick="loadMod(this, 'returns')">↩️ المرتجعات</div>
+        </div>
 
-        <div class="nav-group">المالية والمخزن</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>المالية والمخزن</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="expenses" onclick="loadMod(this, 'expenses')">💸 المصروفات</div>
         <div class="nav-item" data-mod="payroll" onclick="loadMod(this, 'payroll')">👥 الموظفون والرواتب</div>
         <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
@@ -99,8 +110,10 @@ function buildLayout() {
         <div class="nav-item" data-mod="inventory" onclick="loadMod(this, 'inventory')">📦 المخزون</div>
         <div class="nav-item" data-mod="warehouses" onclick="loadMod(this, 'warehouses')">🏭 إدارة المخازن</div>
         <div class="nav-item" data-mod="warehouse-reports" onclick="loadMod(this, 'warehouse-reports')">📊 تقارير المخازن</div>
+        </div>
 
-        <div class="nav-group">المحاسبة</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>المحاسبة</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="coa" onclick="loadMod(this, 'coa')">📒 شجرة الحسابات</div>
         <div class="nav-item" data-mod="journal" onclick="loadMod(this, 'journal')">📝 القيود اليومية</div>
         <div class="nav-item" data-mod="ledger" onclick="loadMod(this, 'ledger')">📖 الأستاذ العام</div>
@@ -109,14 +122,18 @@ function buildLayout() {
         <div class="nav-item" data-mod="trialbalance" onclick="loadMod(this, 'trialbalance')">⚖️ ميزان المراجعة</div>
         <div class="nav-item" data-mod="balancesheet" onclick="loadMod(this, 'balancesheet')">🏦 الميزانية العمومية</div>
         <div class="nav-item" data-mod="archive" onclick="loadMod(this, 'archive')">🗄️ الأرشيف</div>
+        </div>
 
-        <div class="nav-group">🔜 قريباً</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>🔜 قريباً</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب</div>
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي</div>
         <div class="nav-item" data-mod="customer-orders-link" onclick="loadMod(this, 'customer-orders-link')">🔗 ربط برنامج طلبات العملاء</div>
         <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">📱 ربط برنامج المندوب</div>
+        </div>
 
-        <div class="nav-group">التقارير والإعدادات</div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>التقارير والإعدادات</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="reports" onclick="loadMod(this, 'reports')">📈 التقارير</div>
         <div class="nav-item" data-mod="performance-reports" onclick="loadMod(this, 'performance-reports')">📈 تقارير الأداء المتقدمة</div>
         <div class="nav-item" data-mod="general-import-export" onclick="loadMod(this, 'general-import-export')">🔄 استيراد/تصدير عام</div>
@@ -125,7 +142,8 @@ function buildLayout() {
         <div class="nav-item" data-mod="settings" onclick="loadMod(this, 'settings')">⚙️ الإعدادات</div>
         <div class="nav-item" data-mod="users" onclick="loadMod(this, 'users')">👥 المستخدمون</div>
         <div class="nav-item" data-mod="advanced-permissions" onclick="loadMod(this, 'advanced-permissions')">🔐 الصلاحيات المتقدمة</div>
-        
+        </div>
+
         <div class="sidebar-footer"><span>© 2026 Sultan Food</span><span style="color:var(--inv-gold-light)">v2.0</span></div>
       </aside>
       <div class="main">
@@ -147,6 +165,38 @@ function buildLayout() {
         <div class="content" id="app-content"></div>
       </div>
     </div>`;
+    navRestoreCollapsedGroups();
+}
+
+// ★ أقسام القائمة الجانبية قابلة للطي — الحالة (مطوي/مفتوح) بتتخزن في
+//   localStorage بمفتاح نص عنوان القسم نفسه، عشان تفضل زي ما المستخدم
+//   سابها بين الجلسات. الافتراضي: كل الأقسام مفتوحة (نفس الشكل القديم
+//   بالظبط) — ده إضافة بس، مفيش أي تغيير في السلوك الحالي لحد ما
+//   المستخدم يطوي قسم بنفسه.
+function navToggleGroup(headerEl) {
+    const itemsEl = headerEl.nextElementSibling;
+    if (!itemsEl || !itemsEl.classList.contains('nav-group-items')) return;
+    const collapsed = itemsEl.classList.toggle('collapsed');
+    headerEl.classList.toggle('collapsed', collapsed);
+    const label = headerEl.textContent.trim();
+    let collapsedGroups = [];
+    try { collapsedGroups = JSON.parse(localStorage.getItem('navCollapsedGroups') || '[]'); } catch (e) {}
+    collapsedGroups = collapsedGroups.filter(g => g !== label);
+    if (collapsed) collapsedGroups.push(label);
+    localStorage.setItem('navCollapsedGroups', JSON.stringify(collapsedGroups));
+}
+
+function navRestoreCollapsedGroups() {
+    let collapsedGroups = [];
+    try { collapsedGroups = JSON.parse(localStorage.getItem('navCollapsedGroups') || '[]'); } catch (e) {}
+    if (!collapsedGroups.length) return;
+    document.querySelectorAll('.nav-group').forEach(headerEl => {
+        if (!collapsedGroups.includes(headerEl.textContent.trim())) return;
+        const itemsEl = headerEl.nextElementSibling;
+        if (!itemsEl || !itemsEl.classList.contains('nav-group-items')) return;
+        itemsEl.classList.add('collapsed');
+        headerEl.classList.add('collapsed');
+    });
 }
 
 async function setupApp() {

@@ -843,7 +843,7 @@ async function purSave(andNew) {
     }
 
     const { subtotal, rowsDisc, extra, deferred, net } = purCalcNet();
-    const invoiceNo = 'PUR-' + String(PUR_DB.purchaseNo).padStart(4, '0');
+    let invoiceNo = 'PUR-' + String(PUR_DB.purchaseNo).padStart(4, '0');
 
     const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-top-save');
     saveBtns.forEach(b => { b.innerText = '⏳ جاري الحفظ...'; b.disabled = true; });
@@ -854,24 +854,16 @@ async function purSave(andNew) {
             await purReverseOldForEdit();
         }
 
-        // 1) INSERT في purchases
-        const { data: purRows, error: purErr } = await sb.from('purchases').insert({
-            invoice_no: invoiceNo,
-            supplier_id: purSupplierId || null,
-            payment_type: purPayType,
-            subtotal,
-            vat_amount: 0,
-            total: net,
-            status: 'confirmed',
-            warehouse_id: purWarehouseId,
-            treasury_id: purPayType === 'cash' ? (document.getElementById('purTreasuryId')?.value || purTreasuryId || null) : null,
-            created_by: currentUser?.id || null,
-        }).select();
-        if (purErr) throw purErr;
-        const purchaseId = purRows[0].id;
-
-        // 2) INSERT في purchase_items (مع snapshot المؤجل)
-        const itemsToInsert = filled.map(it => {
+        // ★ إنشاء الهيدر + البنود + زيادة العداد كلهم في ترانزاكشن واحدة عبر
+        //   fn_create_purchase (Postgres RPC) — بدل 3 خطوات منفصلة من
+        //   الفرونت إند. السبب: fn_purchase_status_change (تريجر AFTER
+        //   INSERT على purchases) بيرحّل قيد اليومية ويأثّر على رصيد المورد
+        //   فور INSERT الهيدر — قبل ما البنود تتسجل أصلاً. لو إدراج البنود
+        //   فشل لأي سبب، كان بيفضل هيدر "confirmed" معلّق بقيد وبرصيد متأثر
+        //   من غير بنود، والعداد (purchase_counter) ميترفعش، فأي محاولة
+        //   تانية كانت هتتصادم على نفس invoice_no — نفس فخ return_no/
+        //   journal_entries المكرر اللي اتصلح في مرتجعات الشراء النهاردة.
+        const itemsPayload = filled.map(it => {
             const prod = PUR_DB.products.find(p=>p.id===it.pid);
             const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
             // deferred_rebates.expected_amount في القاعدة = qty * rate (generated
@@ -882,7 +874,6 @@ async function purSave(andNew) {
                 ? (it.deferredRate || 0)
                 : (it.price||0) * (1 - (it.disc||0)/100) * (it.deferredRate||0) / 100;
             return {
-                purchase_id: purchaseId,
                 product_id: it.pid,
                 qty: it.qty,
                 unit_price: it.price,
@@ -893,12 +884,23 @@ async function purSave(andNew) {
                 units_per_carton_snapshot: prod?.units_per_carton || 1,
             };
         });
-        const { error: itemsErr } = await sb.from('purchase_items').insert(itemsToInsert);
-        if (itemsErr) throw itemsErr;
-
-        // 3) زِد رقم الفاتورة
-        await sb.from('app_settings').upsert({ key: 'purchase_counter', value: String(PUR_DB.purchaseNo + 1), updated_at: new Date().toISOString() });
-        PUR_DB.purchaseNo++;
+        const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_purchase', {
+            p_supplier_id: purSupplierId || null,
+            p_payment_type: purPayType,
+            p_subtotal: subtotal,
+            p_vat_amount: 0,
+            p_total: net,
+            p_warehouse_id: purWarehouseId,
+            p_treasury_id: purPayType === 'cash' ? (document.getElementById('purTreasuryId')?.value || purTreasuryId || null) : null,
+            p_created_by: currentUser?.id || null,
+            p_items: itemsPayload,
+        });
+        if (rpcErr) throw rpcErr;
+        if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
+        // العداد بيتقفل ويتحرك جوه الـ RPC نفسها — نطابق العرض المحلي على
+        // الرقم الحقيقي اللي الدالة رجّعته
+        const invoiceNoMatch = invoiceNo.match(/(\d+)$/);
+        if (invoiceNoMatch) PUR_DB.purchaseNo = parseInt(invoiceNoMatch[1], 10) + 1;
 
         // ★ لو الفاتورة دي جاية من تحويل أمر شراء، اتعلّم "تم الاستلام"
         //   دلوقتي بس — بعد ما فاتورة الشراء الحقيقية اتسجّلت بنجاح فعلاً،
