@@ -18,6 +18,25 @@ let _repTableMissing = false;
 
 function repFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
+//   يضيّق النتيجة — فواتير/مرتجعات المندوبين من غير فلتر تاريخ كانت
+//   هترجع أول 1000 بس وتحسب مبيعات/عمولة المندوب غلط بمجرد ما sales
+//   تعدّي الرقم ده (متوقع قريب مع الفواتير التاريخية).
+async function repFetchAllRows(table, select, applyFilters) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        let q = sb.from(table).select(select);
+        if (applyFilters) q = applyFilters(q);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
+
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
 // ════════════════════════════════════════════════════════════
@@ -34,18 +53,18 @@ async function renderSalesReps(c) {
             _repList = [];
         }
 
-        const { data: sales } = await sb.from('sales')
-            .select('id, total, rep_id, payment_type, status, created_at')
-            .not('rep_id', 'is', null);
+        const { data: sales } = await repFetchAllRows('sales',
+            'id, total, rep_id, payment_type, status, created_at',
+            (q) => q.not('rep_id', 'is', null));
         _repSales = (sales || []).filter(s => s.status === 'confirmed');
 
         // مرتجعات مبيعات مربوطة بمندوب — لازم تتطرح من إجمالي مبيعاته وعمولته
         // (راجع sales_returns_rep_id_migration.sql)، وإلا مرتجع باسم المندوب
         // مايأثرش على أرقامه هنا خالص.
         try {
-            const { data: returns } = await sb.from('sales_returns')
-                .select('id, total, rep_id, status, created_at')
-                .not('rep_id', 'is', null);
+            const { data: returns } = await repFetchAllRows('sales_returns',
+                'id, total, rep_id, status, created_at',
+                (q) => q.not('rep_id', 'is', null));
             _repReturns = (returns || []).filter(r => r.status === 'confirmed');
         } catch { _repReturns = []; }
 

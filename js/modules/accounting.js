@@ -8,6 +8,25 @@
    ════════════════════════════════════════════════════════════ */
 
 function accFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+// ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
+//   يضيّق النتيجة — قيود اليومية (journal_entry_lines) بقت أكتر من كده،
+//   فأي select بيسحب الجدول كله (زي ميزان المراجعة والميزانية العمومية
+//   من غير فلتر تاريخ) كان هيرجّع أرقام ناقصة/غلط من غير أي خطأ ظاهر.
+async function accFetchAllRows(table, select, applyFilters) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        let q = sb.from(table).select(select);
+        if (applyFilters) q = applyFilters(q);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
 const ACC_TYPE_LABELS = { asset:'أصول', liability:'خصوم', equity:'حقوق ملكية', revenue:'إيرادات', expense:'مصروفات' };
 const ACC_TYPE_COLORS = { asset:'#2563EB', liability:'#DC2626', equity:'#7C3AED', revenue:'#059669', expense:'#D97706' };
 
@@ -168,10 +187,15 @@ async function renderTrialBalance(c) {
 async function accLoadTrialBalance(c, from, to) {
     try {
         const { data: accounts } = await sb.from('accounts').select('*').order('code');
-        let query = sb.from('journal_entry_lines').select('account_code, debit, credit, journal_entries!inner(entry_date)');
-        if (from) query = query.gte('journal_entries.entry_date', from);
-        if (to) query = query.lte('journal_entries.entry_date', to);
-        const { data: lines } = await query;
+        const { data: lines } = await accFetchAllRows(
+            'journal_entry_lines',
+            'account_code, debit, credit, journal_entries!inner(entry_date)',
+            (q) => {
+                if (from) q = q.gte('journal_entries.entry_date', from);
+                if (to) q = q.lte('journal_entries.entry_date', to);
+                return q;
+            }
+        );
 
         const totals = {};
         (lines||[]).forEach(l => {
@@ -245,7 +269,7 @@ async function renderBalanceSheet(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري إعداد الميزانية العمومية...</div>';
     try {
         const { data: accounts } = await sb.from('accounts').select('*');
-        const { data: lines } = await sb.from('journal_entry_lines').select('account_code, debit, credit');
+        const { data: lines } = await accFetchAllRows('journal_entry_lines', 'account_code, debit, credit');
 
         const totals = {};
         (lines||[]).forEach(l => {

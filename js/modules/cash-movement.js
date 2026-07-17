@@ -19,6 +19,27 @@ const CASH_REF_LABELS = {
 
 function cmFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
+//   يضيّق النتيجة — حركة الخزينة (من غير فلتر تاريخ، الوضع الافتراضي
+//   لهذه الصفحة) كانت هترجع أول 1000 حركة بس وتحسب الرصيد المتحرك غلط
+//   بمجرد ما cash_transactions يعدّي الرقم ده (متوقع قريب مع الفواتير
+//   التاريخية). applyFilters بيتنفذ قبل .range() في كل صفحة، فلازم
+//   الـ .order() يترتّب جوّاه عشان الصفحات تيجي بترتيب ثابت وصحيح.
+async function cmFetchAllRows(table, select, applyFilters) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        let q = sb.from(table).select(select);
+        if (applyFilters) q = applyFilters(q);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
+
 async function renderCashMovement(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل حركة الخزينة...</div>';
     try {
@@ -32,12 +53,13 @@ async function cmLoadData(c, from, to, refType) {
     try {
         const { data: cashBalance } = await sb.rpc('get_cash_balance');
 
-        let query = sb.from('cash_transactions').select('*').order('created_at', { ascending: true });
-        if (from) query = query.gte('created_at', from);
-        if (to) query = query.lte('created_at', to + 'T23:59:59');
-        if (refType) query = query.eq('ref_type', refType);
-
-        const { data: allRows, error } = await query;
+        const { data: allRows, error } = await cmFetchAllRows('cash_transactions', '*', (q) => {
+            q = q.order('created_at', { ascending: true });
+            if (from) q = q.gte('created_at', from);
+            if (to) q = q.lte('created_at', to + 'T23:59:59');
+            if (refType) q = q.eq('ref_type', refType);
+            return q;
+        });
         if (error) throw error;
 
         _cmList = allRows || [];
