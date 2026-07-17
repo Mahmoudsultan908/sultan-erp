@@ -3,6 +3,11 @@
 // يصدّر: renderDashboard(container)
 // ════════════════════════════════════════════════════════════
 
+// ★ حالة رسم اتجاه المبيعات — بتتحدث كل تحميل داشبورد، وبيستخدمها زرار
+//   تبديل 7/30 يوم (dashSetTrendRange) عشان يعيد الرسم من غير أي استعلام
+//   جديد لقاعدة البيانات (البيانات الأساسية آخر 30 يوم مجلوبة مرة واحدة بس)
+let dashTrendDaily = [];
+
 async function renderDashboard(container) {
     container.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B">
         <div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل البيانات...
@@ -11,6 +16,7 @@ async function renderDashboard(container) {
     try {
         const today = new Date().toISOString().slice(0, 10);
         const monthStart = today.slice(0, 7) + '-01';
+        const trendStart = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
 
         const [
             { data: cashData },
@@ -25,6 +31,8 @@ async function renderDashboard(container) {
             { data: allStock },
             { data: allCustomers },
             { data: allSuppliers },
+            { data: trendSales },
+            { data: lastBackupRow },
         ] = await Promise.all([
             sb.rpc('get_cash_balance'),
             sb.from('sales').select('total').eq('status','confirmed').gte('created_at', today),
@@ -50,7 +58,33 @@ async function renderDashboard(container) {
             sb.from('customers').select('balance'),
             // نفس منطق حساب مستحقات الموردين المستخدم في js/modules/suppliers.js (مجموع الأرصدة الموجبة فقط)
             sb.from('suppliers').select('balance'),
+            // اتجاه المبيعات — آخر 30 يوم، بيتجمّع باليوم في الـ JS تحت
+            sb.from('sales').select('total,created_at').eq('status','confirmed').gte('created_at', trendStart),
+            sb.from('app_settings').select('value').eq('key','last_backup_at').maybeSingle(),
         ]);
+
+        // ── تجميع مبيعات آخر 30 يوم يوميًا (تعبئة الأيام الفاضية بصفر) ──
+        const dayBuckets = {};
+        (trendSales || []).forEach(r => {
+            const day = String(r.created_at).slice(0, 10);
+            dayBuckets[day] = (dayBuckets[day] || 0) + Number(r.total || 0);
+        });
+        dashTrendDaily = Array.from({ length: 30 }, (_, i) => {
+            const d = new Date(Date.now() - (29 - i) * 86400000);
+            const key = d.toISOString().slice(0, 10);
+            return { date: key, total: dayBuckets[key] || 0 };
+        });
+
+        // ── تنبيه النسخة الاحتياطية: لو معملناش نسخة خالص أو عدى عليها 7 أيام ──
+        let lastBackupIso = null;
+        try { lastBackupIso = lastBackupRow?.value ? JSON.parse(lastBackupRow.value) : null; } catch { lastBackupIso = lastBackupRow?.value || null; }
+        const daysSinceBackup = lastBackupIso ? Math.floor((Date.now() - new Date(lastBackupIso).getTime()) / 86400000) : null;
+        const backupBanner = (daysSinceBackup === null || daysSinceBackup >= 7) ? `
+            <div class="mod-alert-banner warning">
+                <span>⚠️</span>
+                <span>${daysSinceBackup === null ? 'لسه معملتش أي نسخة احتياطية من بيانات النظام.' : `عدّى ${daysSinceBackup} يوم من غير نسخة احتياطية جديدة.`}</span>
+                <span class="dash-see-all" style="margin-right:auto" onclick="loadMod(document.querySelector('[data-mod=settings]'),'settings')">اعمل نسخة الآن ←</span>
+            </div>` : '';
 
         const cash = Number(cashData) || 0;
         const todaySales = (salesToday || []).reduce((s, r) => s + Number(r.total), 0);
@@ -73,6 +107,8 @@ async function renderDashboard(container) {
 
         container.innerHTML = `
         <div class="dash-wrap">
+
+            ${backupBanner}
 
             <!-- رأس الصفحة -->
             <div class="dash-header">
@@ -126,6 +162,20 @@ async function renderDashboard(container) {
                         <div class="dash-kpi-val">${fmt(monthExpenses)}</div>
                         <div class="dash-kpi-lbl">مصروفات ${monthName}</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- اتجاه المبيعات -->
+            <div class="dash-row">
+                <div class="dash-card" style="flex:1">
+                    <div class="dash-card-header">
+                        <span>📈 اتجاه المبيعات</span>
+                        <span>
+                            <button id="dashTrendBtn7" class="dash-trend-btn" onclick="dashSetTrendRange(7)">7 أيام</button>
+                            <button id="dashTrendBtn30" class="dash-trend-btn active" onclick="dashSetTrendRange(30)">30 يوم</button>
+                        </span>
+                    </div>
+                    <div id="dashTrendChartWrap">${dashRenderTrendSVG(30)}</div>
                 </div>
             </div>
 
@@ -246,4 +296,101 @@ async function renderDashboard(container) {
             <button class="dash-refresh" onclick="renderDashboard(document.getElementById('app-content'))" style="margin-top:12px">إعادة المحاولة</button>
         </div>`;
     }
+}
+
+function dashFmtTrend(n) {
+    return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+// ★ حالة آخر رسم اتُنفّذ — بتتخزن عشان دالة الـ hover تقدر توصل لإحداثيات
+//   النقط من غير ما تعيد حساب كل حاجة تاني مع كل حركة فأر
+let dashTrendLayout = null;
+
+function dashRenderTrendSVG(days) {
+    const data = dashTrendDaily.slice(-days);
+    const n = data.length;
+    const values = data.map(d => d.total);
+    const max = Math.max(...values, 1) * 1.15;
+    const W = 700, H = 170, padL = 6, padR = 6, padT = 10, padB = 22;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const stepX = n > 1 ? plotW / (n - 1) : 0;
+    const xAt = i => padL + i * stepX;
+    const yAt = v => padT + plotH - (v / max) * plotH;
+    const baseline = padT + plotH;
+
+    const linePath = 'M ' + data.map((d, i) => `${xAt(i).toFixed(1)},${yAt(d.total).toFixed(1)}`).join(' L ');
+    const areaPath = `${linePath} L ${xAt(n - 1).toFixed(1)},${baseline.toFixed(1)} L ${xAt(0).toFixed(1)},${baseline.toFixed(1)} Z`;
+
+    const labelEvery = days <= 7 ? 1 : 5;
+    const xLabels = data.map((d, i) => {
+        if (i % labelEvery !== 0 && i !== n - 1) return '';
+        const dt = new Date(d.date + 'T00:00:00');
+        const txt = dt.toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric' });
+        return `<text x="${xAt(i).toFixed(1)}" y="${H - 6}" font-size="9" fill="#94A3B8" text-anchor="middle">${txt}</text>`;
+    }).filter(Boolean).join('');
+
+    dashTrendLayout = { data, xAt, yAt, baseline, n, W };
+
+    return `
+    <div style="position:relative">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:150px;display:block" preserveAspectRatio="none">
+        <line x1="${padL}" y1="${baseline.toFixed(1)}" x2="${W - padR}" y2="${baseline.toFixed(1)}" stroke="#F1F5F9" stroke-width="1"/>
+        <defs><linearGradient id="dashTrendGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#059669" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#059669" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${areaPath}" fill="url(#dashTrendGrad)" stroke="none"/>
+        <path d="${linePath}" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line id="dashTrendCrosshair" x1="0" y1="${padT}" x2="0" y2="${baseline.toFixed(1)}" stroke="#CBD5E1" stroke-width="1" stroke-dasharray="3,3" style="opacity:0"/>
+        <circle id="dashTrendDot" cx="0" cy="0" r="4" fill="#059669" stroke="#fff" stroke-width="2" style="opacity:0"/>
+        ${xLabels}
+        <rect x="${padL}" y="0" width="${plotW}" height="${H}" fill="transparent" onmousemove="dashTrendHover(event)" onmouseleave="dashTrendHoverOut()" style="cursor:crosshair"/>
+      </svg>
+      <div id="dashTrendTooltip" style="position:absolute;top:6px;background:#0F172A;color:#fff;padding:4px 9px;border-radius:6px;font-size:11px;pointer-events:none;display:none;white-space:nowrap;line-height:1.5"></div>
+    </div>
+    ${!values.some(v => v > 0) ? '<p class="dash-empty" style="margin-top:8px">لا توجد مبيعات في هذه الفترة</p>' : ''}`;
+}
+
+function dashTrendHover(evt) {
+    if (!dashTrendLayout) return;
+    const svg = evt.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const { data, xAt, yAt, n, W } = dashTrendLayout;
+    const mx = (evt.clientX - rect.left) * (W / rect.width);
+    let idx = 0, best = Infinity;
+    for (let i = 0; i < n; i++) {
+        const dx = Math.abs(xAt(i) - mx);
+        if (dx < best) { best = dx; idx = i; }
+    }
+    const px = xAt(idx), py = yAt(data[idx].total);
+    const dot = document.getElementById('dashTrendDot');
+    const cross = document.getElementById('dashTrendCrosshair');
+    if (dot) { dot.setAttribute('cx', px.toFixed(1)); dot.setAttribute('cy', py.toFixed(1)); dot.style.opacity = 1; }
+    if (cross) { cross.setAttribute('x1', px.toFixed(1)); cross.setAttribute('x2', px.toFixed(1)); cross.style.opacity = 1; }
+    const tip = document.getElementById('dashTrendTooltip');
+    if (tip) {
+        const dt = new Date(data[idx].date + 'T00:00:00');
+        tip.innerHTML = `<b>${dashFmtTrend(data[idx].total)} ج.م</b> — ${dt.toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+        tip.style.display = 'block';
+        const leftPct = (px / W) * 100;
+        tip.style.left = leftPct < 50 ? `calc(${leftPct}% + 8px)` : 'auto';
+        tip.style.right = leftPct >= 50 ? `calc(${100 - leftPct}% + 8px)` : 'auto';
+    }
+}
+
+function dashTrendHoverOut() {
+    const dot = document.getElementById('dashTrendDot');
+    const cross = document.getElementById('dashTrendCrosshair');
+    const tip = document.getElementById('dashTrendTooltip');
+    if (dot) dot.style.opacity = 0;
+    if (cross) cross.style.opacity = 0;
+    if (tip) tip.style.display = 'none';
+}
+
+function dashSetTrendRange(days) {
+    const wrap = document.getElementById('dashTrendChartWrap');
+    if (wrap) wrap.innerHTML = dashRenderTrendSVG(days);
+    document.getElementById('dashTrendBtn7')?.classList.toggle('active', days === 7);
+    document.getElementById('dashTrendBtn30')?.classList.toggle('active', days === 30);
 }

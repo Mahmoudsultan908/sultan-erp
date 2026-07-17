@@ -33,6 +33,10 @@
 .dash-see-all { font-size:12px; font-weight:700; color:var(--inv-gold); cursor:pointer; }
 .dash-see-all:hover { text-decoration:underline; }
 
+/* ── أزرار تبديل مدى اتجاه المبيعات (7/30 يوم) ── */
+.dash-trend-btn { font-size:11px; font-weight:700; color:#64748B; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:7px; padding:4px 10px; cursor:pointer; font-family:inherit; margin-right:4px; }
+.dash-trend-btn.active { background:#ECFDF5; color:#059669; border-color:#A7F3D0; }
+
 /* ── جدول عام ── */
 .dash-table { width:100%; border-collapse:collapse; font-size:13px; }
 .dash-table th { text-align:right; padding:10px 12px; color:#94A3B8; font-weight:700; font-size:11.5px; border-bottom:1.5px solid #F1F5F9; white-space:nowrap; }

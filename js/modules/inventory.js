@@ -1,10 +1,41 @@
 // ════════════════════════════════════════════════════════════
-// inventory.js — عرض المخزون
+// inventory.js — عرض المخزون + جرد فعلي (تسوية)
 // يصدّر: renderInventory(container)
 // ════════════════════════════════════════════════════════════
 
+let invActiveTab = 'view';
+
 async function renderInventory(container) {
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل المخزون...</div>`;
+    container.innerHTML = `
+    <div class="inv-wrap">
+        <div class="dash-header">
+            <div><h2 class="dash-title">📦 المخزون</h2><p class="dash-sub">عرض أرصدة الأصناف وإجراء جرد فعلي</p></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button id="inv-tab-view" class="dash-trend-btn active" style="font-size:13px;padding:8px 16px" onclick="stkCountSwitchTab('view')">📦 عرض المخزون</button>
+            <button id="inv-tab-count" class="dash-trend-btn" style="font-size:13px;padding:8px 16px" onclick="stkCountSwitchTab('count')">🧮 جرد فعلي</button>
+        </div>
+        <div id="inv-tab-content"></div>
+    </div>`;
+    await invRenderStockView(document.getElementById('inv-tab-content'));
+}
+
+function stkCountSwitchTab(tab) {
+    invActiveTab = tab;
+    document.getElementById('inv-tab-view')?.classList.toggle('active', tab === 'view');
+    document.getElementById('inv-tab-count')?.classList.toggle('active', tab === 'count');
+    const root = document.getElementById('inv-tab-content');
+    if (!root) return;
+    if (tab === 'view') invRenderStockView(root);
+    else stkCountRenderForm(root);
+}
+
+// ════════════════════════════════════════════════════════════
+// تبويب 1: عرض المخزون (نفس المنطق القديم بالحرف، بس بيكتب جوه
+// عنصر فرعي بدل الـ container الرئيسي عشان شريط التابات يفضل ظاهر)
+// ════════════════════════════════════════════════════════════
+async function invRenderStockView(root) {
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل المخزون...</div>`;
     try {
         const [{ data: stock }, { data: warehouses }] = await Promise.all([
             sb.from('inventory_stock')
@@ -62,13 +93,7 @@ async function renderInventory(container) {
             document.getElementById('inv-total-count').textContent = rows.length;
         };
 
-        container.innerHTML = `
-        <div class="inv-wrap">
-            <div class="dash-header">
-                <div><h2 class="dash-title">📦 المخزون</h2><p class="dash-sub">عرض أرصدة الأصناف في كل المخازن</p></div>
-                <button class="dash-refresh" onclick="renderInventory(document.getElementById('app-content'))">🔄 تحديث</button>
-            </div>
-
+        root.innerHTML = `
             <!-- KPI -->
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
                 <div class="dash-kpi dash-kpi-blue" style="padding:14px">
@@ -122,8 +147,7 @@ async function renderInventory(container) {
                     <thead><tr><th>الصنف</th><th>الكود</th><th>المخزن</th><th>الكمية</th><th>حد الطلب</th><th>الحالة</th><th>القيمة</th></tr></thead>
                     <tbody id="inv-tbody"><tr><td colspan="7" style="text-align:center;padding:30px;color:#94A3B8">جاري التحميل...</td></tr></tbody>
                 </table>
-            </div>
-        </div>`;
+            </div>`;
 
         const searchEl = document.getElementById('inv-search');
         searchEl._go = () => { search = searchEl.value; render(); };
@@ -132,6 +156,139 @@ async function renderInventory(container) {
         render();
 
     } catch (err) {
-        container.innerHTML = `<div class="dash-error"><div style="font-size:32px">⚠️</div><div>خطأ: ${err.message}</div></div>`;
+        root.innerHTML = `<div class="dash-error"><div style="font-size:32px">⚠️</div><div>خطأ: ${err.message}</div></div>`;
     }
 }
+
+// ════════════════════════════════════════════════════════════
+// تبويب 2: جرد فعلي (تسوية) — راجع stock_count_reconciliation_migration.sql
+// مفيش أي أثر محاسبي هنا، مجرد تصحيح مباشر لكمية inventory_stock +
+// سجل تدقيق (system_qty وقت الجرد، الكمية المعدودة، الفرق)
+// ════════════════════════════════════════════════════════════
+let stkCountWarehouses = [];
+let stkCountRows = []; // { product_id, name, code, unit, system_qty }
+
+async function stkCountRenderForm(root) {
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
+    try {
+        if (!stkCountWarehouses.length) {
+            const { data } = await sb.from('warehouses').select('id,name,is_main').order('is_main', { ascending: false });
+            stkCountWarehouses = data || [];
+        }
+        const defaultWh = stkCountWarehouses[0]?.id || '';
+        await stkCountLoadWarehouse(root, defaultWh);
+    } catch (err) {
+        root.innerHTML = `<div class="dash-error"><div style="font-size:32px">⚠️</div><div>خطأ: ${err.message}</div></div>`;
+    }
+}
+
+async function stkCountLoadWarehouse(root, warehouseId) {
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
+    try {
+        const [{ data: products }, { data: stock }] = await Promise.all([
+            sb.from('products').select('id,name,code,unit').order('name'),
+            sb.from('inventory_stock').select('product_id,qty').eq('warehouse_id', warehouseId),
+        ]);
+        const stockMap = {};
+        (stock || []).forEach(s => stockMap[s.product_id] = Number(s.qty) || 0);
+        stkCountRows = (products || []).map(p => ({
+            product_id: p.id, name: p.name, code: p.code, unit: p.unit || 'وحدة',
+            system_qty: stockMap[p.id] || 0,
+        }));
+        stkCountRenderTable(root, warehouseId, '');
+    } catch (err) {
+        root.innerHTML = `<div class="dash-error"><div style="font-size:32px">⚠️</div><div>خطأ: ${err.message}</div></div>`;
+    }
+}
+
+function stkCountRenderTable(root, warehouseId, search) {
+    const q = (search || '').toLowerCase();
+    const visibleRows = stkCountRows.filter(r => !q || r.name.toLowerCase().includes(q) || (r.code || '').toLowerCase().includes(q));
+
+    root.innerHTML = `
+    <div class="mod-alert-banner info" style="margin-bottom:16px">
+        <span>ℹ️</span>
+        <span>سجّل الكمية المعدودة فعليًا لكل صنف موجود في المخزن المختار — الأصناف اللي متسجّلش لها كمية هتتجاهل ومخزونها مش هيتأثر.</span>
+    </div>
+    <div class="dash-card" style="padding:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+        <select id="stk-wh-select" style="padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-family:Cairo,sans-serif;font-size:13px">
+            ${stkCountWarehouses.map(w => `<option value="${w.id}" ${w.id === warehouseId ? 'selected' : ''}>${w.name}${w.is_main ? ' (رئيسي)' : ''}</option>`).join('')}
+        </select>
+        <input type="text" id="stk-search" placeholder="🔍 بحث باسم أو كود..." value="${search || ''}" style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-family:Cairo,sans-serif;font-size:13px">
+        <span id="stk-counted-badge" style="font-size:12px;color:#64748B;font-weight:700"></span>
+    </div>
+    <div class="dash-card" style="padding:0;overflow:hidden">
+        <table class="dash-table" style="margin:0">
+            <thead><tr><th>الصنف</th><th>الكود</th><th>رصيد النظام</th><th>الكمية المعدودة</th><th>الفرق</th></tr></thead>
+            <tbody id="stk-tbody">
+                ${visibleRows.length ? visibleRows.map(r => `
+                <tr>
+                    <td><strong>${r.name}</strong></td>
+                    <td style="direction:ltr;text-align:center">${r.code || '—'}</td>
+                    <td class="dash-muted">${r.system_qty} <small>${r.unit}</small></td>
+                    <td><input type="number" step="any" class="stk-count-input" data-pid="${r.product_id}" style="width:100px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:Cairo,sans-serif" oninput="stkCountUpdateDiff(this)"></td>
+                    <td class="stk-diff-cell" data-pid-diff="${r.product_id}">—</td>
+                </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:30px;color:#94A3B8">لا توجد نتائج</td></tr>`}
+            </tbody>
+        </table>
+    </div>
+    <div style="margin-top:16px">
+        <label class="ob-label">ملاحظات (اختياري)</label>
+        <textarea id="stk-notes" class="ob-input" style="min-height:60px"></textarea>
+    </div>
+    <button class="ob-save-btn" style="margin-top:16px" onclick="stkCountConfirm('${warehouseId}')">✅ تأكيد الجرد وتحديث المخزون</button>`;
+
+    document.getElementById('stk-wh-select').onchange = (e) => stkCountLoadWarehouse(root, e.target.value);
+    const searchEl = document.getElementById('stk-search');
+    let searchTimer = null;
+    searchEl.oninput = () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => stkCountRenderTable(root, warehouseId, searchEl.value), 250);
+    };
+    stkCountUpdateBadge();
+}
+
+function stkCountUpdateDiff(inputEl) {
+    const pid = inputEl.dataset.pid;
+    const row = stkCountRows.find(r => r.product_id === pid);
+    const diffCell = document.querySelector(`[data-pid-diff="${pid}"]`);
+    if (!row || !diffCell) return;
+    if (inputEl.value === '') { diffCell.textContent = '—'; diffCell.style.color = ''; stkCountUpdateBadge(); return; }
+    const diff = Number(inputEl.value) - row.system_qty;
+    diffCell.textContent = (diff > 0 ? '+' : '') + diff;
+    diffCell.style.color = diff > 0 ? '#059669' : diff < 0 ? '#DC2626' : '#94A3B8';
+    stkCountUpdateBadge();
+}
+
+function stkCountUpdateBadge() {
+    const filled = document.querySelectorAll('.stk-count-input').length
+        ? [...document.querySelectorAll('.stk-count-input')].filter(i => i.value !== '').length : 0;
+    const badge = document.getElementById('stk-counted-badge');
+    if (badge) badge.textContent = filled ? `تم إدخال ${filled} صنف` : '';
+}
+
+window.stkCountConfirm = async (warehouseId) => {
+    const inputs = [...document.querySelectorAll('.stk-count-input')].filter(i => i.value !== '');
+    if (!inputs.length) { alert('⚠️ محتاج تدخل الكمية المعدودة لصنف واحد على الأقل'); return; }
+
+    const items = inputs.map(i => {
+        const row = stkCountRows.find(r => r.product_id === i.dataset.pid);
+        return { product_id: i.dataset.pid, system_qty: row.system_qty, counted_qty: Number(i.value) || 0, unit_name: row.unit };
+    });
+
+    if (!confirm(`هيتم تحديث مخزون ${items.length} صنف مباشرة على الكمية اللي دخلتها. متأكد؟`)) return;
+
+    try {
+        await sb.rpc('fn_apply_stock_count', {
+            p_warehouse_id: warehouseId,
+            p_notes: document.getElementById('stk-notes')?.value || null,
+            p_created_by: currentUser?.id || null,
+            p_items: items,
+        });
+        alert(`✅ تم تحديث مخزون ${items.length} صنف بنجاح`);
+        const root = document.getElementById('inv-tab-content');
+        if (root) await stkCountLoadWarehouse(root, warehouseId);
+    } catch (err) {
+        alert('❌ خطأ أثناء تطبيق الجرد: ' + err.message);
+    }
+};
