@@ -23,6 +23,24 @@ let _prodModalDefaultDeferredType = 'percent';
 
 function prodFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// ★ Supabase بيرجع 1000 صف بالظبط كحد أقصى افتراضي لأي select عادي —
+//   product_prices بقى فيها أكتر من كده (5 مستويات × كل الأصناف)، فأي
+//   select بسيط كان بيقطع الأصناف اللي وقعت بعد أول 1000 صف من غير أي
+//   خطأ ظاهر (مسبب مشكلة "أسعار ناقصة" اللي ظهرت في صفحة الأصناف).
+//   الحل: جلب الصفحات كلها بحلقة .range() لحد ما نوصل لصفحة أصغر من 1000.
+async function prodFetchAllRows(table, select) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        const { data, error } = await sb.from(table).select(select).range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
+
 // ════════════════════════════════════════════════════════════
 // 1) التحميل والعرض الرئيسي
 // ════════════════════════════════════════════════════════════
@@ -38,7 +56,7 @@ async function renderProducts(c) {
             // ★ كل أسعار كل المستويات لكل الأصناف مرة واحدة — عشان تظهر
             //   الأسعار الباقية (مش سعر البيع الأساسي بس) في قائمة الأصناف
             //   نفسها، بدل ما يحتاج المستخدم يفتح تعديل كل صنف لوحده.
-            sb.from('product_prices').select('product_id, price_level_id, price'),
+            prodFetchAllRows('product_prices', 'product_id, price_level_id, price'),
             sb.from('suppliers').select('id, name').eq('is_active', true).order('name'),
         ]);
         _prodList = products || [];

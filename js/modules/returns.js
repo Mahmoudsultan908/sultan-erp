@@ -50,6 +50,22 @@ let retEditingId = null;
 let retEditingOldReturnNo = null;
 let retEditingLinkId = null; // sale_id/purchase_id الأصلي بتاع المرتجع القديم (لو كان مرتبط بفاتورة) — بنحافظ عليه في المرتجع الجديد
 
+// ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي —
+//   product_prices بقى فيها أكتر من كده، فأي select بسيط كان بيقطع
+//   الأصناف اللي وقعت بعد أول 1000 صف من غير أي خطأ ظاهر.
+async function retFetchAllRows(table, select) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        const { data, error } = await sb.from(table).select(select).range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
+
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات + التقديم الرئيسي
 // ════════════════════════════════════════════════════════════
@@ -69,7 +85,7 @@ async function renderReturns(c) {
             // ★ مستويات الأسعار (نفس جداول sales.js بالحرف — راجع invLoadData) —
             //   لو الجدول لسه ما اتعملش، بيرجع خطأ من غير ما يوقف الـ Promise.all كله.
             sb.from('price_levels').select('*').order('sort_order'),
-            sb.from('product_prices').select('product_id, price, price_levels(code)'),
+            retFetchAllRows('product_prices', 'product_id, price, price_levels(code)'),
         ]);
         if (r1.error || !r1.data || r3.error || !r3.data) throw (r1.error || r3.error || new Error('no data'));
         RET_DB.customers = r1.data;
