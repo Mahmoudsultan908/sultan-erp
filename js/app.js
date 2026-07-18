@@ -107,6 +107,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="balance-transfer" onclick="loadMod(this, 'balance-transfer')">🔀 تحويل أرصدة</div>
         <div class="nav-item" data-mod="stock-transfer" onclick="loadMod(this, 'stock-transfer')">🔄 تحويل مخزون</div>
+        <div class="nav-item" data-mod="van-stock-load" onclick="loadMod(this, 'van-stock-load')">🚗 تحميل عربية مندوب</div>
         <div class="nav-item" data-mod="inventory" onclick="loadMod(this, 'inventory')">📦 المخزون</div>
         <div class="nav-item" data-mod="warehouses" onclick="loadMod(this, 'warehouses')">🏭 إدارة المخازن</div>
         <div class="nav-item" data-mod="warehouse-reports" onclick="loadMod(this, 'warehouse-reports')">📊 تقارير المخازن</div>
@@ -257,6 +258,7 @@ window.loadMod = async function(el, modName) {
         'expenses': 'لوحة تحكم المصروفات',
         'payroll': 'الموظفون والرواتب',
         'stock-transfer': 'تحويل مخزون',
+        'van-stock-load': 'تحميل عربية مندوب',
         'sales': 'فاتورة مبيعات جديدة',
         'quotations': 'عروض الأسعار',
         'purchases': 'فاتورة مشتريات جديدة',
@@ -308,6 +310,7 @@ window.loadMod = async function(el, modName) {
     if (modName === 'expenses' && typeof renderExpenses === 'function') await renderExpenses(c);
     if (modName === 'payroll' && typeof renderPayroll === 'function') await renderPayroll(c);
     if (modName === 'stock-transfer' && typeof renderStockTransfer === 'function') await renderStockTransfer(c);
+    if (modName === 'van-stock-load' && typeof renderVanStockLoad === 'function') await renderVanStockLoad(c);
     if (modName === 'sales' && typeof renderSales === 'function') await renderSales(c);
     if (modName === 'quotations' && typeof renderQuotations === 'function') await renderQuotations(c);
     if (modName === 'purchases' && typeof renderPurchases === 'function') await renderPurchases(c);
