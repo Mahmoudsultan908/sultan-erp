@@ -33,7 +33,13 @@ async function renderDashboard(container) {
 
     try {
         const today = new Date().toISOString().slice(0, 10);
-        const monthStart = today.slice(0, 7) + '-01';
+        // نقطة قفل الفترة التاريخية: آخر بيانات منقولة من ديكسف كانت 2026-07-17،
+        // فالتشغيل الفعلي المباشر لسلطان بدأ 2026-07-18 — راجع نفس المنطق في
+        // reports.js. من غير الشرط ده، "ملخص الشهر" هيفضل يخلط تسويات الترحيل
+        // بالأداء التشغيلي الحقيقي طول شهر يوليو.
+        const SULTAN_LIVE_CUTOVER = '2026-07-18';
+        const rawMonthStart = today.slice(0, 7) + '-01';
+        const monthStart = rawMonthStart < SULTAN_LIVE_CUTOVER ? SULTAN_LIVE_CUTOVER : rawMonthStart;
         const trendStart = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
 
         const [

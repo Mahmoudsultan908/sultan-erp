@@ -8,6 +8,13 @@
 //   نقل البيانات التاريخية، فقائمة الدخل كانت بتحسب تكلفة البضاعة
 //   المباعة غلط (ناقصة) لأي فترة بترجع أكتر من 1000 سطر صنف. نفس نمط
 //   الإصلاح المستخدم في accounting.js/cash-movement.js/sales-reps.js.
+// ★ نقطة قفل الفترة التاريخية: آخر بيانات منقولة من ديكسف كانت بتاريخ
+//   2026-07-17، فالتشغيل الفعلي المباشر لسلطان بدأ 2026-07-18. الفترة
+//   قبل التاريخ ده فيها تسويات ترحيل لمرة واحدة (رأس مال، تصحيحات أرصدة)
+//   مش جزء من الأداء التشغيلي العادي، فمش المفروض قائمة الدخل تشملها
+//   بشكل افتراضي — لازم تُختار يدويًا لو حد عايز يراجعها تحديدًا.
+const SULTAN_LIVE_CUTOVER = '2026-07-18';
+
 async function plFetchAllRows(table, select, applyFilters) {
     let all = [], from = 0;
     const pageSize = 1000;
@@ -71,7 +78,8 @@ async function renderReports(container) {
     // ─────────────────────────────────────────
     async function renderPL(c) {
         const today = new Date();
-        const fromDefault = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
+        const monthStartStr = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
+        const fromDefault = monthStartStr < SULTAN_LIVE_CUTOVER ? SULTAN_LIVE_CUTOVER : monthStartStr;
         const toDefault = today.toISOString().slice(0,10);
 
         const load = async (from, to) => {
@@ -106,6 +114,10 @@ async function renderReports(container) {
                     <button class="ob-add-btn" onclick="window._plReload()">🔍 تطبيق</button>
                 </div>
             </div>
+            ${from < SULTAN_LIVE_CUTOVER ? `
+            <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
+                ⚠️ الفترة دي بتشمل بيانات منقولة من ديكسف (قبل ${SULTAN_LIVE_CUTOVER}) فيها تسويات ترحيل لمرة واحدة (رأس مال، تصحيحات أرصدة) مش جزء من الأداء التشغيلي العادي — عشان كده الرقم هنا مش متوقع يطابق "صافي المركز المالي" في الداشبورد. للأداء الفعلي المستمر استخدم فترة تبدأ من ${SULTAN_LIVE_CUTOVER}.
+            </div>` : ''}
             <div class="dash-card" style="padding:24px;max-width:550px">
                 <h3 style="margin:0 0 16px;font-size:15px">قائمة الدخل (${from} إلى ${to})</h3>
                 <div class="dash-summary-row"><span>صافي المبيعات</span><span class="dash-s-green">${fmt(netSales)}</span></div>
