@@ -86,7 +86,7 @@ function usrRenderRows() {
     if (!_usrList.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><span>👥</span>لا يوجد مستخدمون بعد</td></tr>`; return; }
 
     tbody.innerHTML = _usrList.map(u => {
-        const displayName = u.full_name || u.name || u.email || '—';
+        const displayName = u.name || u.email || '—';
         const active = u.is_active !== false;
         return `<tr>
             <td><strong>${displayName}</strong>${u.email && u.email!==displayName ? `<div style="font-size:11px;color:#94A3B8;direction:ltr;text-align:right">${u.email}</div>`:''}</td>
@@ -159,8 +159,10 @@ window.usrSaveNewUser = async function() {
         if (!data.user) throw new Error('تعذّر إنشاء المستخدم — حاول مرة أخرى');
 
         // إنشاء صف profile مرتبط بنفس الـ id (عبر جلسة الأدمن الأصلية sb، مش المؤقتة)
+        // ★ العمود الحقيقي في جدول profiles اسمه name مش full_name — كان فيه
+        // خطأ هنا بيخلي كل محاولة إضافة مستخدم تفشل (جدول profiles.name فقط)
         const { error: profileErr } = await sb.from('profiles').upsert({
-            id: data.user.id, email, full_name: full_name || null, role, is_active: true,
+            id: data.user.id, email, name: full_name || email, role, is_active: true,
         });
         if (profileErr) throw profileErr;
 
@@ -204,7 +206,7 @@ window.usrChangeRole = async function(userId, newRole) {
         if (newRole === 'rep') {
             const u = _usrList.find(x => x.id === userId);
             const { error: repErr } = await sb.from('sales_reps').upsert({
-                id: userId, name: u?.full_name || u?.email || userId, is_active: true,
+                id: userId, name: u?.name || u?.email || userId, is_active: true,
             }, { onConflict: 'id', ignoreDuplicates: true });
             if (repErr) throw repErr;
         }
@@ -224,7 +226,7 @@ window.setupApp = async function() {
     try {
         const { data: { user } } = await sb.auth.getUser();
         if (user) {
-            const { data: profile } = await sb.from('profiles').select('role, is_active, full_name').eq('id', user.id).maybeSingle();
+            const { data: profile } = await sb.from('profiles').select('role, is_active, name').eq('id', user.id).maybeSingle();
             if (profile && profile.is_active === false) {
                 await sb.auth.signOut();
                 document.getElementById('root').innerHTML = `
