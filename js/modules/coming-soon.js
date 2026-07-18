@@ -29,12 +29,10 @@ async function renderCustomerOrdersLink(c) {
     csRenderPage(c, '🔗', 'ربط برنامج طلبات العملاء',
         'مزامنة تلقائية بين طلبات العملاء الواردة من التطبيق الخارجي وفواتير المبيعات في هذا النظام.');
 }
-async function renderRepAppLink(c) {
-    csRenderPage(c, '📱', 'ربط برنامج المندوب',
-        'مزامنة بيانات المندوبين من تطبيق الموبايل الخاص بهم (الزيارات، الطلبات، التحصيلات) مع هذا النظام.');
-}
+// ★ renderRepAppLink انتقلت لموديول حقيقي: rep-management.js (بقت
+// صفحة "مندوب سلطان" الموحّدة، مش قريباً)
 
 Object.assign(window, {
     renderWhatsAppIntegration,
-    renderAIDashboard, renderCustomerOrdersLink, renderRepAppLink,
+    renderAIDashboard, renderCustomerOrdersLink,
 });

@@ -52,11 +52,11 @@ const AP_PAGE_GROUPS = [
     ]},
     { title: '🔜 قريباً', pages: [
         ['warehouse-reports', '📊 تقارير المخازن'], ['general-import-export', '🔄 استيراد/تصدير عام'],
-        ['sales-reps', '🚗 المندوبون'], ['performance-reports', '📈 تقارير الأداء المتقدمة'],
+        ['performance-reports', '📈 تقارير الأداء المتقدمة'],
         ['print-center', '🖨️ مركز الطباعة'], ['crm', '🤝 CRM'], ['archive', '🗄️ الأرشيف'],
         ['whatsapp', '💬 واتساب'], ['ai-dashboard', '🤖 لوحة الذكاء الاصطناعي'],
         ['employee-evaluation', '⭐ تقييم الموظفين'],
-        ['customer-orders-link', '🔗 ربط طلبات العملاء'], ['rep-app-link', '📱 ربط برنامج المندوب'],
+        ['customer-orders-link', '🔗 ربط طلبات العملاء'], ['rep-app-link', '🚗 مندوب سلطان'],
     ]},
     { title: 'التقارير والإعدادات', pages: [
         ['reports', '📈 التقارير'], ['opening-balances', '📋 الأرصدة الافتتاحية'],

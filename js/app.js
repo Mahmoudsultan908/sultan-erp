@@ -82,7 +82,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="customers" onclick="loadMod(this, 'customers')">📇 كشف حساب عميل</div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء <span id="crmOverdueBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
-        <div class="nav-item" data-mod="sales-reps" onclick="loadMod(this, 'sales-reps')">🚗 المندوبون</div>
+        <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">🚗 مندوب سلطان</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span>المشتريات والموردين</span><span class="nav-group-arrow">▾</span></div>
@@ -107,7 +107,6 @@ function buildLayout() {
         <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="balance-transfer" onclick="loadMod(this, 'balance-transfer')">🔀 تحويل أرصدة</div>
         <div class="nav-item" data-mod="stock-transfer" onclick="loadMod(this, 'stock-transfer')">🔄 تحويل مخزون</div>
-        <div class="nav-item" data-mod="van-stock-load" onclick="loadMod(this, 'van-stock-load')">🚗 تحميل عربية مندوب</div>
         <div class="nav-item" data-mod="inventory" onclick="loadMod(this, 'inventory')">📦 المخزون</div>
         <div class="nav-item" data-mod="warehouses" onclick="loadMod(this, 'warehouses')">🏭 إدارة المخازن</div>
         <div class="nav-item" data-mod="warehouse-reports" onclick="loadMod(this, 'warehouse-reports')">📊 تقارير المخازن</div>
@@ -130,7 +129,6 @@ function buildLayout() {
         <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب</div>
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي</div>
         <div class="nav-item" data-mod="customer-orders-link" onclick="loadMod(this, 'customer-orders-link')">🔗 ربط برنامج طلبات العملاء</div>
-        <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">📱 ربط برنامج المندوب</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span>التقارير والإعدادات</span><span class="nav-group-arrow">▾</span></div>
@@ -258,7 +256,6 @@ window.loadMod = async function(el, modName) {
         'expenses': 'لوحة تحكم المصروفات',
         'payroll': 'الموظفون والرواتب',
         'stock-transfer': 'تحويل مخزون',
-        'van-stock-load': 'تحميل عربية مندوب',
         'sales': 'فاتورة مبيعات جديدة',
         'quotations': 'عروض الأسعار',
         'purchases': 'فاتورة مشتريات جديدة',
@@ -282,7 +279,6 @@ window.loadMod = async function(el, modName) {
         'balancesheet': 'الميزانية العمومية',
         'warehouse-reports': 'تقارير المخازن',
         'general-import-export': 'استيراد وتصدير عام',
-        'sales-reps': 'المندوبون',
         'performance-reports': 'تقارير الأداء المتقدمة',
         'advanced-permissions': 'الصلاحيات المتقدمة',
         'print-center': 'مركز الطباعة',
@@ -292,7 +288,7 @@ window.loadMod = async function(el, modName) {
         'ai-dashboard': 'لوحة الذكاء الاصطناعي',
         'employee-evaluation': 'تقييم الموظفين',
         'customer-orders-link': 'ربط برنامج طلبات العملاء',
-        'rep-app-link': 'ربط برنامج المندوب',
+        'rep-app-link': 'مندوب سلطان',
         'reports': 'التقارير المالية',
         'opening-balances': 'الأرصدة الافتتاحية',
         'settings': 'الإعدادات العامة',
@@ -310,7 +306,6 @@ window.loadMod = async function(el, modName) {
     if (modName === 'expenses' && typeof renderExpenses === 'function') await renderExpenses(c);
     if (modName === 'payroll' && typeof renderPayroll === 'function') await renderPayroll(c);
     if (modName === 'stock-transfer' && typeof renderStockTransfer === 'function') await renderStockTransfer(c);
-    if (modName === 'van-stock-load' && typeof renderVanStockLoad === 'function') await renderVanStockLoad(c);
     if (modName === 'sales' && typeof renderSales === 'function') await renderSales(c);
     if (modName === 'quotations' && typeof renderQuotations === 'function') await renderQuotations(c);
     if (modName === 'purchases' && typeof renderPurchases === 'function') await renderPurchases(c);
@@ -334,7 +329,6 @@ window.loadMod = async function(el, modName) {
     if (modName === 'balancesheet' && typeof renderBalanceSheet === 'function') await renderBalanceSheet(c);
     if (modName === 'warehouse-reports' && typeof renderWarehouseReports === 'function') await renderWarehouseReports(c);
     if (modName === 'general-import-export' && typeof renderGeneralImportExport === 'function') await renderGeneralImportExport(c);
-    if (modName === 'sales-reps' && typeof renderSalesReps === 'function') await renderSalesReps(c);
     if (modName === 'performance-reports' && typeof renderPerformanceReports === 'function') await renderPerformanceReports(c);
     if (modName === 'advanced-permissions' && typeof renderAdvancedPermissions === 'function') await renderAdvancedPermissions(c);
     if (modName === 'print-center' && typeof renderPrintCenter === 'function') await renderPrintCenter(c);
