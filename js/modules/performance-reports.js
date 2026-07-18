@@ -12,6 +12,25 @@ let _perfCustomers = [];
 let _perfReps = [];
 let _perfTab = 'product'; // 'product' | 'customer' | 'rep' | 'compare'
 
+// ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
+//   يضيّق النتيجة — sale_items بقى أكتر من كده بعد نقل البيانات التاريخية،
+//   فتقرير "حسب الصنف" و"مقارنة فترات" كانا بيحسبوا إيراد/تكلفة ناقصين
+//   لأي فترة برجّع أكتر من 1000 سطر صنف. نفس نمط الإصلاح في reports.js.
+async function prfFetchAllRows(table, select, applyFilters) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        let q = sb.from(table).select(select);
+        if (applyFilters) q = applyFilters(q);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
+
 function perfFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function perfDefaultFrom() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10); }
 function perfToday() { return new Date().toISOString().slice(0, 10); }
@@ -103,10 +122,11 @@ window.prfLoadByProduct = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
 
     try {
-        const { data: items, error } = await sb.from('sale_items')
-            .select('product_id, qty, free_qty, line_total, cost_price_snapshot, sales!inner(created_at, status)')
-            .eq('sales.status', 'confirmed')
-            .gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59');
+        const { data: items, error } = await prfFetchAllRows(
+            'sale_items',
+            'product_id, qty, free_qty, line_total, cost_price_snapshot, sales!inner(created_at, status)',
+            (q) => q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59')
+        );
         if (error) throw error;
 
         const byProduct = {};
@@ -123,10 +143,11 @@ window.prfLoadByProduct = async function () {
         const productIds = Object.keys(byProduct);
         const deferredRateByProduct = {};
         if (productIds.length) {
-            const { data: piRows } = await sb.from('purchase_items')
-                .select('product_id, deferred_rate, purchases!inner(created_at, status)')
-                .in('product_id', productIds)
-                .eq('purchases.status', 'confirmed');
+            const { data: piRows } = await prfFetchAllRows(
+                'purchase_items',
+                'product_id, deferred_rate, purchases!inner(created_at, status)',
+                (q) => q.in('product_id', productIds).eq('purchases.status', 'confirmed')
+            );
             (piRows || []).forEach(r => {
                 const cur = deferredRateByProduct[r.product_id];
                 const rowDate = new Date(r.purchases?.created_at || 0);
@@ -361,7 +382,8 @@ function prfRenderCompareForm() {
 
 async function prfLoadPeriodTotals(from, to) {
     const [{ data: items, error: e1 }, { data: sales, error: e2 }] = await Promise.all([
-        sb.from('sale_items').select('product_id, qty, line_total, sales!inner(created_at, status)').eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59'),
+        prfFetchAllRows('sale_items', 'product_id, qty, line_total, sales!inner(created_at, status)', (q) =>
+            q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59')),
         sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
     ]);
     if (e1) throw e1;

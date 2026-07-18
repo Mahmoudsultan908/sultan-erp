@@ -10,6 +10,25 @@ let _glSelectedCode = '';
 
 function glFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
+//   يضيّق النتيجة — لسه الحساب الأكبر (الخزينة) تحت الحد ده، لكن قريب
+//   منه وبيكبر مع كل عملية، فالإصلاح هنا وقائي قبل ما يحصل نفس اللي
+//   حصل في قائمة الدخل. نفس نمط الإصلاح في reports.js/accounting.js.
+async function glFetchAllRows(table, select, applyFilters) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        let q = sb.from(table).select(select);
+        if (applyFilters) q = applyFilters(q);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
+
 async function renderGeneralLedger(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل الأستاذ العام...</div>';
     try {
@@ -69,14 +88,16 @@ async function glLoadAccount(code, from, to) {
     try {
         const account = _glAccounts.find(a => a.code === code);
 
-        let query = sb.from('journal_entry_lines')
-            .select('debit, credit, journal_entries!inner(ref, description, entry_date, created_at)')
-            .eq('account_code', code)
-            .order('journal_entries(entry_date)', { ascending: true });
-        if (from) query = query.gte('journal_entries.entry_date', from);
-        if (to) query = query.lte('journal_entries.entry_date', to);
-
-        const { data: lines, error } = await query;
+        const { data: lines, error } = await glFetchAllRows(
+            'journal_entry_lines',
+            'debit, credit, journal_entries!inner(ref, description, entry_date, created_at)',
+            (q) => {
+                q = q.eq('account_code', code).order('journal_entries(entry_date)', { ascending: true });
+                if (from) q = q.gte('journal_entries.entry_date', from);
+                if (to) q = q.lte('journal_entries.entry_date', to);
+                return q;
+            }
+        );
         if (error) throw error;
 
         const isDebitNature = ['asset', 'expense'].includes(account?.type);
