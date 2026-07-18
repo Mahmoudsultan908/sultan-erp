@@ -173,6 +173,7 @@ window.usrSaveNewUser = async function() {
                 id: data.user.id, name: full_name || email, is_active: true,
             });
             if (repErr) throw repErr;
+            await usrEnsureRepTreasury(data.user.id, full_name || email);
         }
 
         document.getElementById('usrAddModal').remove();
@@ -187,6 +188,30 @@ window.usrSaveNewUser = async function() {
 // ════════════════════════════════════════════════════════════
 // 3) تفعيل / تعطيل / تغيير الدور
 // ════════════════════════════════════════════════════════════
+// كل مندوب لازم يكون له خزنة خاصة بيه (مقبوضاته/مصروفاته الميدانية
+// منفصلة عن الخزنة الرئيسية لحد التوريد) ومستوى سعر افتراضي — بيتعمل
+// مرة واحدة بس أول ما المستخدم يبقى مندوب، مش هيكرر لو موجود بالفعل
+async function usrEnsureRepTreasury(repId, repName) {
+    try {
+        const { data: rep } = await sb.from('sales_reps').select('treasury_id,price_level_id').eq('id', repId).maybeSingle();
+        if (rep?.treasury_id) return; // موجودة بالفعل
+
+        const { data: treas, error: treasErr } = await sb.from('treasuries')
+            .insert({ name: `خزنة ${repName} (مندوب)`, is_default: false, is_active: true })
+            .select('id').single();
+        if (treasErr) throw treasErr;
+
+        const { data: retailLevel } = await sb.from('price_levels').select('id').eq('code', 'RETAIL').maybeSingle();
+
+        await sb.from('sales_reps').update({
+            treasury_id: treas.id,
+            price_level_id: rep?.price_level_id || retailLevel?.id || null,
+        }).eq('id', repId);
+    } catch (err) {
+        console.warn('تعذّر إنشاء خزنة المندوب تلقائياً:', err.message);
+    }
+}
+
 window.usrToggleActive = async function(userId, activate) {
     const msg = activate ? 'إعادة تفعيل هذا المستخدم؟' : 'تعطيل هذا المستخدم؟ لن يستطيع الدخول للنظام بعدها.';
     if (!confirm(msg)) return;
@@ -209,6 +234,7 @@ window.usrChangeRole = async function(userId, newRole) {
                 id: userId, name: u?.name || u?.email || userId, is_active: true,
             }, { onConflict: 'id', ignoreDuplicates: true });
             if (repErr) throw repErr;
+            await usrEnsureRepTreasury(userId, u?.name || u?.email || userId);
         }
     } catch (err) {
         alert('❌ خطأ: ' + err.message);

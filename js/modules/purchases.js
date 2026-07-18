@@ -16,7 +16,7 @@ let PUR_DB = {
 };
 let purWarehouseId = null;
 let purSupplierId = null;
-let purPayType = 'cash'; // cash | credit
+let purPayType = 'credit'; // cash | credit
 let purTreasuryId = null; // الخزنة المختارة (للدفع النقدي)
 
 // ── حالة الفاتورة ──
@@ -91,7 +91,7 @@ async function renderPurchases(c) {
 
     purItems = [{ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', upc: 1, deferredRate: 0, deferredDate: '', deferredType: 'percent' }];
     purSupplierId = null;
-    purPayType = 'cash';
+    purPayType = 'credit';
     purTreasuryId = PUR_DB.treasuries?.find(t => t.is_default)?.id || null;
     purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null;
     purPendingPOOrderId = null;
@@ -189,6 +189,7 @@ async function renderPurchases(c) {
         </div>
     </div>`;
     purBindEvents();
+    purSetPayType(purPayType); // الـ select فوق بيتفتح على "نقدي" شكلياً — نزامن الشكل مع الحالة الحقيقية
     purRenderItems();
     purUpdateSummary();
     purUpdateSupplierChip();

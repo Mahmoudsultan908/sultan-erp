@@ -18,7 +18,7 @@ let invRepId = null;       // المندوب المختار (اختياري)
 // ── حالة الفاتورة الحالية ──
 let invItems = [];          // سطور الفاتورة
 let invCustId = null;       // العميل المختار
-let invPayType = 'cash';    // cash | credit
+let invPayType = 'credit';    // cash | credit
 let invTreasuryId = null;   // الخزنة المختارة (للدفع النقدي)
 let invEditingId = null;    // تعديل فاتورة قديمة
 let invEditingOldItems = [];       // بنود الفاتورة القديمة (لإرجاع المخزون عند الإلغاء)
@@ -211,7 +211,7 @@ function invNextOfflineInvoiceNo() {
 }
 
 // ── سعر بيع صنف حسب مستوى السعر ──
-let invPriceLevelCode = ''; // '' = استخدام الافتراضي (جملة/تجزئة القديم) — قابل للتغيير من القائمة أو من مجموعة العميل
+let invPriceLevelCode = 'RETAIL'; // القطاعي هو الافتراضي — قابل للتغيير من القائمة أو من مجموعة العميل
 
 function invGetSellPrice(p) {
     // لو فيه مستوى سعر مختار، وله سعر مسجّل لهذا الصنف تحديداً، استخدمه
@@ -219,8 +219,8 @@ function invGetSellPrice(p) {
         const levelPrice = INV_DB.priceMap?.[p.id + '|' + invPriceLevelCode];
         if (levelPrice > 0) return levelPrice;
     }
-    // fallback: نفس السلوك القديم (جملة ثم تجزئة)
-    return Number(p?.wholesale_price) || Number(p?.retail_price) || 0;
+    // fallback: قطاعي أولاً، وبعدين جملة لو مفيش سعر قطاعي مسجّل للصنف ده
+    return Number(p?.retail_price) || Number(p?.wholesale_price) || 0;
 }
 function invGetBuyPrice(p) {
     return Number(p?.purchase_price) || 0;
@@ -267,9 +267,9 @@ async function renderSales(c) {
     // إعادة ضبط الحالة عند فتح الفاتورة
     invItems = [{ id: Date.now(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', stock: 0 }];
     invCustId = null;
-    invPayType = 'cash';
+    invPayType = 'credit';
     invTreasuryId = INV_DB.treasuries?.find(t => t.is_default)?.id || null;
-    invPriceLevelCode = '';
+    invPriceLevelCode = 'RETAIL';
     invRepId = null;
     invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
     invPendingQuoteId = null;
@@ -373,6 +373,7 @@ async function renderSales(c) {
 
     // ربط الأحداث
     invBindEvents();
+    invSetPayType(invPayType); // القالب فوق بيثبّت "نقدي" شكلياً — نزامن الشكل مع الحالة الحقيقية
     invRenderItems();
     invUpdateSummary();
     invUpdateCustomerChip();
