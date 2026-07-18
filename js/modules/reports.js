@@ -3,6 +3,26 @@
 // يصدّر: renderReports(container)
 // ════════════════════════════════════════════════════════════
 
+// ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
+//   يضيّق النتيجة — sale_items/sale_return_items بقوا أكتر من كده بعد
+//   نقل البيانات التاريخية، فقائمة الدخل كانت بتحسب تكلفة البضاعة
+//   المباعة غلط (ناقصة) لأي فترة بترجع أكتر من 1000 سطر صنف. نفس نمط
+//   الإصلاح المستخدم في accounting.js/cash-movement.js/sales-reps.js.
+async function plFetchAllRows(table, select, applyFilters) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        let q = sb.from(table).select(select);
+        if (applyFilters) q = applyFilters(q);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
+
 async function renderReports(container) {
     let activeReport = 'pl';
     let _repDefSuppliers = [];
@@ -61,12 +81,11 @@ async function renderReports(container) {
                 sb.from('sales_returns').select('total').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
                 // تكلفة البضاعة المباعة الفعلية = تكلفة الصنف وقت البيع (cost_price_snapshot) وليست
                 // قيمة المشتريات في نفس الفترة — الشراء بيغذي المخزون، مش بالضرورة بيتباع في نفس الفترة.
-                sb.from('sale_items').select('qty, cost_price_snapshot, sales!inner(created_at, status)')
-                    .eq('sales.status', 'confirmed')
-                    .gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59'),
-                sb.from('sale_return_items').select('qty, cost_price_snapshot, sales_returns!inner(created_at, status)')
-                    .eq('sales_returns.status', 'confirmed')
-                    .gte('sales_returns.created_at', from).lte('sales_returns.created_at', to + 'T23:59:59'),
+                // مفلترة بـ plFetchAllRows عشان أسطر الأصناف بقت أكتر من حد الـ1000 صف الافتراضي.
+                plFetchAllRows('sale_items', 'qty, cost_price_snapshot, sales!inner(created_at, status)', (q) =>
+                    q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59')),
+                plFetchAllRows('sale_return_items', 'qty, cost_price_snapshot, sales_returns!inner(created_at, status)', (q) =>
+                    q.eq('sales_returns.status', 'confirmed').gte('sales_returns.created_at', from).lte('sales_returns.created_at', to + 'T23:59:59')),
             ]);
             const totalSales = (sales||[]).reduce((s,r)=>s+Number(r.total),0);
             const totalReturns = (salesReturns||[]).reduce((s,r)=>s+Number(r.total),0);

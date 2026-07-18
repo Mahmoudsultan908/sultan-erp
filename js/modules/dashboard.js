@@ -8,6 +8,24 @@
 //   جديد لقاعدة البيانات (البيانات الأساسية آخر 30 يوم مجلوبة مرة واحدة بس)
 let dashTrendDaily = [];
 
+// ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
+//   يضيّق النتيجة — نفس نمط الإصلاح المستخدم في reports.js/accounting.js
+//   لحساب تكلفة البضاعة المباعة صح لو حجم مبيعات الشهر كبر مع الوقت.
+async function dashFetchAllRows(table, select, applyFilters) {
+    let all = [], from = 0;
+    const pageSize = 1000;
+    while (true) {
+        let q = sb.from(table).select(select);
+        if (applyFilters) q = applyFilters(q);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) return { data: null, error };
+        all = all.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+    return { data: all, error: null };
+}
+
 async function renderDashboard(container) {
     container.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B">
         <div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل البيانات...
@@ -43,11 +61,12 @@ async function renderDashboard(container) {
             sb.from('sales_returns').select('total').eq('status','confirmed').gte('created_at', monthStart),
             sb.from('purchases').select('total').eq('status','confirmed').gte('created_at', monthStart),
             sb.from('expenses').select('amount').eq('status','confirmed').gte('expense_date', monthStart),
-            // تكلفة البضاعة المباعة الفعلية (مش المشتريات) — راجع نفس المنطق في reports.js
-            sb.from('sale_items').select('qty, cost_price_snapshot, sales!inner(created_at, status)')
-                .eq('sales.status', 'confirmed').gte('sales.created_at', monthStart),
-            sb.from('sale_return_items').select('qty, cost_price_snapshot, sales_returns!inner(created_at, status)')
-                .eq('sales_returns.status', 'confirmed').gte('sales_returns.created_at', monthStart),
+            // تكلفة البضاعة المباعة الفعلية (مش المشتريات) — راجع نفس المنطق في reports.js.
+            // مفلترة بـ dashFetchAllRows عشان أسطر الأصناف تعدّي حد الـ1000 صف الافتراضي مع الوقت.
+            dashFetchAllRows('sale_items', 'qty, cost_price_snapshot, sales!inner(created_at, status)', (q) =>
+                q.eq('sales.status', 'confirmed').gte('sales.created_at', monthStart)),
+            dashFetchAllRows('sale_return_items', 'qty, cost_price_snapshot, sales_returns!inner(created_at, status)', (q) =>
+                q.eq('sales_returns.status', 'confirmed').gte('sales_returns.created_at', monthStart)),
             sb.from('inventory_stock').select('qty, product_id, products(name, code)').lt('qty', 10).limit(5),
             sb.from('sale_items')
                 .select('product_id, qty, products(name), sales!inner(created_at,status)')
