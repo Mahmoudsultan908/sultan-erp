@@ -22,8 +22,11 @@ async function renderDashboard(container) {
             { data: cashData },
             { data: salesToday },
             { data: salesMonth },
+            { data: salesReturnsMonth },
             { data: purchasesMonth },
             { data: expensesMonth },
+            { data: saleItemsCostMonth },
+            { data: returnItemsCostMonth },
             { data: lowStock },
             { data: topProducts },
             { data: latestSales },
@@ -37,8 +40,14 @@ async function renderDashboard(container) {
             sb.rpc('get_cash_balance'),
             sb.from('sales').select('total').eq('status','confirmed').gte('created_at', today),
             sb.from('sales').select('total,subtotal').eq('status','confirmed').gte('created_at', monthStart),
+            sb.from('sales_returns').select('total').eq('status','confirmed').gte('created_at', monthStart),
             sb.from('purchases').select('total').eq('status','confirmed').gte('created_at', monthStart),
             sb.from('expenses').select('amount').eq('status','confirmed').gte('expense_date', monthStart),
+            // تكلفة البضاعة المباعة الفعلية (مش المشتريات) — راجع نفس المنطق في reports.js
+            sb.from('sale_items').select('qty, cost_price_snapshot, sales!inner(created_at, status)')
+                .eq('sales.status', 'confirmed').gte('sales.created_at', monthStart),
+            sb.from('sale_return_items').select('qty, cost_price_snapshot, sales_returns!inner(created_at, status)')
+                .eq('sales_returns.status', 'confirmed').gte('sales_returns.created_at', monthStart),
             sb.from('inventory_stock').select('qty, product_id, products(name, code)').lt('qty', 10).limit(5),
             sb.from('sale_items')
                 .select('product_id, qty, products(name), sales!inner(created_at,status)')
@@ -89,9 +98,13 @@ async function renderDashboard(container) {
         const cash = Number(cashData) || 0;
         const todaySales = (salesToday || []).reduce((s, r) => s + Number(r.total), 0);
         const monthSales = (salesMonth || []).reduce((s, r) => s + Number(r.total), 0);
+        const monthReturns = (salesReturnsMonth || []).reduce((s, r) => s + Number(r.total), 0);
+        const netMonthSales = monthSales - monthReturns;
         const monthPurchases = (purchasesMonth || []).reduce((s, r) => s + Number(r.total), 0);
         const monthExpenses = (expensesMonth || []).reduce((s, r) => s + Number(r.amount), 0);
-        const monthProfit = monthSales - monthPurchases - monthExpenses;
+        const monthCOGS = (saleItemsCostMonth || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0)
+            - (returnItemsCostMonth || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0);
+        const monthProfit = netMonthSales - monthCOGS - monthExpenses;
 
         // ── تقرير الجرد اليومي (صافي المركز المالي) ──────────────────
         // قيمة المخزون + رصيد الخزنة + مديونية العملاء - مستحقات الموردين
@@ -272,9 +285,9 @@ async function renderDashboard(container) {
                 <!-- ملخص الشهر -->
                 <div class="dash-card" style="flex:1">
                     <div class="dash-card-header"><span>📊 ملخص ${monthName}</span></div>
-                    <div class="dash-summary-row"><span>إجمالي المبيعات</span><span class="dash-s-green">${fmt(monthSales)}</span></div>
-                    <div class="dash-summary-row"><span>إجمالي المشتريات</span><span class="dash-s-red">${fmt(monthPurchases)}</span></div>
-                    <div class="dash-summary-row"><span>إجمالي المصروفات</span><span class="dash-s-red">${fmt(monthExpenses)}</span></div>
+                    <div class="dash-summary-row"><span>صافي المبيعات</span><span class="dash-s-green">${fmt(netMonthSales)}</span></div>
+                    <div class="dash-summary-row"><span>(-) تكلفة البضاعة المباعة</span><span class="dash-s-red">${fmt(monthCOGS)}</span></div>
+                    <div class="dash-summary-row"><span>(-) إجمالي المصروفات</span><span class="dash-s-red">${fmt(monthExpenses)}</span></div>
                     <div class="dash-summary-divider"></div>
                     <div class="dash-summary-row dash-summary-total">
                         <span>${monthProfit >= 0 ? '✅ صافي الربح' : '📉 صافي الخسارة'}</span>
@@ -282,7 +295,7 @@ async function renderDashboard(container) {
                     </div>
                     <div class="dash-summary-row" style="font-size:11px;color:#94A3B8;margin-top:4px">
                         <span>هامش الربح</span>
-                        <span>${monthSales > 0 ? Math.round(monthProfit / monthSales * 100) : 0}%</span>
+                        <span>${netMonthSales > 0 ? Math.round(monthProfit / netMonthSales * 100) : 0}%</span>
                     </div>
                 </div>
             </div>

@@ -9,3 +9,4 @@ HANDOVER_FOR_CLAUDE.md
 *.Xlsx
 *.xlsx
 ~$*
+dexef_migration_data/
