@@ -15,6 +15,7 @@ let VL_DB = { warehouses: [], products: [], reps: [], stockMap: {}, list: [] };
 let vlItems = [];
 let vlWarehouseId = null;
 let vlRepId = null;
+let _vlMultiSelected = {}; // {productId: qty} أثناء فتح مودال الاختيار المتعدد
 
 function vlFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function vlToday() { return new Date().toISOString().split('T')[0]; }
@@ -127,9 +128,95 @@ function vlHeaderHTML() {
 function vlSearchBarHTML() {
     return `
     <div class="inv-searchbar">
-        <div style="flex:1;color:#CBD5E1;font-size:12.5px">أضف سطراً لكل صنف تحمّله في عربية المندوب، وحدّد الكمية.</div>
-        <button class="inv-add-row-btn" onclick="vlAddRow()">+ إضافة صنف</button>
+        <div style="flex:1;color:#CBD5E1;font-size:12.5px">اختار أصناف متعددة دفعة واحدة بالبحث، أو أضف صنف واحد يدوياً.</div>
+        <button class="inv-add-row-btn" onclick="vlOpenMultiPick()">☑️ اختيار أصناف متعددة</button>
+        <button class="inv-add-row-btn" onclick="vlAddRow()">+ سطر يدوي</button>
     </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// اختيار أصناف متعددة (بحث + تحديد) — نفس نمط invOpenMultiPick فى sales.js
+// ════════════════════════════════════════════════════════════
+function vlOpenMultiPick() {
+    if (!vlWarehouseId) { alert('اختر المخزن أولاً'); return; }
+    document.getElementById('vlMultiModal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'vlMultiModal';
+    m.className = 'mod-modal-bg active';
+    m.innerHTML = `
+    <div class="mod-modal" style="max-width:640px">
+        <div class="mod-modal-header"><h3>☑️ اختيار أصناف متعددة</h3>
+            <button class="mod-modal-close" onclick="vlCloseMultiPick()">✕</button></div>
+        <div class="mod-modal-body">
+            <input type="text" class="mod-form-input" id="vlMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="vlRenderMultiPickList(this.value)">
+            <div id="vlMultiPickList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="inv-btn inv-btn-print" onclick="vlCloseMultiPick()">إلغاء</button>
+            <button class="inv-btn inv-btn-save" onclick="vlAddMultiPicked()">➕ إضافة المحدد</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+    _vlMultiSelected = {};
+    vlRenderMultiPickList('');
+    setTimeout(() => document.getElementById('vlMultiSearch')?.focus(), 50);
+}
+function vlCloseMultiPick() {
+    document.getElementById('vlMultiModal')?.remove();
+    _vlMultiSelected = {};
+}
+function vlRenderMultiPickList(val) {
+    const box = document.getElementById('vlMultiPickList');
+    if (!box) return;
+    const v = (val || '').trim();
+    const list = v ? VL_DB.products.filter(p => (p.name || '').includes(v) || (p.code || '').includes(v)) : VL_DB.products;
+    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
+    box.innerHTML = list.slice(0, 200).map(p => {
+        const sel = _vlMultiSelected[p.id];
+        const checked = sel != null;
+        const qty = sel ?? 1;
+        const stock = vlGetStock(p.id);
+        return `<label class="inv-multi-row" data-pid="${p.id}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="vlMultiToggle('${p.id}',this.checked)">
+            <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code || ''} · ${p.unit || ''}</small></span>
+            <span style="font-size:11px;color:#94A3B8">مخزون: ${vlFmt(stock)}</span>
+            <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="0.001" style="width:76px;padding:6px 8px"
+                onclick="event.stopPropagation()" oninput="vlMultiSetQty('${p.id}',this.value)">
+        </label>`;
+    }).join('');
+}
+function vlMultiToggle(pid, checked) {
+    if (checked) { if (_vlMultiSelected[pid] == null) _vlMultiSelected[pid] = 1; }
+    else delete _vlMultiSelected[pid];
+}
+function vlMultiSetQty(pid, val) {
+    const q = parseFloat(val) || 0;
+    if (q <= 0) return;
+    _vlMultiSelected[pid] = q;
+    const cb = document.querySelector(`.inv-multi-row[data-pid="${pid}"] input[type=checkbox]`);
+    if (cb && !cb.checked) cb.checked = true;
+}
+function vlAddMultiPicked() {
+    const ids = Object.keys(_vlMultiSelected);
+    if (!ids.length) { alert('لم يتم اختيار أي صنف'); return; }
+    let added = 0;
+    ids.forEach(pid => {
+        const p = VL_DB.products.find(x => x.id === pid);
+        if (!p) return;
+        const qty = _vlMultiSelected[pid] || 1;
+        const ex = vlItems.findIndex(i => i.productId === pid);
+        if (ex >= 0) {
+            vlItems[ex].qty = (vlItems[ex].qty || 0) + qty;
+        } else {
+            const empty = vlItems.find(i => !i.productId);
+            if (empty) { empty.productId = pid; empty.qty = qty; }
+            else vlItems.push({ id: Date.now() + added, productId: pid, qty });
+        }
+        added++;
+    });
+    vlRenderItems();
+    vlUpdateSummary();
+    vlCloseMultiPick();
 }
 
 function vlBottomBarHTML() {
@@ -357,4 +444,5 @@ window.vlSave = async function () {
 Object.assign(window, {
     renderVanStockLoad,
     vlAddRow, vlRemoveRow, vlOnProductChange, vlOnQtyInput, vlOnFilterChange, vlSave,
+    vlOpenMultiPick, vlCloseMultiPick, vlRenderMultiPickList, vlMultiToggle, vlMultiSetQty, vlAddMultiPicked,
 });
