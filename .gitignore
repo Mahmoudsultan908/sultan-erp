@@ -6,3 +6,6 @@
 HANDOVER_FOR_CLAUDE.md
 مراجعة_خطة_التسليم.md
 خطة_نقل_البيانات_من_DEXEF.md
+*.Xlsx
+*.xlsx
+~$*
