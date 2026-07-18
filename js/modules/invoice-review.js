@@ -24,10 +24,10 @@
 
 const REV_CONFIG = {
     sales: {
-        table: 'sales', itemsTable: 'sale_items', entityJoin: 'customers(name,phone)',
+        table: 'sales', itemsTable: 'sale_items', entityJoin: 'customers(name,phone), sales_reps(name)',
         noField: 'invoice_no', noPlaceholder: 'INV-0001', label: 'فاتورة مبيعات', icon: '🧾',
         entityLabel: 'العميل', hasPaymentType: true, canPrint: true, canEdit: true,
-        editMod: 'sales', pendingFlag: '_pendingSalesEdit',
+        editMod: 'sales', pendingFlag: '_pendingSalesEdit', showRepBadge: true,
     },
     purchase: {
         table: 'purchases', itemsTable: 'purchase_items', entityJoin: 'suppliers(name,phone)',
@@ -36,10 +36,10 @@ const REV_CONFIG = {
         editMod: 'purchases', pendingFlag: '_pendingPurchaseEdit',
     },
     sales_return: {
-        table: 'sales_returns', itemsTable: 'sale_return_items', entityJoin: 'customers(name,phone)',
+        table: 'sales_returns', itemsTable: 'sale_return_items', entityJoin: 'customers(name,phone), sales_reps(name)',
         noField: 'return_no', noPlaceholder: 'RS-0001', label: 'مرتجع مبيعات', icon: '↩️',
         entityLabel: 'العميل', hasPaymentType: false, canPrint: true, canEdit: true,
-        editMod: 'returns', pendingFlag: '_pendingReturnEdit',
+        editMod: 'returns', pendingFlag: '_pendingReturnEdit', showRepBadge: true,
     },
     purchase_return: {
         table: 'purchase_returns', itemsTable: 'purchase_return_items', entityJoin: 'suppliers(name,phone)',
@@ -146,7 +146,7 @@ function revRenderTable(rows) {
             </tr></thead>
             <tbody>
                 ${rows.length ? rows.map(r => `<tr>
-                    <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${r[cfg.noField]}</span></td>
+                    <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${r[cfg.noField]}</span>${cfg.showRepBadge && r.sales_reps?.name ? `<div style="margin-top:3px"><span style="background:#EDE9FE;color:#6D28D9;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;white-space:nowrap">🚗 ${r.sales_reps.name}</span></div>` : ''}</td>
                     <td>${r.customers?.name || r.suppliers?.name || 'نقدي'}</td>
                     <td>${cfg.hasPaymentType
                         ? (r.payment_type==='credit' ? '📋 آجل' : '💵 نقدي')
