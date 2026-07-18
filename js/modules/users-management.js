@@ -164,6 +164,15 @@ window.usrSaveNewUser = async function() {
         });
         if (profileErr) throw profileErr;
 
+        // مندوب مبيعات: لازم صف sales_reps بنفس الـ id، عشان فواتيره/مخزون عربيته
+        // يتربطوا بيه (sales.rep_id و van_stock.rep_id بيعتمدوا على نفس الـ id ده)
+        if (role === 'rep') {
+            const { error: repErr } = await sb.from('sales_reps').upsert({
+                id: data.user.id, name: full_name || email, is_active: true,
+            });
+            if (repErr) throw repErr;
+        }
+
         document.getElementById('usrAddModal').remove();
         alert('✅ تم إضافة المستخدم بنجاح');
         renderUsersManagement(document.getElementById('app-content'));
@@ -190,6 +199,15 @@ window.usrChangeRole = async function(userId, newRole) {
     try {
         const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', userId);
         if (error) throw error;
+
+        // لو اتحول لمندوب مبيعات، لازم يبقى له صف sales_reps بنفس الـ id (لو مش موجود أصلاً)
+        if (newRole === 'rep') {
+            const u = _usrList.find(x => x.id === userId);
+            const { error: repErr } = await sb.from('sales_reps').upsert({
+                id: userId, name: u?.full_name || u?.email || userId, is_active: true,
+            }, { onConflict: 'id', ignoreDuplicates: true });
+            if (repErr) throw repErr;
+        }
     } catch (err) {
         alert('❌ خطأ: ' + err.message);
         renderUsersManagement(document.getElementById('app-content'));
