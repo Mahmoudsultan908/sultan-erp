@@ -55,6 +55,13 @@ async function renderSettings(container) {
             </div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
+                <h3 style="margin:0 0 16px;font-size:15px">🛒 إعدادات سلطانو</h3>
+                <label class="ob-label">الحد الأدنى العام للطلب (ج.م)</label>
+                <input type="number" id="set-sultano-min-order" class="ob-input" style="max-width:250px" value="${get('sultanoo_min_order_amount','0')}" min="0" step="10">
+                <p style="font-size:12px;color:#94A3B8;margin-top:6px">لو منطقة العميل ليها حد أدنى خاص بيها (من شاشة "إدارة المناطق")، بيتطبّق هو بدل الحد العام ده.</p>
+            </div>
+
+            <div class="dash-card" style="padding:24px;margin-top:16px">
                 <h3 style="margin:0 0 16px;font-size:15px">💾 نسخة احتياطية</h3>
                 <p id="sett-backup-last" style="font-size:13px;color:#64748B;margin-bottom:14px">${settFmtLastBackup(get('last_backup_at', null))}</p>
                 <button class="ob-save-btn" id="sett-backup-btn" onclick="settBackupNow()">⬇️ تحميل نسخة احتياطية الآن</button>
@@ -77,6 +84,7 @@ async function renderSettings(container) {
                 { key: 'vat_rate', value: document.getElementById('set-vat-rate').value },
                 { key: 'system_start_date', value: document.getElementById('set-system-start').value },
                 { key: 'daily_sales_target', value: document.getElementById('set-daily-sales-target').value },
+                { key: 'sultanoo_min_order_amount', value: document.getElementById('set-sultano-min-order').value },
             ];
             try {
                 for (const e of entries) {

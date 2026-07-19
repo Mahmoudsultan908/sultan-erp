@@ -400,7 +400,7 @@ async function mdRenderLookup(type) {
 
     if (type === 'region') {
         const { data } = await sb.from('customer_regions').select('*').order('name');
-        content.innerHTML = mdLookupListHTML(data||[], 'region', 'اسم المنطقة');
+        content.innerHTML = mdRegionListHTML(data||[]);
     } else if (type === 'classification') {
         const { data } = await sb.from('customer_classifications').select('*').order('name');
         content.innerHTML = mdLookupListHTML(data||[], 'classification', 'اسم التصنيف');
@@ -421,6 +421,32 @@ async function mdRenderLookup(type) {
                 <span>${g.name}</span></div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:16px">لا توجد مجموعات بعد</p>'}`;
     }
 }
+
+// نفس mdLookupListHTML بس مع حقل "الحد الأدنى للطلب" لكل منطقة — بيتحدد
+// منه الحد الأدنى لطلبات سلطانو حسب منطقة العميل (راجع fn_sultano_get_areas)
+function mdRegionListHTML(items) {
+    return `
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="text" id="newLookupName" class="mod-form-input" style="margin:0" placeholder="اسم المنطقة...">
+            <button class="mod-btn mod-btn-primary" onclick="mdAddLookup('region')">+</button>
+        </div>
+        ${items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F1F5F9">
+            <span>${i.name}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+                <label style="font-size:11px;color:#94A3B8">حد أدنى للطلب (سلطانو)</label>
+                <input type="number" id="regMinOrder-${i.id}" class="mod-form-input" value="${i.min_order_amount||0}" min="0" step="10" style="width:90px;margin:0">
+                <button class="mod-btn" style="padding:4px 10px;font-size:12px" onclick="mdSaveRegionMinOrder('${i.id}')">💾</button>
+            </div>
+        </div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:16px">لا توجد عناصر بعد</p>'}`;
+}
+
+window.mdSaveRegionMinOrder = async function(id) {
+    const val = parseFloat(document.getElementById('regMinOrder-'+id)?.value) || 0;
+    try {
+        const { error } = await sb.from('customer_regions').update({ min_order_amount: val }).eq('id', id);
+        if (error) throw error;
+    } catch(e) { alert('خطأ: ' + e.message); }
+};
 
 function mdLookupListHTML(items, type, placeholder) {
     return `

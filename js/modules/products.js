@@ -266,6 +266,14 @@ async function prodOpenModal(p) {
                         <img id="prodImagePreview" src="${p?.images?.[0]||''}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#F1F5F9;${p?.images?.[0]?'':'display:none'}">
                         <input type="file" id="prodImageFile" class="mod-form-input" accept="image/*" style="margin:0" onchange="prodPreviewImage(this)">
                     </div>
+                    <div style="display:flex;gap:16px;margin-top:8px">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                            <input type="checkbox" id="prodIsFeatured" ${p?.is_featured?'checked':''} style="width:auto">⭐ عرض مميز في سلطانو
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                            <input type="checkbox" id="prodIsBestseller" ${p?.is_bestseller?'checked':''} style="width:auto">🔥 الأكثر مبيعاً في سلطانو
+                        </label>
+                    </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>الكود</label>
@@ -520,6 +528,8 @@ window.prodSave = async function() {
             category_id, company_id, supplier_id, purchase_unit, sale_unit, unit: sale_unit,
             units_per_carton, purchase_price, reorder_point,
             default_deferred_rate, default_deferred_type,
+            is_featured: document.getElementById('prodIsFeatured')?.checked || false,
+            is_bestseller: document.getElementById('prodIsBestseller')?.checked || false,
         };
 
         // رفع صورة الصنف (لو المستخدم اختار ملف جديد) — لو مفيش ملف جديد،
