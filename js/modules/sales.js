@@ -248,6 +248,19 @@ function invNormalizeRepId(v) {
 function invOnRepChange() {
     const sel = document.getElementById('invRep');
     if (sel) invRepId = invNormalizeRepId(sel.value);
+    invApplyRepTreasury(invRepId);
+}
+// لو الفاتورة اتنسبت لمندوب (تلقائي من العميل أو يدوي)، والدفع نقدي،
+// الخزنة الافتراضية لازم تبقى خزنة المندوب نفسه مش الخزنة الرئيسية —
+// وإلا الكاش يتسجل فى مكان تاني غير درج المندوب اللي فعلاً باع وقبض.
+// قابل للتغيير يدوياً بعد كده زي أي حقل تاني، ده بس افتراضي أذكى.
+function invApplyRepTreasury(repId) {
+    if (!repId) return;
+    const rep = (INV_DB.reps || []).find(r => r.id === repId);
+    if (!rep?.treasury_id) return;
+    invTreasuryId = rep.treasury_id;
+    const treasSel = document.getElementById('invTreasuryId');
+    if (treasSel) treasSel.value = rep.treasury_id;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -302,6 +315,8 @@ async function renderSales(c) {
                 invCustId = oldSale.customer_id;
                 invPayType = oldSale.payment_type || 'cash';
                 invRepId = invNormalizeRepId(oldSale.rep_id);
+                if (oldSale.treasury_id) invTreasuryId = oldSale.treasury_id;
+                else invApplyRepTreasury(invRepId);
                 if (oldSale.warehouse_id) invWarehouseId = oldSale.warehouse_id;
             }
         } catch (err) {
@@ -750,6 +765,7 @@ function invSelectCustomer(id) {
         invRepId = c.default_rep_id;
         const repSel = document.getElementById('invRep');
         if (repSel) repSel.value = c.default_rep_id;
+        invApplyRepTreasury(invRepId);
     }
     invToast(`👤 تم اختيار: ${c.name}`, 'success');
     setTimeout(()=>document.getElementById('invFastSearch')?.focus(), 50);
