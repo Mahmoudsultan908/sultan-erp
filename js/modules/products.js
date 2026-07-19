@@ -266,13 +266,20 @@ async function prodOpenModal(p) {
                         <img id="prodImagePreview" src="${p?.images?.[0]||''}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#F1F5F9;${p?.images?.[0]?'':'display:none'}">
                         <input type="file" id="prodImageFile" class="mod-form-input" accept="image/*" style="margin:0" onchange="prodPreviewImage(this)">
                     </div>
-                    <div style="display:flex;gap:16px;margin-top:8px">
+                    <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
                         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                             <input type="checkbox" id="prodIsFeatured" ${p?.is_featured?'checked':''} style="width:auto">⭐ عرض مميز في سلطانو
                         </label>
                         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                             <input type="checkbox" id="prodIsBestseller" ${p?.is_bestseller?'checked':''} style="width:auto">🔥 الأكثر مبيعاً في سلطانو
                         </label>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:#DC2626">
+                            <input type="checkbox" id="prodHiddenSultano" ${p?.hidden_from_sultano?'checked':''} style="width:auto">🚫 إخفاء عن سلطانو (حتى لو متوفر بالمخزون)
+                        </label>
+                    </div>
+                    <div class="mod-form-group" style="margin-top:8px">
+                        <label>الحد الأقصى للطلب في سلطانو <small style="color:#94A3B8;font-weight:400">(سيب فاضي = يستخدم الحد العام من الإعدادات)</small></label>
+                        <input type="number" id="prodMaxOrderQty" class="mod-form-input" value="${p?.max_order_qty??''}" min="1" step="1" placeholder="الحد العام">
                     </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -530,6 +537,8 @@ window.prodSave = async function() {
             default_deferred_rate, default_deferred_type,
             is_featured: document.getElementById('prodIsFeatured')?.checked || false,
             is_bestseller: document.getElementById('prodIsBestseller')?.checked || false,
+            hidden_from_sultano: document.getElementById('prodHiddenSultano')?.checked || false,
+            max_order_qty: document.getElementById('prodMaxOrderQty')?.value ? parseFloat(document.getElementById('prodMaxOrderQty').value) : null,
         };
 
         // رفع صورة الصنف (لو المستخدم اختار ملف جديد) — لو مفيش ملف جديد،
