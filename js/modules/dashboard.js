@@ -56,6 +56,7 @@ async function renderDashboard(container) {
             { data: latestSales },
             { data: overdueCustomers },
             { data: allStock },
+            { data: allVanStock },
             { data: allCustomers },
             { data: allSuppliers },
             { data: trendSales },
@@ -88,6 +89,9 @@ async function renderDashboard(container) {
             sb.from('customers').select('name, balance, credit_limit').gt('balance', 0).order('balance', { ascending: false }).limit(5),
             // نفس منطق حساب قيمة المخزون المستخدم في js/modules/inventory.js (qty * purchase_price)
             sb.from('inventory_stock').select('qty, products(purchase_price)'),
+            // بضاعة موجودة فعليًا مع المندوبين على العربيات — من غيرها "قيمة البضاعة"
+            // فى تقرير الجرد كانت بتفوّت كل مخزون العربيات وتوريه أقل من الحقيقي
+            sb.from('van_stock').select('qty, products(purchase_price)'),
             // نفس منطق حساب مديونية العملاء المستخدم في js/modules/customers.js (مجموع الأرصدة الموجبة فقط)
             sb.from('customers').select('balance'),
             // نفس منطق حساب مستحقات الموردين المستخدم في js/modules/suppliers.js (مجموع الأرصدة الموجبة فقط)
@@ -132,11 +136,12 @@ async function renderDashboard(container) {
         const monthProfit = netMonthSales - monthCOGS - monthExpenses;
 
         // ── تقرير الجرد اليومي (صافي المركز المالي) ──────────────────
-        // قيمة المخزون + رصيد الخزنة + مديونية العملاء - مستحقات الموردين
+        // قيمة المخزون (مخازن + عربيات المندوبين) + رصيد الخزنة + مديونية العملاء - مستحقات الموردين
         const stockValue = (allStock || []).reduce((s, r) => s + (Number(r.qty) || 0) * Number(r.products?.purchase_price || 0), 0);
+        const vanStockValue = (allVanStock || []).reduce((s, r) => s + (Number(r.qty) || 0) * Number(r.products?.purchase_price || 0), 0);
         const customersDebt = (allCustomers || []).reduce((s, c) => s + (Number(c.balance) > 0 ? Number(c.balance) : 0), 0);
         const suppliersDebt = (allSuppliers || []).reduce((s, sp) => s + (Number(sp.balance) > 0 ? Number(sp.balance) : 0), 0);
-        const netWorth = stockValue + cash + customersDebt - suppliersDebt;
+        const netWorth = stockValue + vanStockValue + cash + customersDebt - suppliersDebt;
 
         const fmt = (n) => Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const fmtDate = (d) => new Date(d).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -203,7 +208,7 @@ async function renderDashboard(container) {
                 </div>
             </div>
 
-            <!-- اتجاه المبيعات -->
+            <!-- اتجاه المبيعات + تقرير الجرد اليومي: جنب بعض فى نفس الصف -->
             <div class="dash-row">
                 <div class="dash-card" style="flex:1">
                     <div class="dash-card-header">
@@ -215,13 +220,11 @@ async function renderDashboard(container) {
                     </div>
                     <div id="dashTrendChartWrap">${dashRenderTrendSVG(30)}</div>
                 </div>
-            </div>
 
-            <!-- تقرير الجرد اليومي: صافي المركز المالي (قيمة مخزون + خزنة + مديونية عملاء - مستحقات موردين) -->
-            <div class="dash-row">
                 <div class="dash-card" style="flex:1">
                     <div class="dash-card-header"><span>📋 تقرير الجرد اليومي — صافي المركز المالي</span></div>
-                    <div class="dash-summary-row"><span>📦 قيمة البضاعة (المخزون)</span><span class="dash-s-green">${fmt(stockValue)}</span></div>
+                    <div class="dash-summary-row"><span>📦 قيمة البضاعة (المخازن)</span><span class="dash-s-green">${fmt(stockValue)}</span></div>
+                    <div class="dash-summary-row"><span>🚚 بضاعة عربيات المندوبين</span><span class="dash-s-green">${fmt(vanStockValue)}</span></div>
                     <div class="dash-summary-row"><span>💰 رصيد الخزنة (كل الخزن)</span><span class="dash-s-green">${fmt(cash)}</span></div>
                     <div class="dash-summary-row"><span>👥 مديونية العملاء (لينا عندهم)</span><span class="dash-s-green">${fmt(customersDebt)}</span></div>
                     <div class="dash-summary-row"><span>🏭 مستحقات الموردين (عندنا ليهم)</span><span class="dash-s-red">- ${fmt(suppliersDebt)}</span></div>
