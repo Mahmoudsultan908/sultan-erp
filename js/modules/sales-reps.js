@@ -213,6 +213,12 @@ function repOpenModal(x) {
                     </select></div>
                 ${x?.treasury_id ? `<div class="mod-form-group"><label>خزنة المندوب</label>
                     <div style="padding:10px 14px;background:#F1F5F9;border-radius:8px;font-size:13px;color:#475569">🏦 ${_repTreasuries.find(t=>t.id===x.treasury_id)?.name || '—'} <small>(بتتعمل تلقائياً، منفصلة عن الخزنة الرئيسية)</small></div></div>` : ''}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="mod-form-group"><label>🎯 هدف المبيعات اليومي (ج)</label>
+                        <input type="number" id="repDailyTarget" class="mod-form-input" value="${x?.daily_sales_target || 0}" min="0" step="1"></div>
+                    <div class="mod-form-group"><label>🏪 هدف الزيارات اليومي</label>
+                        <input type="number" id="repVisitsTarget" class="mod-form-input" value="${x?.daily_visits_target || 0}" min="0" step="1"></div>
+                </div>
                 <div class="mod-form-group"><label>ملاحظات</label>
                     <input type="text" id="repNotes" class="mod-form-input" value="${x?.notes || ''}" placeholder="اختياري"></div>
             </div>
@@ -234,6 +240,8 @@ window.repSave = async function () {
         phone: document.getElementById('repPhone').value.trim() || null,
         commission_pct: parseFloat(document.getElementById('repCommission').value) || 0,
         price_level_id: document.getElementById('repPriceLevel').value || null,
+        daily_sales_target: parseFloat(document.getElementById('repDailyTarget').value) || 0,
+        daily_visits_target: parseInt(document.getElementById('repVisitsTarget').value) || 0,
         notes: document.getElementById('repNotes').value.trim() || null,
     };
 
