@@ -28,6 +28,7 @@ let invEditingOldPayType = null;
 let invEditingOldCustId = null;
 let invEditingOldInvoiceNo = null;
 let invPendingQuoteId = null; // عرض سعر بيتحوّل حالياً — يتعلّم "تم التحويل" بعد نجاح الحفظ بس (مش قبله)
+let invPendingOrderId = null; // طلب سلطانو بيتحوّل حالياً — نفس المنطق، customer_orders.converted_sale_id بيتحدّث بعد الحفظ بس
 
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات الحية من Supabase
@@ -286,6 +287,7 @@ async function renderSales(c) {
     invRepId = null;
     invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
     invPendingQuoteId = null;
+    invPendingOrderId = null;
 
     // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
     if (window._pendingSalesEdit) {
@@ -334,7 +336,8 @@ async function renderSales(c) {
         }
         if (pending.customerId) invCustId = pending.customerId;
         // هيتعلّم "تم التحويل" بعد الحفظ الناجح فعلاً — راجع التعليق في quotations.js
-        invPendingQuoteId = pending.quoteId || null;
+        if (pending.kind === 'order') invPendingOrderId = pending.quoteId || null;
+        else invPendingQuoteId = pending.quoteId || null;
     }
 
     c.innerHTML = `
@@ -1420,6 +1423,19 @@ async function invSave(andNew) {
                 await sb.from('quotations').update({ status: 'converted' }).eq('id', invPendingQuoteId);
             } catch {}
             invPendingQuoteId = null;
+        }
+
+        // ★ لو الفاتورة دي جاية من اعتماد طلب سلطانو، اربط الطلب بالفاتورة
+        //   الحقيقية دلوقتي بس — بعد نجاح الحفظ فعلاً (نفس منطق عروض الأسعار فوق)
+        if (invPendingOrderId) {
+            try {
+                await sb.from('customer_orders').update({
+                    converted_sale_id: rpcRows?.[0]?.id || null,
+                    reviewed_by: currentUser?.id || null,
+                    reviewed_at: new Date().toISOString(),
+                }).eq('id', invPendingOrderId);
+            } catch {}
+            invPendingOrderId = null;
         }
 
         // لو آجل → حدّث رصيد العميل محلياً (الـ trigger في DB المفروض بيعملها)

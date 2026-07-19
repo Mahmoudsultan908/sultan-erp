@@ -55,7 +55,7 @@ function rcrRenderPage(c) {
         </tr></thead><tbody>
             ${reviewed.map(r => `<tr>
                 <td>${r.request_type==='new'?'🆕 جديد':'✏️ تعديل'}</td>
-                <td>🚗 ${r.rep?.name||'—'}</td>
+                <td>${r.source==='sultano' ? '🌐 سلطانو' : '🚗 '+(r.rep?.name||'—')}</td>
                 <td>${r.proposed_name||'—'}</td>
                 <td>${r.status==='approved'?'<span style="color:#059669;font-weight:700">✅ معتمد</span>':'<span style="color:#DC2626;font-weight:700">❌ مرفوض</span>'}</td>
                 <td style="color:#64748B">${r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'—'}</td>
@@ -69,7 +69,7 @@ function rcrRowHTML(r) {
     const isNew = r.request_type === 'new';
     return `<tr data-rcr-id="${r.id}">
         <td>${isNew ? '🆕 جديد' : '✏️ تعديل'}</td>
-        <td>🚗 ${r.rep?.name || '—'}</td>
+        <td>${r.source==='sultano' ? '🌐 سلطانو' : '🚗 '+(r.rep?.name || '—')}</td>
         <td><input type="text" class="mod-form-input" id="rcrName-${r.id}" value="${(r.proposed_name||'').replace(/"/g,'&quot;')}" style="min-width:140px"></td>
         <td><input type="text" class="mod-form-input" id="rcrPhone-${r.id}" value="${(r.proposed_phone||'').replace(/"/g,'&quot;')}" dir="ltr" style="min-width:120px"></td>
         <td><input type="text" class="mod-form-input" id="rcrAddr-${r.id}" value="${(r.proposed_address||'').replace(/"/g,'&quot;')}" style="min-width:140px"></td>
@@ -101,7 +101,7 @@ window.rcrApprove = async function (id) {
         }).eq('id', id);
         if (error) throw error;
 
-        renderRepCustomerRequests(document.getElementById('repMgmtBody') || document.getElementById('app-content'));
+        renderRepCustomerRequests(document.getElementById('repMgmtBody') || document.getElementById('corBody') || document.getElementById('app-content'));
     } catch (err) {
         alert('خطأ أثناء الاعتماد: ' + err.message);
     }
@@ -114,7 +114,7 @@ window.rcrReject = async function (id) {
             status: 'rejected', reviewed_by: currentUser?.id || null, reviewed_at: new Date().toISOString(),
         }).eq('id', id);
         if (error) throw error;
-        renderRepCustomerRequests(document.getElementById('repMgmtBody') || document.getElementById('app-content'));
+        renderRepCustomerRequests(document.getElementById('repMgmtBody') || document.getElementById('corBody') || document.getElementById('app-content'));
     } catch (err) {
         alert('خطأ أثناء الرفض: ' + err.message);
     }

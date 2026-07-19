@@ -24,15 +24,12 @@ async function renderAIDashboard(c) {
         'تحليلات ذكية وتوصيات تلقائية لتحسين المبيعات وإدارة المخزون بناءً على بيانات النظام.');
 }
 
-// ── ربط الأنظمة الخارجية ──
-async function renderCustomerOrdersLink(c) {
-    csRenderPage(c, '🔗', 'ربط برنامج طلبات العملاء',
-        'مزامنة تلقائية بين طلبات العملاء الواردة من التطبيق الخارجي وفواتير المبيعات في هذا النظام.');
-}
 // ★ renderRepAppLink انتقلت لموديول حقيقي: rep-management.js (بقت
 // صفحة "مندوب سلطان" الموحّدة، مش قريباً)
+// ★ renderCustomerOrdersLink انتقلت لموديول حقيقي: customer-orders-review.js
+// (بقت صفحة مراجعة طلبات سلطانو، مش قريباً)
 
 Object.assign(window, {
     renderWhatsAppIntegration,
-    renderAIDashboard, renderCustomerOrdersLink,
+    renderAIDashboard,
 });

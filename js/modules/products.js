@@ -14,6 +14,7 @@ let _prodSuppliers = [];
 let _prodSearch = '';
 let _prodFilterCat = '';
 let _prodEditingId = null;
+const PROD_IMAGE_BUCKET = 'product-images'; // باكت عام (Public) — عشان سلطانو يعرض الصورة للعميل من غير تسجيل دخول
 // المؤجل التقديري (مبلغ فعلي للوحدة) المستخدم في حساب هامش الربح داخل مودال
 // التعديل الحالي (آخر مؤجل اتسجل لهذا الصنف في فواتير الشراء — راجع prodOpenModal)
 let _prodModalDeferredRate = 0;
@@ -259,6 +260,13 @@ async function prodOpenModal(p) {
                 <div class="mod-form-group"><label>اسم الصنف *</label>
                     <input type="text" id="prodName" class="mod-form-input" value="${p?.name||''}" placeholder="مثال: بسكويت تايجر">
                 </div>
+                <div class="mod-form-group">
+                    <label>صورة الصنف <small style="color:#94A3B8;font-weight:400">(بتظهر للعميل في سلطانو)</small></label>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <img id="prodImagePreview" src="${p?.images?.[0]||''}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#F1F5F9;${p?.images?.[0]?'':'display:none'}">
+                        <input type="file" id="prodImageFile" class="mod-form-input" accept="image/*" style="margin:0" onchange="prodPreviewImage(this)">
+                    </div>
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>الكود</label>
                         <input type="text" id="prodCode" class="mod-form-input" value="${p?.code||''}" placeholder="مثال: P-001" dir="ltr"></div>
@@ -335,6 +343,14 @@ async function prodOpenModal(p) {
 }
 
 window.prodCloseModal = function() { document.getElementById('prodModal')?.remove(); };
+
+window.prodPreviewImage = function(input) {
+    const file = input.files[0];
+    const img = document.getElementById('prodImagePreview');
+    if (!file || !img) return;
+    img.src = URL.createObjectURL(file);
+    img.style.display = '';
+};
 
 // تبديل نوع المؤجل الافتراضي (٪ / ثابت) — تعديل مباشر للـ DOM بدل إعادة رسم
 // المودال كله، عشان مايضيعش أي حقول تانية اتكتبت فعلاً جوه المودال
@@ -505,6 +521,18 @@ window.prodSave = async function() {
             units_per_carton, purchase_price, reorder_point,
             default_deferred_rate, default_deferred_type,
         };
+
+        // رفع صورة الصنف (لو المستخدم اختار ملف جديد) — لو مفيش ملف جديد،
+        // مفيش مفتاح images في الـ payload خالص فتفضل الصورة القديمة زي ما هي
+        const imageFile = document.getElementById('prodImageFile')?.files?.[0];
+        if (imageFile) {
+            const safeName = imageFile.name.replace(/[^\w.\-]+/g, '_');
+            const path = `${Date.now()}_${safeName}`;
+            const { error: upErr } = await sb.storage.from(PROD_IMAGE_BUCKET).upload(path, imageFile);
+            if (upErr) throw upErr;
+            const { data: pub } = sb.storage.from(PROD_IMAGE_BUCKET).getPublicUrl(path);
+            payload.images = [pub.publicUrl];
+        }
         // مزامنة wholesale_price/retail_price (أعمدة WorkFlow Hub القديمة) من أول مستويين — للتوافق مع sales.js
         if (_prodPriceLevels[0]) payload.wholesale_price = levelPrices.find(lp=>lp.levelId===_prodPriceLevels[0].id)?.price || 0;
         if (_prodPriceLevels[1]) payload.retail_price = levelPrices.find(lp=>lp.levelId===_prodPriceLevels[1].id)?.price || 0;
