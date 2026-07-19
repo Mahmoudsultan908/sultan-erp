@@ -63,7 +63,7 @@ function custRenderPage(c) {
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>التصنيف</th><th>المجموعة</th>
+                <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>التصنيف</th><th>المجموعة</th><th>المندوب</th>
                 <th style="text-align:left">الحد الائتماني</th><th style="text-align:left">الرصيد</th><th></th>
             </tr></thead><tbody id="custMgTbody"></tbody></table>
         </div>`;
@@ -78,12 +78,13 @@ function custRenderRows() {
         const q = _mgCustSearch.toLowerCase();
         rows = rows.filter(x => (x.name||'').toLowerCase().includes(q) || (x.phone||'').includes(q));
     }
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`; return; }
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`; return; }
 
     tbody.innerHTML = rows.map(x => {
         const region = _mgCustRegions.find(r=>r.id===x.region_id);
         const cls = _mgCustClassifications.find(cl=>cl.id===x.classification_id);
         const grp = _mgCustGroups.find(g=>g.id===x.group_id);
+        const rep = _mgCustReps.find(r=>r.id===x.default_rep_id);
         const bal = Number(x.balance)||0;
         return `<tr>
             <td><strong>${x.name}</strong></td>
@@ -91,6 +92,7 @@ function custRenderRows() {
             <td>${region?.name||'—'}</td>
             <td>${cls?.name||'—'}</td>
             <td>${grp?.name||'—'}</td>
+            <td>${rep?`🚗 ${rep.name}`:'—'}</td>
             <td style="text-align:left">${x.credit_limit>0?mdFmt(x.credit_limit):'—'}</td>
             <td style="text-align:left;font-weight:700;color:${bal>0?'#DC2626':'#059669'}">${mdFmt(bal)}</td>
             <td><button class="cc-edit" onclick="custOpenEdit('${x.id}')">✏️</button></td>
