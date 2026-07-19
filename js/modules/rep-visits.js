@@ -76,7 +76,7 @@ function rvRenderPage(c) {
             <input type="date" id="rvDate" class="mod-form-input" style="margin:0;width:auto" value="${RV_DATE}" onchange="rvOnDateChange(this.value)">
             <span style="font-size:13px;color:#64748B">${RV_LIST.length} زيارة مسجّلة — ${visited} باع/حصّل، ${skipped} رفض</span>
         </div>
-        <button class="mod-btn mod-btn-primary" onclick="rvOpenGenerateModal()">📋 تسجيل زيارات اليوم</button>
+        <button class="mod-btn mod-btn-primary" onclick="rvOpenGenerateModal()">📋 ملء خط السير من زيارات اليوم</button>
     </div>
     ${Object.keys(byRep).length ? Object.entries(byRep).map(([repName, visits]) => `
         <div class="mod-table-wrap" style="margin-bottom:16px">
@@ -95,9 +95,11 @@ function rvRenderPage(c) {
 }
 
 // ════════════════════════════════════════════════════════════
-// تسجيل زيارات اليوم — بيولّد صفوف rep_visits (planned) لتاريخ
-// RV_DATE من خط سير يوم تختاره (مش لازم يطابق يوم الأسبوع الفعلي
-// للتاريخ، عشان لو حابب يكرر خط سير يوم تاني فى يوم مختلف).
+// ملء خط السير من زيارات اليوم — عكس فكرة "خط سير → زيارات":
+// بياخد كل الزيارات المسجّلة فعلاً بتاريخ RV_DATE (أي حالة — باع/حصّل/
+// رفض/مخطط) وبيضيف كل عميل اتزار لخط سير يوم من أيام الأسبوع تختاره
+// (مش لازم يطابق يوم RV_DATE نفسه). لو العميل موجود بالفعل فى خط سير
+// يوم تاني، بيتضاف لليوم الجديد كمان من غير ما يتشال من القديم.
 // ════════════════════════════════════════════════════════════
 function rvOpenGenerateModal() {
     document.getElementById('rvGenModal')?.remove();
@@ -107,50 +109,65 @@ function rvOpenGenerateModal() {
     m.className = 'mod-modal-bg active';
     m.innerHTML = `
     <div class="mod-modal" style="max-width:420px">
-        <div class="mod-modal-header"><h3>📋 تسجيل زيارات اليوم</h3>
+        <div class="mod-modal-header"><h3>📋 ملء خط السير من زيارات اليوم</h3>
             <button class="mod-modal-close" onclick="document.getElementById('rvGenModal').remove()">✕</button></div>
         <div class="mod-modal-body">
             <div style="font-size:13px;color:#64748B;margin-bottom:12px">
-                هيتسجّل زيارات مخططة بتاريخ <b>${RV_DATE}</b> لكل عملاء خط السير الخاص باليوم اللي هتختاره، لكل المندوبين.
-                العملاء اللي عندهم زيارة مسجّلة أصلاً فى التاريخ ده مش هيتأثروا.
+                هياخد كل العملاء اللي عندهم زيارة مسجّلة بتاريخ <b>${RV_DATE}</b> (${RV_LIST.length} زيارة) ويضيفهم لخط سير اليوم اللي هتختاره — مع مندوبيهم نفسهم.
+                لو عميل موجود أصلاً فى خط سير يوم تاني، هيتضاف لليوم الجديد كمان من غير ما يتشال من القديم.
             </div>
-            <label style="font-size:13px;font-weight:700;color:#334155">كرر خط سير يوم:</label>
+            <label style="font-size:13px;font-weight:700;color:#334155">ضيفهم لخط سير يوم:</label>
             <select id="rvGenDay" class="mod-form-input">
                 ${RV_WEEKDAYS.map(([k, n]) => `<option value="${k}" ${k === defaultDay ? 'selected' : ''}>${n}</option>`).join('')}
             </select>
         </div>
         <div class="mod-modal-footer">
             <button class="inv-btn inv-btn-print" onclick="document.getElementById('rvGenModal').remove()">إلغاء</button>
-            <button class="inv-btn inv-btn-save" onclick="rvGenerateVisits()">✅ تسجيل</button>
+            <button class="inv-btn inv-btn-save" onclick="rvFillRouteFromVisits()">✅ إضافة</button>
         </div>
     </div>`;
     document.body.appendChild(m);
 }
 
-window.rvGenerateVisits = async function () {
+window.rvFillRouteFromVisits = async function () {
     const dayKey = document.getElementById('rvGenDay')?.value;
     if (!dayKey) return;
+    const dayName = RV_WEEKDAY_NAMES[dayKey];
+    if (!RV_LIST.length) { alert('مفيش زيارات مسجّلة فى التاريخ ده أصلاً'); return; }
     try {
-        const { data: routes, error } = await sb.from('rep_routes')
-            .select('id, rep_id, rep_route_customers(customer_id)')
-            .eq('day_of_week', dayKey)
-            .eq('is_active', true);
-        if (error) throw error;
-        const rows = [];
-        (routes || []).forEach(r => {
-            (r.rep_route_customers || []).forEach(rc => {
-                rows.push({ route_id: r.id, rep_id: r.rep_id, customer_id: rc.customer_id, visit_date: RV_DATE, status: 'planned' });
-            });
+        const pairs = [];
+        const seen = new Set();
+        RV_LIST.forEach(v => {
+            const key = v.rep_id + '|' + v.customer_id;
+            if (seen.has(key)) return;
+            seen.add(key);
+            pairs.push({ rep_id: v.rep_id, customer_id: v.customer_id });
         });
-        if (!rows.length) { alert('مفيش عملاء متسجّلين فى خط السير ده'); return; }
-        const { error: insErr } = await sb.from('rep_visits')
-            .upsert(rows, { onConflict: 'rep_id,customer_id,visit_date', ignoreDuplicates: true });
+
+        const { data: existingRoutes, error: rErr } = await sb.from('rep_routes')
+            .select('id, rep_id').eq('day_of_week', dayKey);
+        if (rErr) throw rErr;
+        const routeIdByRep = {};
+        (existingRoutes || []).forEach(r => { routeIdByRep[r.rep_id] = r.id; });
+
+        const repIdsNeeded = [...new Set(pairs.map(p => p.rep_id))].filter(id => !routeIdByRep[id]);
+        for (const repId of repIdsNeeded) {
+            const { data, error } = await sb.from('rep_routes')
+                .insert({ rep_id: repId, name: 'خط ' + dayName, day_of_week: dayKey })
+                .select('id').single();
+            if (error) throw error;
+            routeIdByRep[repId] = data.id;
+        }
+
+        const rows = pairs.map(p => ({ route_id: routeIdByRep[p.rep_id], customer_id: p.customer_id }));
+        const { data: insData, error: insErr } = await sb.from('rep_route_customers')
+            .upsert(rows, { onConflict: 'route_id,customer_id', ignoreDuplicates: true })
+            .select('id');
         if (insErr) throw insErr;
+
         document.getElementById('rvGenModal')?.remove();
-        await rvLoad();
-        const c = document.getElementById('repMgmtBody') || document.getElementById('app-content');
-        rvRenderPage(c);
-        alert(`تم — ${rows.length} زيارة اتضافت/اتأكدت لتاريخ ${RV_DATE}`);
+        const addedCount = insData?.length || 0;
+        alert(`تم — من أصل ${pairs.length} عميل زاروا النهاردة، ${addedCount} اتضافوا لخط ${dayName} (الباقي كان موجود فيه أصلاً).`);
     } catch (err) { alert('خطأ: ' + err.message); }
 };
 
@@ -347,4 +364,4 @@ window.rvSwitchSubtab = async function (tab) {
     await renderRepVisits(c);
 };
 
-Object.assign(window, { renderRepVisits, rvOnDateChange, rvSwitchSubtab, rvAddRouteCustomer, rvRemoveRouteCustomer, rvOnGoalRepChange, rvOpenGenerateModal, rvGenerateVisits });
+Object.assign(window, { renderRepVisits, rvOnDateChange, rvSwitchSubtab, rvAddRouteCustomer, rvRemoveRouteCustomer, rvOnGoalRepChange, rvOpenGenerateModal, rvFillRouteFromVisits });
