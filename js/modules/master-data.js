@@ -165,6 +165,12 @@ function custOpenModal(x) {
                             <option value="check" ${x?.preferred_payment_method==='check'?'selected':''}>شيك</option>
                         </select></div>
                 </div>
+                <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;margin-top:4px">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:#991B1B;cursor:pointer">
+                        <input type="checkbox" id="custDebtLocked" ${x?.debt_locked?'checked':''} style="width:17px;height:17px">
+                        🔒 قفل بيع الآجل لهذا العميل — المندوب يقدر يبيعله نقدي ويحصّل منه بس، مايقدرش يسجّل آجل
+                    </label>
+                </div>
                 ${x ? `<div style="background:#F8FAFC;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#64748B;margin-top:6px">
                     💡 الرصيد الحالي (${mdFmt(x.balance||0)} ج.م) لا يُعدَّل من هنا — يتغيّر تلقائياً من الفواتير والتحصيل فقط.
                 </div>` : ''}
@@ -194,6 +200,7 @@ window.custSave = async function() {
         credit_limit: parseFloat(document.getElementById('custCreditLimit').value) || 0,
         preferred_payment_method: document.getElementById('custPayMethod').value || null,
         default_rep_id: document.getElementById('custDefaultRep')?.value || null,
+        debt_locked: !!document.getElementById('custDebtLocked')?.checked,
     };
 
     const btn = document.querySelector('#custMgModal .mod-btn-primary');

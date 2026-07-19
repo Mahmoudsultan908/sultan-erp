@@ -6,11 +6,12 @@
    🚗 تحميل عربية (renderVanStockLoad من van-stock-load.js)
    📦 مخزون العربيات (renderVanStockView من van-stock-view.js)
    ↩️ إرجاع للمخزن (renderVanStockReturn من van-stock-return.js)
+   📋 مراجعة طلبات المندوبين (renderRepCustomerRequests من rep-customer-requests.js)
    يصدّر: renderRepAppLink(container) — بيحل محل الاسم/المكان القديم
    "ربط برنامج المندوب" تحت "🔜 قريباً"
    ════════════════════════════════════════════════════════════ */
 
-let _repMgmtTab = 'list'; // 'list' | 'load' | 'stock' | 'return'
+let _repMgmtTab = 'list'; // 'list' | 'load' | 'stock' | 'return' | 'requests'
 
 async function renderRepAppLink(c) {
     c.innerHTML = `
@@ -23,6 +24,7 @@ async function renderRepAppLink(c) {
         <button class="mod-btn ${_repMgmtTab==='load'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('load')">🚗 تحميل عربية</button>
         <button class="mod-btn ${_repMgmtTab==='stock'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('stock')">📦 مخزون العربيات</button>
         <button class="mod-btn ${_repMgmtTab==='return'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('return')">↩️ إرجاع للمخزن</button>
+        <button class="mod-btn ${_repMgmtTab==='requests'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('requests')">📋 مراجعة طلبات المندوبين</button>
     </div>
     <div id="repMgmtBody"></div>`;
     await repMgmtRenderTab();
@@ -34,7 +36,8 @@ async function repMgmtRenderTab() {
     if (_repMgmtTab === 'list') await renderSalesReps(body);
     else if (_repMgmtTab === 'load') await renderVanStockLoad(body);
     else if (_repMgmtTab === 'stock') await renderVanStockView(body);
-    else await renderVanStockReturn(body);
+    else if (_repMgmtTab === 'return') await renderVanStockReturn(body);
+    else await renderRepCustomerRequests(body);
 }
 
 window.repMgmtSwitchTab = async function (tab) {
