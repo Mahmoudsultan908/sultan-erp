@@ -45,6 +45,7 @@ async function printThermalReceipt(type, data) {
     else if (type === 'payment') html = tpBuildVoucherHTML(company, data, 'payment');
     else if (type === 'return') html = tpBuildReturnHTML(company, data);
     else if (type === 'expense') html = tpBuildExpenseHTML(company, data);
+    else if (type === 'van_load') html = tpBuildVanLoadHTML(company, data);
     else return;
 
     // ★ نافذة أطول من الأول (700 مش 600) + إعادة تحجيم فعلية على طول
@@ -275,6 +276,35 @@ function tpBuildReturnHTML(company, data) {
     <div class="tp-divider"></div>
     <div class="tp-grand tp-row"><span>إجمالي المرتجع</span><span>${tpFmt(data.total)}</span></div>`;
     return tpWrapper(company, title + ' ' + data.returnNo, body);
+}
+
+// ════════════════════════════════════════════════════════════
+// تحميل عربية مندوب — إيصال تسليم بضاعة (بدون أسعار، نقل فيزيائي بحت)
+// data = { loadNo, date, loadSeq, repName, whName, notes, items:[{name,qty,unit_name}] }
+// ════════════════════════════════════════════════════════════
+function tpBuildVanLoadHTML(company, data) {
+    const seqLabel = { 1: 'الأول', 2: 'الثاني', 3: 'الثالث', 4: 'الرابع', 5: 'الخامس' }[data.loadSeq] || (data.loadSeq + '');
+    const totalQty = (data.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0);
+    const body = `
+    <div class="tp-title">إيصال تحميل عربية مندوب</div>
+    <div class="tp-row"><span class="lbl">رقم التحميل</span><span class="val">${data.loadNo}</span></div>
+    <div class="tp-row"><span class="lbl">المندوب</span><span class="val">${data.repName || '—'}</span></div>
+    <div class="tp-row"><span class="lbl">من مخزن</span><span class="val">${data.whName || '—'}</span></div>
+    <div class="tp-row"><span class="lbl">تحميل اليوم رقم</span><span class="val">${seqLabel}</span></div>
+    <div class="tp-row"><span class="lbl">التاريخ</span><span class="val">${data.date}</span></div>
+    ${data.notes ? `<div class="tp-row"><span class="lbl">ملاحظات</span><span class="val">${data.notes}</span></div>` : ''}
+    <div class="tp-divider"></div>
+    <table class="tp-items">
+        <thead><tr><th>الصنف</th><th>الكمية</th><th>الوحدة</th></tr></thead>
+        <tbody>
+            ${(data.items||[]).map(it=>`<tr>
+                <td>${it.name}</td><td>${tpFmt(it.qty).replace('.00','')}</td><td>${it.unit_name||''}</td>
+            </tr>`).join('')}
+        </tbody>
+    </table>
+    <div class="tp-divider"></div>
+    <div class="tp-grand tp-row"><span>إجمالي الكمية المحمّلة</span><span>${tpFmt(totalQty).replace('.00','')}</span></div>`;
+    return tpWrapper(company, 'تحميل عربية ' + data.loadNo, body);
 }
 
 Object.assign(window, { printThermalReceipt });

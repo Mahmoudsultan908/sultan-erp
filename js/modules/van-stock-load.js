@@ -15,6 +15,7 @@ let VL_DB = { warehouses: [], products: [], reps: [], stockMap: {}, list: [] };
 let vlItems = [];
 let vlWarehouseId = null;
 let vlRepId = null;
+let vlLoadSeq = 1; // رقم التحميل لنفس المندوب فى نفس اليوم (أول/تاني/تالت...)
 let _vlMultiSelected = {}; // {productId: qty} أثناء فتح مودال الاختيار المتعدد
 
 function vlFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -40,17 +41,29 @@ async function renderVanStockLoad(container) {
         vlRepId = VL_DB.reps[0]?.id || null;
         vlItems = [{ id: Date.now() + Math.random(), productId: null, qty: 1 }];
 
-        await vlLoadRecent();
+        await Promise.all([vlLoadRecent(), vlComputeLoadSequence()]);
         vlRenderScreen(container);
     } catch (err) {
         container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
+// تحميل أول/تاني/تالت... لنفس المندوب فى نفس اليوم — بيتقترح تلقائي
+// (عدد تحميلات المندوب ده النهاردة + 1) وقابل للتعديل يدوي من الشاشة
+async function vlComputeLoadSequence() {
+    if (!vlRepId) { vlLoadSeq = 1; return; }
+    try {
+        const { count } = await sb.from('van_stock_loads')
+            .select('id', { count: 'exact', head: true })
+            .eq('rep_id', vlRepId).eq('load_date', vlToday());
+        vlLoadSeq = (count || 0) + 1;
+    } catch (e) { vlLoadSeq = 1; }
+}
+
 async function vlLoadRecent() {
     try {
         const { data, error } = await sb.from('van_stock_loads')
-            .select('*, wh:warehouse_id(name), rep:rep_id(name), van_stock_load_items(qty)')
+            .select('*, wh:warehouse_id(name), rep:rep_id(name), van_stock_load_items(qty, unit_name, product:product_id(name))')
             .order('created_at', { ascending: false }).limit(30);
         if (error) throw error;
         VL_DB.list = data || [];
@@ -234,6 +247,10 @@ function vlInfoCardHTML() {
         <div class="inv-sum-row"><span class="lbl">عدد الأصناف</span><span class="val" id="vlSummaryItems">0</span></div>
         <div class="inv-sum-row"><span class="lbl">إجمالي الكمية</span><span class="val" id="vlSummaryQty">0.00</span></div>
         <div class="inv-sum-divider"></div>
+        <div style="margin-bottom:10px">
+            <label style="font-size:12px;color:var(--inv-muted);display:block;margin-bottom:4px">رقم التحميل اليوم لهذا المندوب (أول/تاني/تالت...)</label>
+            <input type="number" class="mod-form-input" id="vlLoadSeq" value="${vlLoadSeq}" min="1" step="1" style="width:80px" oninput="vlOnLoadSeqInput(this.value)">
+        </div>
         <div style="font-size:11.5px;color:var(--inv-muted)">تحميل عربية المندوب لا يخصم أو يزيد من رصيد الخزنة ولا يضيف قيوداً محاسبية — هو نقل فيزيائي من المخزن لعربية المندوب فقط. مبيعات المندوب من عربيته بتخصم من هنا تلقائياً.</div>
     </div>`;
 }
@@ -242,6 +259,7 @@ function vlActionsCardHTML() {
     return `
     <div class="inv-actions">
         <button class="inv-btn inv-btn-save" onclick="vlSave()">💾 حفظ التحميل</button>
+        <button class="inv-btn inv-btn-print" onclick="vlSaveAndPrint()">🖨️ حفظ وطباعة</button>
     </div>`;
 }
 
@@ -259,10 +277,10 @@ function vlRecentListHTML() {
     <div class="mod-table-wrap" style="margin-top:16px">
         <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر التحميلات</div>
         <table class="mod-table"><thead><tr>
-            <th>رقم التحميل</th><th>التاريخ</th><th>من مخزن</th><th>عربية المندوب</th><th>عدد الأصناف</th><th style="text-align:left">إجمالي الكمية</th><th>ملاحظات</th>
+            <th>رقم التحميل</th><th>التاريخ</th><th>من مخزن</th><th>عربية المندوب</th><th>رقم اليوم</th><th>عدد الأصناف</th><th style="text-align:left">إجمالي الكمية</th><th>ملاحظات</th><th></th>
         </tr></thead>
         <tbody>
-            ${list.length ? list.map(t => {
+            ${list.length ? list.map((t, i) => {
                 const items = t.van_stock_load_items || [];
                 const totalQty = items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
                 return `<tr>
@@ -270,11 +288,13 @@ function vlRecentListHTML() {
                     <td>${t.load_date ? new Date(t.load_date).toLocaleDateString('ar-EG') : '—'}</td>
                     <td>${t.wh?.name || '—'}</td>
                     <td>🚗 ${t.rep?.name || '—'}</td>
+                    <td>${t.load_sequence || 1}</td>
                     <td>${items.length}</td>
                     <td style="text-align:left;font-weight:700">${vlFmt(totalQty)}</td>
                     <td style="color:#64748B">${t.notes || '—'}</td>
+                    <td><button class="cc-edit" onclick="vlReprint(${i})">🖨️</button></td>
                 </tr>`;
-            }).join('') : `<tr><td colspan="7" class="empty-state"><span>🚗</span>لا توجد تحميلات حتى الآن.</td></tr>`}
+            }).join('') : `<tr><td colspan="9" class="empty-state"><span>🚗</span>لا توجد تحميلات حتى الآن.</td></tr>`}
         </tbody></table>
     </div>`;
 }
@@ -284,13 +304,20 @@ function vlGetStock(pid) {
     return VL_DB.stockMap[vlWarehouseId + '|' + pid] || 0;
 }
 
-function vlOnFilterChange() {
+async function vlOnFilterChange() {
     const whSel = document.getElementById('vlWarehouse');
     const repSel = document.getElementById('vlRep');
     if (whSel) vlWarehouseId = whSel.value;
     if (repSel) vlRepId = repSel.value;
     vlRenderItems();
+    await vlComputeLoadSequence();
+    const seqInput = document.getElementById('vlLoadSeq');
+    if (seqInput) seqInput.value = vlLoadSeq;
 }
+
+window.vlOnLoadSeqInput = function (val) {
+    vlLoadSeq = parseInt(val) || 1;
+};
 
 function vlRenderItems() {
     const tbody = document.getElementById('vlItemsBody');
@@ -383,14 +410,16 @@ function vlUpdateSummary() {
     set('vlSummaryQty', vlFmt(totalQty));
 }
 
-window.vlSave = async function () {
+// اللب المشترك بين "حفظ" و"حفظ وطباعة" — بيرجع بيانات التحميل المحفوظ
+// لو نجح (عشان الطباعة تستخدمها من غير ما تعمل استعلام تاني)، أو null لو فشل
+async function vlSaveCore() {
     const whId = vlWarehouseId;
     const repId = vlRepId;
-    if (!whId) return alert('يرجى اختيار المخزن');
-    if (!repId) return alert('يرجى اختيار المندوب');
+    if (!whId) { alert('يرجى اختيار المخزن'); return null; }
+    if (!repId) { alert('يرجى اختيار المندوب'); return null; }
 
     const filled = vlItems.filter(it => it.productId && (it.qty || 0) > 0);
-    if (!filled.length) return alert('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر');
+    if (!filled.length) { alert('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر'); return null; }
 
     const qtyByProduct = {};
     filled.forEach(it => { qtyByProduct[it.productId] = (qtyByProduct[it.productId] || 0) + it.qty; });
@@ -398,15 +427,13 @@ window.vlSave = async function () {
         const stock = vlGetStock(pid);
         if (qtyByProduct[pid] > stock) {
             const name = VL_DB.products.find(p => p.id === pid)?.name || pid;
-            return alert(`الكمية المطلوب تحميلها من صنف "${name}" (${vlFmt(qtyByProduct[pid])}) أكبر من المتاح في المخزن (${vlFmt(stock)})`);
+            alert(`الكمية المطلوب تحميلها من صنف "${name}" (${vlFmt(qtyByProduct[pid])}) أكبر من المتاح في المخزن (${vlFmt(stock)})`);
+            return null;
         }
     }
 
     const date = document.getElementById('vlDate')?.value || vlToday();
     const notes = document.getElementById('vlNotes')?.value.trim() || null;
-
-    const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-top-save');
-    saveBtns.forEach(b => { b.dataset._label = b.dataset._label || b.innerHTML; b.innerHTML = '⏳ جاري التحميل...'; b.disabled = true; });
 
     try {
         const loadNo = 'VL-' + Date.now();
@@ -416,6 +443,7 @@ window.vlSave = async function () {
             rep_id: repId,
             load_date: date,
             notes,
+            load_sequence: vlLoadSeq || 1,
             created_by: currentUser?.id || null,
         }).select();
         if (error) throw error;
@@ -433,16 +461,64 @@ window.vlSave = async function () {
             throw itemsErr;
         }
 
-        alert(`تم تحميل عربية المندوب بنجاح (${loadNo})`);
-        renderVanStockLoad(document.getElementById('app-content'));
+        return {
+            loadNo, date, notes, loadSeq: vlLoadSeq || 1,
+            repName: VL_DB.reps.find(r => r.id === repId)?.name || '',
+            whName: VL_DB.warehouses.find(w => w.id === whId)?.name || '',
+            items: filled.map(it => ({
+                name: VL_DB.products.find(p => p.id === it.productId)?.name || '',
+                qty: it.qty,
+                unit_name: VL_DB.products.find(p => p.id === it.productId)?.unit || '',
+            })),
+        };
     } catch (err) {
         alert('خطأ أثناء التحميل: ' + err.message);
+        return null;
+    }
+}
+
+window.vlSave = async function () {
+    const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-btn-print, .inv-top-save');
+    saveBtns.forEach(b => { b.dataset._label = b.dataset._label || b.innerHTML; b.disabled = true; });
+    document.querySelector('.inv-top-save').innerHTML = '⏳ جاري التحميل...';
+
+    const result = await vlSaveCore();
+    if (result) {
+        alert(`تم تحميل عربية المندوب بنجاح (${result.loadNo})`);
+        renderVanStockLoad(document.getElementById('app-content'));
+    } else {
+        saveBtns.forEach(b => { b.innerHTML = b.dataset._label; b.disabled = false; });
+    }
+};
+
+window.vlReprint = async function (idx) {
+    const t = VL_DB.list[idx];
+    if (!t) return;
+    await printThermalReceipt('van_load', {
+        loadNo: t.load_no, date: t.load_date, loadSeq: t.load_sequence || 1,
+        repName: t.rep?.name || '', whName: t.wh?.name || '', notes: t.notes,
+        items: (t.van_stock_load_items || []).map(it => ({ name: it.product?.name || '', qty: it.qty, unit_name: it.unit_name })),
+    });
+};
+
+window.vlSaveAndPrint = async function () {
+    const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-btn-print, .inv-top-save');
+    saveBtns.forEach(b => { b.dataset._label = b.dataset._label || b.innerHTML; b.disabled = true; });
+    const printBtn = document.querySelector('.inv-btn-print');
+    if (printBtn) printBtn.innerHTML = '⏳ جاري الحفظ...';
+
+    const result = await vlSaveCore();
+    if (result) {
+        await printThermalReceipt('van_load', result);
+        renderVanStockLoad(document.getElementById('app-content'));
+    } else {
         saveBtns.forEach(b => { b.innerHTML = b.dataset._label; b.disabled = false; });
     }
 };
 
 Object.assign(window, {
     renderVanStockLoad,
-    vlAddRow, vlRemoveRow, vlOnProductChange, vlOnQtyInput, vlOnFilterChange, vlSave,
+    vlAddRow, vlRemoveRow, vlOnProductChange, vlOnQtyInput, vlOnFilterChange, vlSave, vlSaveAndPrint,
     vlOpenMultiPick, vlCloseMultiPick, vlRenderMultiPickList, vlMultiToggle, vlMultiSetQty, vlAddMultiPicked,
+    vlOnLoadSeqInput,
 });
