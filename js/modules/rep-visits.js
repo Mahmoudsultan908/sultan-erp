@@ -27,7 +27,7 @@ const RV_WEEKDAYS = [
 const RV_WEEKDAY_NAMES = Object.fromEntries(RV_WEEKDAYS);
 
 function rvStatusLabel(status, notes) {
-    if (status === 'visited') return notes ? notes.split(' + ').map(s => ({ sold: '💰 باع', collect: '🔵 حصّل', reject: '❌ رفض', closed: '🔒 مغلق' }[s] || s).join(' + ')).join(' + ') : '✅ اتزار';
+    if (status === 'visited') return notes ? notes.split(' + ').map(s => ({ sold: '💰 باع', collect: '🔵 حصّل', reject: '❌ رفض', closed: '🔒 مغلق' }[s] || s)).join(' + ') : '✅ اتزار';
     if (status === 'skipped') return '❌ رفض';
     return '⏳ مخطط';
 }
