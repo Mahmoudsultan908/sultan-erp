@@ -7,6 +7,10 @@
 //   تبديل 7/30 يوم (dashSetTrendRange) عشان يعيد الرسم من غير أي استعلام
 //   جديد لقاعدة البيانات (البيانات الأساسية آخر 30 يوم مجلوبة مرة واحدة بس)
 let dashTrendDaily = [];
+// ★ الهدف اليومي للمبيعات (من الإعدادات العامة → app_settings) — بيتحدد
+//   لون كل عمود فى رسم "اتجاه المبيعات" حسب نسبة تحقيقه، زي نفس منطق
+//   ألوان الأهداف فى rep-visits.js (rvRenderGoalsPage) بالظبط
+let dashDailyTarget = 0;
 
 // ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
 //   يضيّق النتيجة — نفس نمط الإصلاح المستخدم في reports.js/accounting.js
@@ -61,6 +65,7 @@ async function renderDashboard(container) {
             { data: allSuppliers },
             { data: trendSales },
             { data: lastBackupRow },
+            { data: dailyTargetRow },
         ] = await Promise.all([
             sb.rpc('get_cash_balance'),
             sb.from('sales').select('total').eq('status','confirmed').gte('created_at', today),
@@ -99,6 +104,7 @@ async function renderDashboard(container) {
             // اتجاه المبيعات — آخر 30 يوم، بيتجمّع باليوم في الـ JS تحت
             sb.from('sales').select('total,created_at').eq('status','confirmed').gte('created_at', trendStart),
             sb.from('app_settings').select('value').eq('key','last_backup_at').maybeSingle(),
+            sb.from('app_settings').select('value').eq('key','daily_sales_target').maybeSingle(),
         ]);
 
         // ── تجميع مبيعات آخر 30 يوم يوميًا (تعبئة الأيام الفاضية بصفر) ──
@@ -112,6 +118,8 @@ async function renderDashboard(container) {
             const key = d.toISOString().slice(0, 10);
             return { date: key, total: dayBuckets[key] || 0 };
         });
+        try { dashDailyTarget = Number(JSON.parse(dailyTargetRow?.value ?? '0')) || 0; }
+        catch { dashDailyTarget = Number(dailyTargetRow?.value) || 0; }
 
         // ── تنبيه النسخة الاحتياطية: لو معملناش نسخة خالص أو عدى عليها 7 أيام ──
         let lastBackupIso = null;
@@ -347,20 +355,37 @@ function dashFmtTrend(n) {
 //   النقط من غير ما تعيد حساب كل حاجة تاني مع كل حركة فأر
 let dashTrendLayout = null;
 
+// ألوان الأعمدة حسب نسبة تحقيق الهدف اليومي — نفس تدريج ألوان الأهداف
+// المستخدم فى rep-visits.js (rvRenderGoalsPage): 100%+ أخضر، 60-99% برتقالي، أقل من 60% أحمر.
+// لو مفيش هدف متحدد من الإعدادات (٠)، كل الأعمدة بتاخد اللون الأخضر العادي.
+function dashTrendBarColor(v) {
+    if (dashDailyTarget <= 0) return '#059669';
+    const pct = v / dashDailyTarget * 100;
+    return pct >= 100 ? '#059669' : pct >= 60 ? '#F59E0B' : '#EF4444';
+}
+
 function dashRenderTrendSVG(days) {
     const data = dashTrendDaily.slice(-days);
     const n = data.length;
     const values = data.map(d => d.total);
-    const max = Math.max(...values, 1) * 1.15;
+    const max = Math.max(...values, dashDailyTarget, 1) * 1.15;
     const W = 700, H = 170, padL = 6, padR = 6, padT = 10, padB = 22;
     const plotW = W - padL - padR, plotH = H - padT - padB;
     const stepX = n > 1 ? plotW / (n - 1) : 0;
     const xAt = i => padL + i * stepX;
     const yAt = v => padT + plotH - (v / max) * plotH;
     const baseline = padT + plotH;
+    const barW = n > 1 ? Math.max(2, stepX * 0.62) : Math.min(plotW * 0.4, 60);
 
-    const linePath = 'M ' + data.map((d, i) => `${xAt(i).toFixed(1)},${yAt(d.total).toFixed(1)}`).join(' L ');
-    const areaPath = `${linePath} L ${xAt(n - 1).toFixed(1)},${baseline.toFixed(1)} L ${xAt(0).toFixed(1)},${baseline.toFixed(1)} Z`;
+    const bars = data.map((d, i) => {
+        const h = Math.max((d.total / max) * plotH, d.total > 0 ? 1.5 : 0);
+        const x = xAt(i) - barW / 2, y = baseline - h;
+        return `<rect data-i="${i}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${dashTrendBarColor(d.total)}"/>`;
+    }).join('');
+
+    const targetLine = dashDailyTarget > 0 ? `
+        <line x1="${padL}" y1="${yAt(dashDailyTarget).toFixed(1)}" x2="${W - padR}" y2="${yAt(dashDailyTarget).toFixed(1)}" stroke="#334155" stroke-width="1.2" stroke-dasharray="4,3"/>
+        <text x="${W - padR}" y="${(yAt(dashDailyTarget) - 4).toFixed(1)}" font-size="9.5" fill="#334155" text-anchor="end" font-weight="700">🎯 الهدف: ${dashFmtTrend(dashDailyTarget)}</text>` : '';
 
     const labelEvery = days <= 7 ? 1 : 5;
     const xLabels = data.map((d, i) => {
@@ -370,26 +395,24 @@ function dashRenderTrendSVG(days) {
         return `<text x="${xAt(i).toFixed(1)}" y="${H - 6}" font-size="9" fill="#94A3B8" text-anchor="middle">${txt}</text>`;
     }).filter(Boolean).join('');
 
-    dashTrendLayout = { data, xAt, yAt, baseline, n, W };
+    dashTrendLayout = { data, xAt, n, W, barW, padT, plotH };
 
     return `
     <div style="position:relative">
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:150px;display:block" preserveAspectRatio="none">
         <line x1="${padL}" y1="${baseline.toFixed(1)}" x2="${W - padR}" y2="${baseline.toFixed(1)}" stroke="#F1F5F9" stroke-width="1"/>
-        <defs><linearGradient id="dashTrendGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#059669" stop-opacity="0.18"/>
-          <stop offset="100%" stop-color="#059669" stop-opacity="0"/>
-        </linearGradient></defs>
-        <path d="${areaPath}" fill="url(#dashTrendGrad)" stroke="none"/>
-        <path d="${linePath}" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <line id="dashTrendCrosshair" x1="0" y1="${padT}" x2="0" y2="${baseline.toFixed(1)}" stroke="#CBD5E1" stroke-width="1" stroke-dasharray="3,3" style="opacity:0"/>
-        <circle id="dashTrendDot" cx="0" cy="0" r="4" fill="#059669" stroke="#fff" stroke-width="2" style="opacity:0"/>
+        <rect id="dashTrendHoverCol" x="0" y="${padT}" width="${barW.toFixed(1)}" height="${plotH.toFixed(1)}" fill="#0F172A" opacity="0"/>
+        ${bars}
+        ${targetLine}
         ${xLabels}
         <rect x="${padL}" y="0" width="${plotW}" height="${H}" fill="transparent" onmousemove="dashTrendHover(event)" onmouseleave="dashTrendHoverOut()" style="cursor:crosshair"/>
       </svg>
       <div id="dashTrendTooltip" style="position:absolute;top:6px;background:#0F172A;color:#fff;padding:4px 9px;border-radius:6px;font-size:11px;pointer-events:none;display:none;white-space:nowrap;line-height:1.5"></div>
     </div>
-    ${!values.some(v => v > 0) ? '<p class="dash-empty" style="margin-top:8px">لا توجد مبيعات في هذه الفترة</p>' : ''}`;
+    ${!values.some(v => v > 0) ? '<p class="dash-empty" style="margin-top:8px">لا توجد مبيعات في هذه الفترة</p>' : ''}
+    ${dashDailyTarget > 0 ? `<div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:#64748B">
+        <span>🟢 حقّق الهدف</span><span>🟠 قرّب منه (٦٠٪+)</span><span>🔴 بعيد عنه</span>
+    </div>` : ''}`;
 }
 
 function dashTrendHover(evt) {
@@ -397,22 +420,28 @@ function dashTrendHover(evt) {
     const svg = evt.currentTarget.ownerSVGElement;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const { data, xAt, yAt, n, W } = dashTrendLayout;
+    const { data, xAt, n, W, barW, padT, plotH } = dashTrendLayout;
     const mx = (evt.clientX - rect.left) * (W / rect.width);
     let idx = 0, best = Infinity;
     for (let i = 0; i < n; i++) {
         const dx = Math.abs(xAt(i) - mx);
         if (dx < best) { best = dx; idx = i; }
     }
-    const px = xAt(idx), py = yAt(data[idx].total);
-    const dot = document.getElementById('dashTrendDot');
-    const cross = document.getElementById('dashTrendCrosshair');
-    if (dot) { dot.setAttribute('cx', px.toFixed(1)); dot.setAttribute('cy', py.toFixed(1)); dot.style.opacity = 1; }
-    if (cross) { cross.setAttribute('x1', px.toFixed(1)); cross.setAttribute('x2', px.toFixed(1)); cross.style.opacity = 1; }
+    const px = xAt(idx);
+    const col = document.getElementById('dashTrendHoverCol');
+    if (col) { col.setAttribute('x', (px - barW / 2).toFixed(1)); col.setAttribute('y', padT); col.setAttribute('height', plotH); col.style.opacity = 0.05; }
     const tip = document.getElementById('dashTrendTooltip');
     if (tip) {
-        const dt = new Date(data[idx].date + 'T00:00:00');
-        tip.innerHTML = `<b>${dashFmtTrend(data[idx].total)} ج.م</b> — ${dt.toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+        const d = data[idx];
+        const dt = new Date(d.date + 'T00:00:00');
+        let extra = '';
+        if (dashDailyTarget > 0) {
+            const diff = d.total - dashDailyTarget;
+            extra = diff >= 0
+                ? `<br><span style="color:#4ADE80">✅ حقّق الهدف (+${dashFmtTrend(diff)})</span>`
+                : `<br><span style="color:#FCA5A5">⚠️ ${dashFmtTrend(-diff)} تحت الهدف</span>`;
+        }
+        tip.innerHTML = `<b>${dashFmtTrend(d.total)} ج.م</b> — ${dt.toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' })}${extra}`;
         tip.style.display = 'block';
         const leftPct = (px / W) * 100;
         tip.style.left = leftPct < 50 ? `calc(${leftPct}% + 8px)` : 'auto';
@@ -421,11 +450,9 @@ function dashTrendHover(evt) {
 }
 
 function dashTrendHoverOut() {
-    const dot = document.getElementById('dashTrendDot');
-    const cross = document.getElementById('dashTrendCrosshair');
+    const col = document.getElementById('dashTrendHoverCol');
     const tip = document.getElementById('dashTrendTooltip');
-    if (dot) dot.style.opacity = 0;
-    if (cross) cross.style.opacity = 0;
+    if (col) col.style.opacity = 0;
     if (tip) tip.style.display = 'none';
 }
 

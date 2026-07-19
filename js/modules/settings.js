@@ -49,6 +49,9 @@ async function renderSettings(container) {
                 <label class="ob-label">تاريخ بداية استخدام النظام</label>
                 <input type="date" id="set-system-start" class="ob-input" style="max-width:250px" value="${get('system_start_date', new Date().toISOString().slice(0,10))}">
                 <p style="font-size:12px;color:#94A3B8;margin-top:6px">يُستخدم كمرجع لإدخال الأرصدة الافتتاحية</p>
+                <label class="ob-label" style="margin-top:14px">الهدف اليومي للمبيعات (ج.م)</label>
+                <input type="number" id="set-daily-sales-target" class="ob-input" style="max-width:250px" value="${get('daily_sales_target','0')}" min="0" step="100">
+                <p style="font-size:12px;color:#94A3B8;margin-top:6px">بيتعرض كخط مرجعي على رسم "اتجاه المبيعات" فى لوحة التحكم — سيبه صفر لو مش عايز تفعّله.</p>
             </div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
@@ -73,6 +76,7 @@ async function renderSettings(container) {
                 { key: 'vat_enabled', value: String(document.getElementById('set-vat-enabled').checked) },
                 { key: 'vat_rate', value: document.getElementById('set-vat-rate').value },
                 { key: 'system_start_date', value: document.getElementById('set-system-start').value },
+                { key: 'daily_sales_target', value: document.getElementById('set-daily-sales-target').value },
             ];
             try {
                 for (const e of entries) {
