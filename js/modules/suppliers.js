@@ -288,8 +288,9 @@ window.supCloseModal = function(id) { const m = document.getElementById(id); if 
 // نفس المورد تلقائياً — نفس فكرة custGoEditProfile في customers.js.
 window.supGoEditProfile = function(supplierId) {
     window._pendingSupplierEdit = supplierId;
+    window._pendingSuppHubTab = 'manage';
     supCloseModal('supStmtModal');
-    document.querySelector('[data-mod="suppliers-manage"]')?.click();
+    document.querySelector('[data-mod="suppliers-hub"]')?.click();
 };
 
 // ════════════════════════════════════════════════════════════

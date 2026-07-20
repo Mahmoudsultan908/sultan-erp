@@ -25,42 +25,43 @@ const AP_ROLES = [
 // نفس صفحات القائمة الجانبية في app.js (buildLayout) — ما عدا dashboard
 // (متاحة دايماً للجميع) وadvanced-permissions نفسها (تفادي قفلها من نفسها).
 const AP_PAGE_GROUPS = [
-    { title: 'البيانات الأساسية', pages: [
-        ['products', '🏷️ الأصناف'], ['product-import', '📥 استيراد أصناف Excel'],
-        ['customers-manage', '👤 إدارة العملاء'], ['customer-import', '📥 استيراد عملاء Excel'],
-        ['suppliers-manage', '🏭 إدارة الموردين'], ['supplier-import', '📥 استيراد موردين Excel'],
+    { title: 'الأصناف / العملاء / الموردين', pages: [
+        ['products', '🏷️ الأصناف (+ استيراد Excel)'],
+        ['customers-hub', '👤 العملاء (+ استيراد + كشف حساب)'],
+        ['suppliers-hub', '🏭 الموردين (+ استيراد + كشف حساب)'],
     ]},
     { title: 'المبيعات والعملاء', pages: [
         ['sales', '🧾 فاتورة المبيعات'], ['quotations', '📋 عروض الأسعار'],
-        ['collections', '💵 تحصيل العملاء'], ['customers', '📇 كشف حساب عميل'],
+        ['collections', '💵 تحصيل العملاء'], ['crm', '🤝 إدارة علاقات العملاء'],
+        ['rep-app-link', '🚗 مندوب سلطان'], ['customer-orders-link', '🔗 طلبات العملاء'],
     ]},
     { title: 'المشتريات والموردين', pages: [
         ['purchases', '📥 فاتورة المشتريات'], ['purchase-orders', '📋 أوامر الشراء'],
-        ['payments', '💸 دفع الموردين'], ['suppliers', '📇 كشف حساب مورد'],
+        ['payments', '💸 دفع الموردين'],
     ]},
     { title: 'المراجعة والمرتجعات', pages: [
         ['invoice-review', '🔍 مراجعة الفواتير'], ['returns', '↩️ المرتجعات'],
     ]},
     { title: 'المالية والمخزن', pages: [
-        ['expenses', '💸 المصروفات'], ['stock-transfer', '🔄 تحويل مخزون'],
-        ['inventory', '📦 المخزون'], ['warehouses', '🏭 إدارة المخازن'],
+        ['expenses', '💸 المصروفات'], ['treasury', '🏦 الخزن'], ['balance-transfer', '🔀 تحويل أرصدة'],
+        ['inventory-hub', '📦 المخزون (+ تحويل + مخازن + تقارير)'],
+    ]},
+    { title: 'الموظفين', pages: [
+        ['payroll', '👥 الموظفون والرواتب'], ['employee-evaluation', '⭐ تقييم الموظفين'],
     ]},
     { title: 'المحاسبة', pages: [
-        ['coa', '📒 شجرة الحسابات'], ['journal', '📝 القيود اليومية'], ['ledger', '📖 الأستاذ العام'],
-        ['cash-movement', '💰 حركة الخزينة'], ['audit-log', '🔐 سجل التدقيق'],
-        ['trialbalance', '⚖️ ميزان المراجعة'], ['balancesheet', '🏦 الميزانية العمومية'],
+        ['coa', '📒 شجرة الحسابات'],
+        ['accounting-books', '📖 الدفاتر (قيود + أستاذ + ميزان + ميزانية)'],
+        ['accounting-monitoring', '🔍 المراقبة والأرشفة (خزينة + تدقيق + أرشيف)'],
     ]},
     { title: '🔜 قريباً', pages: [
-        ['warehouse-reports', '📊 تقارير المخازن'], ['general-import-export', '🔄 استيراد/تصدير عام'],
-        ['performance-reports', '📈 تقارير الأداء المتقدمة'],
-        ['print-center', '🖨️ مركز الطباعة'], ['crm', '🤝 CRM'], ['archive', '🗄️ الأرشيف'],
         ['whatsapp', '💬 واتساب'], ['ai-dashboard', '🤖 لوحة الذكاء الاصطناعي'],
-        ['employee-evaluation', '⭐ تقييم الموظفين'],
-        ['customer-orders-link', '🔗 ربط طلبات العملاء'], ['rep-app-link', '🚗 مندوب سلطان'],
     ]},
     { title: 'التقارير والإعدادات', pages: [
-        ['reports', '📈 التقارير'], ['opening-balances', '📋 الأرصدة الافتتاحية'],
-        ['settings', '⚙️ الإعدادات'], ['users', '👥 المستخدمون'],
+        ['reports-hub', '📈 التقارير (عام + أداء متقدم)'],
+        ['general-import-export', '🔄 استيراد/تصدير عام'], ['print-center', '🖨️ مركز الطباعة'],
+        ['opening-balances', '📋 الأرصدة الافتتاحية'],
+        ['settings-hub', '⚙️ الإعدادات (+ المستخدمون + الصلاحيات)'],
     ]},
 ];
 

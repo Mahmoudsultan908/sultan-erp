@@ -334,8 +334,9 @@ window.custCloseModal = function(id) { const m = document.getElementById(id); if
 // في شاشة تانية عشان يعدّل رقم تليفون أو حد ائتماني مثلاً.
 window.custGoEditProfile = function(customerId) {
     window._pendingCustomerEdit = customerId;
+    window._pendingCustHubTab = 'manage';
     custCloseModal('custStmtModal');
-    document.querySelector('[data-mod="customers-manage"]')?.click();
+    document.querySelector('[data-mod="customers-hub"]')?.click();
 };
 
 // أيقونة الانتقال المباشر جنب كل حركة فى الكشف — بتاخد نفس فكرة

@@ -113,7 +113,7 @@ function prodRenderPage(c) {
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCategoryManager()">📁 إدارة المجموعات</button>
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCompanyManager()">🏢 إدارة الشركات</button>
             <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="prodOpenNewRestockedReport()">🆕 أصناف جديدة/اتشرت تاني</button>
-            <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="loadMod(document.querySelector('[data-mod=&quot;product-import&quot;]'), 'product-import')">📥 استيراد Excel</button>
+            <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="prodHubSwitchTab('import')">📥 استيراد Excel</button>
             <button class="mod-btn" style="background:#EFF6FF;color:#2563EB" onclick="prodExportXls()">📤 تصدير Excel</button>
         </div>
 

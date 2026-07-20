@@ -129,7 +129,7 @@ async function renderDashboard(container) {
             <div class="mod-alert-banner warning">
                 <span>⚠️</span>
                 <span>${daysSinceBackup === null ? 'لسه معملتش أي نسخة احتياطية من بيانات النظام.' : `عدّى ${daysSinceBackup} يوم من غير نسخة احتياطية جديدة.`}</span>
-                <span class="dash-see-all" style="margin-right:auto" onclick="loadMod(document.querySelector('[data-mod=settings]'),'settings')">اعمل نسخة الآن ←</span>
+                <span class="dash-see-all" style="margin-right:auto" onclick="loadMod(document.querySelector('[data-mod=settings-hub]'),'settings-hub')">اعمل نسخة الآن ←</span>
             </div>` : '';
 
         const cash = Number(cashData) || 0;

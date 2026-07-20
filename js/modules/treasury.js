@@ -143,7 +143,8 @@ window.tsySaveNew = async function() {
 // flag + كليك على عنصر القائمة الجانبية)
 window.tsyShowStatement = function(treasuryId) {
     window._pendingTreasuryFilter = treasuryId;
-    document.querySelector('[data-mod="cash-movement"]')?.click();
+    window._pendingAccMonTab = 'cash-movement';
+    document.querySelector('[data-mod="accounting-monitoring"]')?.click();
 };
 
 window.tsyToggleActive = async function(treasuryId, currentlyActive) {
