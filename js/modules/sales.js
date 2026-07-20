@@ -29,6 +29,8 @@ let invEditingOldCustId = null;
 let invEditingOldInvoiceNo = null;
 let invPendingQuoteId = null; // عرض سعر بيتحوّل حالياً — يتعلّم "تم التحويل" بعد نجاح الحفظ بس (مش قبله)
 let invPendingOrderId = null; // طلب سلطانو بيتحوّل حالياً — نفس المنطق، customer_orders.converted_sale_id بيتحدّث بعد الحفظ بس
+let invPendingOrderNo = null; // رقم/إجمالي الطلب الأصلي — بيتعرض في بانر تأكيد واضح فوق الفاتورة عشان مايتلخبطش مع طلب تاني
+let invPendingOrderTotal = null;
 
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات الحية من Supabase
@@ -288,6 +290,8 @@ async function renderSales(c) {
     invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
     invPendingQuoteId = null;
     invPendingOrderId = null;
+    invPendingOrderNo = null;
+    invPendingOrderTotal = null;
 
     // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
     if (window._pendingSalesEdit) {
@@ -336,8 +340,13 @@ async function renderSales(c) {
         }
         if (pending.customerId) invCustId = pending.customerId;
         // هيتعلّم "تم التحويل" بعد الحفظ الناجح فعلاً — راجع التعليق في quotations.js
-        if (pending.kind === 'order') invPendingOrderId = pending.quoteId || null;
-        else invPendingQuoteId = pending.quoteId || null;
+        if (pending.kind === 'order') {
+            invPendingOrderId = pending.quoteId || null;
+            invPendingOrderNo = pending.orderNo || null;
+            invPendingOrderTotal = pending.orderTotal || null;
+        } else {
+            invPendingQuoteId = pending.quoteId || null;
+        }
     }
 
     c.innerHTML = `
@@ -345,6 +354,9 @@ async function renderSales(c) {
         ${invEditingId ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
             <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على الفاتورة <strong>${invEditingOldInvoiceNo}</strong>. عند الحفظ: هتتلغي الفاتورة القديمة تلقائياً (مع إرجاع المخزون والرصيد) وتتسجّل فاتورة جديدة بالتعديلات.</span>
             <button class="inv-top-btn" style="padding:4px 10px" onclick="invEditingId=null;invEditingOldInvoiceNo=null;renderSales(document.getElementById('app-content'))">إلغاء التعديل</button>
+        </div>` : ''}
+        ${invPendingOrderId ? `<div style="background:#DCFCE7;border:2px solid #16A34A;color:#166534;padding:12px 16px;border-radius:9px;margin-bottom:8px;font-size:13.5px;font-weight:700">
+            ✅ بتعتمد طلب سلطانو <strong>${invPendingOrderNo || ''}</strong> بإجمالي <strong>${invFmt(invPendingOrderTotal || 0)} ج.م</strong> — تأكد إن الأصناف والإجمالي تحت مطابقين للرقم ده بالظبط قبل ما تحفظ، خصوصًا لو بتراجع أكتر من طلب في نفس الوقت.
         </div>` : ''}
         ${INV_DB.isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
             📴 <strong>غير متصل بالإنترنت</strong> — الأصناف والعملاء المعروضة من آخر نسخة محفوظة (${INV_DB.offlineDataAge ? new Date(INV_DB.offlineDataAge).toLocaleString('ar-EG') : '—'})، وممكن ماتكونش محدّثة. الفاتورة هتتسجّل محلياً برقم مؤقت وتتزامن تلقائياً برقم رسمي لما الاتصال يرجع. <strong>تعديل فاتورة موجودة مش متاح أوفلاين.</strong>
@@ -1433,9 +1445,12 @@ async function invSave(andNew) {
                     converted_sale_id: rpcRows?.[0]?.id || null,
                     reviewed_by: currentUser?.id || null,
                     reviewed_at: new Date().toISOString(),
+                    status: 'preparing', // كان بيفضل "جديد" للأبد عند العميل حتى بعد الاعتماد
                 }).eq('id', invPendingOrderId);
             } catch {}
             invPendingOrderId = null;
+            invPendingOrderNo = null;
+            invPendingOrderTotal = null;
         }
 
         // لو آجل → حدّث رصيد العميل محلياً (الـ trigger في DB المفروض بيعملها)

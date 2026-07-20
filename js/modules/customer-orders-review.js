@@ -22,6 +22,18 @@ let COR_CATS = [];
 const COR_IMAGE_BUCKET = 'product-images'; // نفس الباكت العام المستخدم لصور الأصناف
 
 function corFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+const COR_STATUS_LABELS = { preparing: '📦 جاري التحضير', delivering: '🚚 خرج للتسليم', delivered: '✅ تم التسليم' };
+
+window.corUpdateDeliveryStatus = async function(id, status) {
+    try {
+        const { error } = await sb.from('customer_orders').update({ status }).eq('id', id);
+        if (error) throw error;
+        const o = COR_ORDERS.find(x => x.id === id);
+        if (o) o.status = status;
+    } catch (err) {
+        alert('خطأ: ' + err.message);
+    }
+};
 
 async function renderCustomerOrdersLink(c) {
     c.innerHTML = `
@@ -90,7 +102,11 @@ function corRenderOrdersPage(c) {
                 <td>${o.order_no || '—'}</td>
                 <td>${o.customers?.name || '—'}</td>
                 <td>${corFmt(o.total)}</td>
-                <td>${o.converted_sale_id ? '<span style="color:#059669;font-weight:700">✅ اتحوّلت لفاتورة</span>' : '<span style="color:#DC2626;font-weight:700">❌ مرفوض</span>'}</td>
+                <td>${o.converted_sale_id ? `
+                    <select class="mod-form-input" style="margin:0;padding:4px 8px;font-size:12px;width:auto" onchange="corUpdateDeliveryStatus('${o.id}',this.value)">
+                        ${['preparing','delivering','delivered'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${COR_STATUS_LABELS[s]}</option>`).join('')}
+                    </select>
+                ` : '<span style="color:#DC2626;font-weight:700">❌ مرفوض</span>'}</td>
                 <td style="color:#64748B">${o.created_at ? new Date(o.created_at).toLocaleDateString('ar-EG') : '—'}</td>
             </tr>`).join('')}
         </tbody></table>
@@ -125,6 +141,8 @@ window.corApproveOrder = function (id) {
         kind: 'order',
         quoteId: o.id,
         customerId: o.customer_id,
+        orderNo: o.order_no,
+        orderTotal: o.total,
         items: items.map(it => ({
             pid: it.product_id, name: it.products?.name || '', code: it.products?.code || '',
             qty: Number(it.qty) || 0, price: Number(it.unit_price) || 0, disc: 0, free: 0,
@@ -298,4 +316,5 @@ window.corDeleteBanner = async function(id) {
 Object.assign(window, {
     renderCustomerOrdersLink, corSwitchTab, corApproveOrder, corRejectOrder,
     corOpenBannerModal, corPreviewBannerImage, corSaveBanner, corDeleteBanner,
+    corUpdateDeliveryStatus,
 });
