@@ -8,11 +8,12 @@
    ↩️ إرجاع للمخزن (renderVanStockReturn من van-stock-return.js)
    📋 مراجعة طلبات المندوبين (renderRepCustomerRequests من rep-customer-requests.js)
    🗺️ زيارات المندوبين (renderRepVisits من rep-visits.js)
+   📊 تقرير الإغلاق اليومي (renderRepDailyClosing من rep-daily-closing.js)
    يصدّر: renderRepAppLink(container) — بيحل محل الاسم/المكان القديم
    "ربط برنامج المندوب" تحت "🔜 قريباً"
    ════════════════════════════════════════════════════════════ */
 
-let _repMgmtTab = 'list'; // 'list' | 'load' | 'stock' | 'return' | 'requests' | 'visits'
+let _repMgmtTab = 'list'; // 'list' | 'load' | 'stock' | 'return' | 'requests' | 'visits' | 'closing'
 
 async function renderRepAppLink(c) {
     c.innerHTML = `
@@ -27,6 +28,7 @@ async function renderRepAppLink(c) {
         <button class="mod-btn ${_repMgmtTab==='return'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('return')">↩️ إرجاع للمخزن</button>
         <button class="mod-btn ${_repMgmtTab==='requests'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('requests')">📋 مراجعة طلبات المندوبين</button>
         <button class="mod-btn ${_repMgmtTab==='visits'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('visits')">🗺️ زيارات المندوبين</button>
+        <button class="mod-btn ${_repMgmtTab==='closing'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('closing')">📊 تقرير الإغلاق اليومي</button>
     </div>
     <div id="repMgmtBody"></div>`;
     await repMgmtRenderTab();
@@ -40,6 +42,7 @@ async function repMgmtRenderTab() {
     else if (_repMgmtTab === 'stock') await renderVanStockView(body);
     else if (_repMgmtTab === 'return') await renderVanStockReturn(body);
     else if (_repMgmtTab === 'requests') await renderRepCustomerRequests(body);
+    else if (_repMgmtTab === 'closing') await renderRepDailyClosing(body);
     else await renderRepVisits(body);
 }
 
