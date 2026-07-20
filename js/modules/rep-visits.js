@@ -13,7 +13,7 @@
 
 let RV_DATE = new Date().toISOString().split('T')[0];
 let RV_LIST = [];
-let RV_SUBTAB = 'visits'; // 'visits' | 'routes' | 'goals'
+let RV_SUBTAB = 'visits'; // 'visits' | 'routes' — الأهداف والتحقيق بقى تبويب مستقل جوه rep-management.js (راجع repMgmtSwitchTab('goals'))
 let RV_ROUTES = [];
 let RV_REPS = [];
 let RV_REP_CUSTOMERS = {}; // repId => [{id,name}]
@@ -36,8 +36,7 @@ async function renderRepVisits(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل...</div>';
     try {
         if (RV_SUBTAB === 'visits') { await rvLoad(); rvRenderPage(c); }
-        else if (RV_SUBTAB === 'routes') { await rvLoadRoutes(); rvRenderRoutesPage(c); }
-        else { await rvLoadGoals(); rvRenderGoalsPage(c); }
+        else { await rvLoadRoutes(); rvRenderRoutesPage(c); }
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
@@ -47,7 +46,6 @@ function rvSubtabsHTML() {
     return `<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="mod-btn ${RV_SUBTAB==='visits'?'mod-btn-primary':''}" onclick="rvSwitchSubtab('visits')">📋 زيارات اليوم</button>
         <button class="mod-btn ${RV_SUBTAB==='routes'?'mod-btn-primary':''}" onclick="rvSwitchSubtab('routes')">🗺️ خطوط السير الأسبوعية</button>
-        <button class="mod-btn ${RV_SUBTAB==='goals'?'mod-btn-primary':''}" onclick="rvSwitchSubtab('goals')">🎯 الأهداف والتحقيق</button>
     </div>`;
 }
 
@@ -283,7 +281,7 @@ async function rvLoadGoals() {
 
 function rvRenderGoalsPage(c) {
     if (!RV_GOAL_REPS.length) {
-        c.innerHTML = rvSubtabsHTML() + `<div class="empty-state"><span>🎯</span>مفيش مندوبين نشطين لسه</div>`;
+        c.innerHTML = `<div class="empty-state"><span>🎯</span>مفيش مندوبين نشطين لسه</div>`;
         return;
     }
     const rep = RV_GOAL_REPS.find(r => r.id === RV_GOAL_SELECTED_REP) || RV_GOAL_REPS[0];
@@ -302,7 +300,6 @@ function rvRenderGoalsPage(c) {
     const dayData = RV_GOAL_DAILY[rep.id] || {};
 
     c.innerHTML = `
-    ${rvSubtabsHTML()}
     <div style="margin-bottom:16px">
         <select class="mod-form-input" style="width:auto" onchange="rvOnGoalRepChange(this.value)">
             ${RV_GOAL_REPS.map(r => `<option value="${r.id}" ${r.id === rep.id ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}

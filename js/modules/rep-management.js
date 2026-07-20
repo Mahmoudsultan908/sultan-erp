@@ -9,12 +9,14 @@
    📋 مراجعة طلبات المندوبين (renderRepCustomerRequests من rep-customer-requests.js)
    🗺️ زيارات المندوبين (renderRepVisits من rep-visits.js)
    📊 تقرير الإغلاق اليومي (renderRepDailyClosing من rep-daily-closing.js)
+   🎯 الأهداف والتحقيق (rvLoadGoals/rvRenderGoalsPage من rep-visits.js —
+      كانت تبويب فرعي جوه "زيارات المندوبين"، طلعناها هنا كتبويب مستقل)
    🧮 جرد عربية (renderVanStockCount من van-stock-count.js)
    يصدّر: renderRepAppLink(container) — بيحل محل الاسم/المكان القديم
    "ربط برنامج المندوب" تحت "🔜 قريباً"
    ════════════════════════════════════════════════════════════ */
 
-let _repMgmtTab = 'list'; // 'list' | 'load' | 'stock' | 'return' | 'requests' | 'visits' | 'closing' | 'count'
+let _repMgmtTab = 'list'; // 'list' | 'load' | 'stock' | 'return' | 'requests' | 'visits' | 'closing' | 'goals' | 'count'
 const REP_LINK_LAST_SEEN_KEY = 'sultan_replink_last_seen';
 
 async function renderRepAppLink(c) {
@@ -32,6 +34,7 @@ async function renderRepAppLink(c) {
         <button class="mod-btn ${_repMgmtTab==='requests'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('requests')">📋 مراجعة طلبات المندوبين</button>
         <button class="mod-btn ${_repMgmtTab==='visits'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('visits')">🗺️ زيارات المندوبين</button>
         <button class="mod-btn ${_repMgmtTab==='closing'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('closing')">📊 تقرير الإغلاق اليومي</button>
+        <button class="mod-btn ${_repMgmtTab==='goals'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('goals')">🎯 الأهداف والتحقيق</button>
         <button class="mod-btn ${_repMgmtTab==='count'?'mod-btn-primary':''}" onclick="repMgmtSwitchTab('count')">🧮 جرد عربية</button>
     </div>
     <div id="repMgmtBody"></div>`;
@@ -47,6 +50,7 @@ async function repMgmtRenderTab() {
     else if (_repMgmtTab === 'return') await renderVanStockReturn(body);
     else if (_repMgmtTab === 'requests') await renderRepCustomerRequests(body);
     else if (_repMgmtTab === 'closing') await renderRepDailyClosing(body);
+    else if (_repMgmtTab === 'goals') { await rvLoadGoals(); rvRenderGoalsPage(body); }
     else if (_repMgmtTab === 'count') await renderVanStockCount(body);
     else await renderRepVisits(body);
 }
