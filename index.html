@@ -256,6 +256,14 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .inv-cell-input.is-free { background: #FEFCE8; font-weight: 500; }
 .inv-cell-input.is-ro { background: #F1F5F9; color: #94A3B8; cursor: not-allowed; }
 .inv-cell-total { text-align: center; font-weight: 800; color: var(--inv-gold); font-size: 14px; white-space: nowrap; width: 100px; }
+/* عداد الكمية +/- بدل أسهم المتصفح الافتراضية */
+.inv-qty-stepper { display: flex; align-items: stretch; gap: 2px; min-width: 90px; }
+.inv-qty-stepper .inv-cell-input { flex: 1 1 0; min-width: 0; width: auto; padding: 7px 1px; }
+.inv-qty-btn { flex: 0 0 20px; width: 20px; border: none; border-radius: 6px; background: #F1F5F9; color: var(--inv-navy); font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit; line-height: 1; transition: 0.15s; }
+.inv-qty-btn:hover { background: var(--inv-gold); color: #fff; }
+.inv-qty-btn:active { transform: scale(0.92); }
+.inv-qty-input::-webkit-outer-spin-button, .inv-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.inv-qty-input { -moz-appearance: textfield; }
 .inv-cell-stock { text-align: center; width: 70px; }
 .inv-cell-stock .num { font-weight: 700; font-size: 13px; color: var(--inv-green); }
 .inv-cell-stock .num.low { color: var(--inv-red); }

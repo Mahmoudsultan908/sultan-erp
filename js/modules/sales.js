@@ -662,8 +662,12 @@ function invRenderItems() {
                 ${low?'<div class="low-lbl">نقص</div>':''}
             </td>
             <td>
-                <input type="number" class="inv-cell-input is-num" value="${it.qty||1}" min="0.001" step="1"
-                    oninput="invItems[${idx}].qty=parseFloat(this.value)||0;invUpdateRowTotal(${idx});invUpdateSummary()" onkeydown="invRowKey(event,${idx},'qty')">
+                <div class="inv-qty-stepper">
+                    <button type="button" class="inv-qty-btn" tabindex="-1" onclick="invStepQty(${idx},-1)">−</button>
+                    <input type="number" id="invQtyInput-${idx}" class="inv-cell-input is-num inv-qty-input" value="${it.qty||1}" min="0.001" step="1"
+                        oninput="invItems[${idx}].qty=parseFloat(this.value)||0;invUpdateRowTotal(${idx});invUpdateSummary()" onkeydown="invRowKey(event,${idx},'qty')">
+                    <button type="button" class="inv-qty-btn" tabindex="-1" onclick="invStepQty(${idx},1)">+</button>
+                </div>
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num is-free" value="${it.free||0}" min="0" step="0.001"
@@ -704,6 +708,19 @@ function invUpdateRowTotal(idx) {
     const marginPct = (it.price && costPrice) ? Math.round(((it.price - costPrice) / it.price) * 100) : 0;
     el.innerHTML = `${invFmt(lineTotal)}<div style="font-size:10.5px;color:${marginPct>=20?'var(--inv-green)':'var(--inv-red)'};font-weight:600">${prod && costPrice ? marginPct+'% ربح' : ''}</div>`;
 }
+
+// زرار −/+ جنب الكمية بدل أسهم المتصفح — كل ضغطة وحدة واحدة بالظبط،
+// وبيحدّث نفس مسار invUpdateRowTotal/invUpdateSummary اللي الكتابة اليدوية بتستخدمه
+window.invStepQty = function(idx, delta) {
+    const it = invItems[idx];
+    if (!it) return;
+    const next = Math.max(0, Math.round(((it.qty || 0) + delta) * 1000) / 1000);
+    it.qty = next;
+    const input = document.getElementById('invQtyInput-' + idx);
+    if (input) input.value = next;
+    invUpdateRowTotal(idx);
+    invUpdateSummary();
+};
 
 function invUpdateSummary() {
     const { subtotal, rowsDisc, extra, net } = invCalcNet();
