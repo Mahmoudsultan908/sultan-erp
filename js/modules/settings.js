@@ -59,9 +59,7 @@ async function renderSettings(container) {
                 <label class="ob-label">الحد الأدنى العام للطلب (ج.م)</label>
                 <input type="number" id="set-sultano-min-order" class="ob-input" style="max-width:250px" value="${get('sultanoo_min_order_amount','0')}" min="0" step="10">
                 <p style="font-size:12px;color:#94A3B8;margin-top:6px">لو منطقة العميل ليها حد أدنى خاص بيها (من شاشة "إدارة المناطق")، بيتطبّق هو بدل الحد العام ده.</p>
-                <label class="ob-label" style="margin-top:14px">الحد الأقصى العام لكمية الصنف في الطلب</label>
-                <input type="number" id="set-sultano-max-qty" class="ob-input" style="max-width:250px" value="${get('sultanoo_max_order_qty','50')}" min="1" step="1">
-                <p style="font-size:12px;color:#94A3B8;margin-top:6px">بيتطبّق على أي صنف مالوش حد أقصى خاص بيه (من شاشة الأصناف).</p>
+                <p style="font-size:12px;color:#94A3B8;margin-top:14px">الحد الأقصى لكمية أي صنف في الطلب = رصيد المخزون المتاح منه تلقائياً، إلا لو الصنف ليه حد أقصى خاص (من شاشة الأصناف) فبيتطبّق هو بدل رصيد المخزون.</p>
             </div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
@@ -88,7 +86,6 @@ async function renderSettings(container) {
                 { key: 'system_start_date', value: document.getElementById('set-system-start').value },
                 { key: 'daily_sales_target', value: document.getElementById('set-daily-sales-target').value },
                 { key: 'sultanoo_min_order_amount', value: document.getElementById('set-sultano-min-order').value },
-                { key: 'sultanoo_max_order_qty', value: document.getElementById('set-sultano-max-qty').value },
             ];
             try {
                 for (const e of entries) {

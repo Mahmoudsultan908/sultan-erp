@@ -323,8 +323,8 @@ async function prodOpenModal(p, opts) {
                         </label>
                     </div>
                     <div class="mod-form-group" style="margin-top:8px">
-                        <label>الحد الأقصى للطلب في سلطانو <small style="color:#94A3B8;font-weight:400">(سيب فاضي = يستخدم الحد العام من الإعدادات)</small></label>
-                        <input type="number" id="prodMaxOrderQty" class="mod-form-input" value="${p?.max_order_qty??''}" min="1" step="1" placeholder="الحد العام">
+                        <label>الحد الأقصى للطلب في سلطانو <small style="color:#94A3B8;font-weight:400">(سيب فاضي = يستخدم رصيد المخزون كحد أقصى)</small></label>
+                        <input type="number" id="prodMaxOrderQty" class="mod-form-input" value="${p?.max_order_qty??''}" min="1" step="1" placeholder="رصيد المخزون">
                     </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
