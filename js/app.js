@@ -99,17 +99,25 @@ function buildLayout() {
         <div class="nav-item" data-mod="returns" onclick="loadMod(this, 'returns')">↩️ المرتجعات</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>المالية والمخزن</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>المالية</span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="expenses" onclick="loadMod(this, 'expenses')">💸 المصروفات</div>
-        <div class="nav-item" data-mod="payroll" onclick="loadMod(this, 'payroll')">👥 الموظفون والرواتب</div>
-        <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
         <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="balance-transfer" onclick="loadMod(this, 'balance-transfer')">🔀 تحويل أرصدة</div>
+        </div>
+
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>المخزون</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
         <div class="nav-item" data-mod="stock-transfer" onclick="loadMod(this, 'stock-transfer')">🔄 تحويل مخزون</div>
         <div class="nav-item" data-mod="inventory" onclick="loadMod(this, 'inventory')">📦 المخزون</div>
         <div class="nav-item" data-mod="warehouses" onclick="loadMod(this, 'warehouses')">🏭 إدارة المخازن</div>
         <div class="nav-item" data-mod="warehouse-reports" onclick="loadMod(this, 'warehouse-reports')">📊 تقارير المخازن</div>
+        </div>
+
+        <div class="nav-group" onclick="navToggleGroup(this)"><span>الموظفين</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
+        <div class="nav-item" data-mod="payroll" onclick="loadMod(this, 'payroll')">👥 الموظفون والرواتب</div>
+        <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span>المحاسبة</span><span class="nav-group-arrow">▾</span></div>
