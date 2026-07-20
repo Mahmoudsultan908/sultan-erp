@@ -282,7 +282,9 @@ window.colPreview = function() {
     const cid = document.getElementById('colCustId').value;
     const amount = parseFloat(document.getElementById('colAmount').value) || 0;
     const area = document.getElementById('colBalancePreview');
-    if (!cid || amount <= 0) { area.innerHTML = ''; return; }
+    // ★ رصيد العميل يظهر فور اختياره، من غير ما ينتظر إدخال مبلغ — سطر
+    //   "بعد التحصيل" بس هو اللي محتاج مبلغ فعلي عشان يتحسب.
+    if (!cid) { area.innerHTML = ''; return; }
     const c = _colCustomers.find(x=>x.id===cid);
     if (!c) return;
     const bal = Number(c.balance) || 0;
@@ -290,8 +292,9 @@ window.colPreview = function() {
     area.innerHTML = `
         <div class="limit-box" style="border-color:#D1FAE5;background:#ECFDF5">
             <div class="limit-row"><span class="lr-label">المستحق على العميل:</span><span class="lr-val" style="color:#DC2626">${colFmt(bal)} ج.م</span></div>
+            ${amount > 0 ? `
             <div class="limit-row"><span class="lr-label">هذا التحصيل:</span><span class="lr-val" style="color:#059669">${colFmt(amount)} ج.م</span></div>
-            <div class="limit-row"><span class="lr-label">المستحق بعد التحصيل:</span><span class="lr-val" style="color:${after>0?'#D97706':'#059669'}">${colFmt(after)} ج.م</span></div>
+            <div class="limit-row"><span class="lr-label">المستحق بعد التحصيل:</span><span class="lr-val" style="color:${after>0?'#D97706':'#059669'}">${colFmt(after)} ج.م</span></div>` : ''}
         </div>`;
 };
 
