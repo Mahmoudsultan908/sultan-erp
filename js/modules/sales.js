@@ -647,7 +647,7 @@ function invRenderItems() {
                 ${low?'<div class="low-lbl">نقص</div>':''}
             </td>
             <td>
-                <input type="number" class="inv-cell-input is-num" value="${it.qty||1}" min="0.001" step="0.001"
+                <input type="number" class="inv-cell-input is-num" value="${it.qty||1}" min="0.001" step="1"
                     oninput="invItems[${idx}].qty=parseFloat(this.value)||0;invUpdateRowTotal(${idx});invUpdateSummary()" onkeydown="invRowKey(event,${idx},'qty')">
             </td>
             <td>
@@ -783,7 +783,10 @@ function invSelectCustomer(id) {
         invApplyRepTreasury(invRepId);
     }
     invToast(`👤 تم اختيار: ${c.name}`, 'success');
-    setTimeout(()=>document.getElementById('invFastSearch')?.focus(), 50);
+    // ★ من غير ما نفوكس invFastSearch هنا: الفوكس بيطلق حدث 'focus' اللي
+    //   بيفتح قائمة أول 8 أصناف تلقائي (راجع invFastSearch)، فكانت لوحة
+    //   البحث بتتفتح لوحدها أول ما تختار عميل — عايزينها تتفتح بس لما
+    //   المستخدم فعلاً يدوس/يروح بالماوس على مربع البحث بنفسه.
 }
 function invUpdateCustomerChip() {
     const chip = document.getElementById('invCustChip');
@@ -810,8 +813,12 @@ function invFastSearch(val) {
     if (!ac) return;
     // من غير كتابة: تعرض أول 8 أصناف زي ما هم، عشان القائمة تظهر على طول
     // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
+    // بحث مرن: بيقسم النص المكتوب لأجزاء بالمسافة، وأي صنف اسمه فيه كل
+    // الأجزاء دي (مش لازم بالترتيب ولا كلمة كاملة) بيتوافق — يعني تكتب
+    // "او جب" وتلاقي "اولكر ... جبنة" من غير ما تكتب الاسم كامل.
+    const terms = val.trim().split(/\s+/).filter(Boolean);
     const m = (val.length ? INV_DB.products.filter(p =>
-        (p.name||'').includes(val) || (p.code||'').includes(val) || (p.barcode||'').includes(val)
+        terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(val) || (p.barcode||'').includes(val)
     ) : INV_DB.products).slice(0,8);
     if (m.length) {
         ac.innerHTML = m.map((p,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="invPickProduct('${p.id}')" onmouseenter="invFastHover(${i})">
@@ -947,7 +954,8 @@ function invRenderMultiPickList(val) {
     const box = document.getElementById('invMultiPickList');
     if (!box) return;
     const v = (val||'').trim();
-    const list = v ? INV_DB.products.filter(p => (p.name||'').includes(v) || (p.code||'').includes(v)) : INV_DB.products;
+    const terms = v.split(/\s+/).filter(Boolean);
+    const list = v ? INV_DB.products.filter(p => terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(v)) : INV_DB.products;
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _invMultiSelected[p.id];
@@ -958,7 +966,7 @@ function invRenderMultiPickList(val) {
             <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code||''} · ${p.unit||''}</small></span>
             <span style="font-size:11px;color:#94A3B8">مخزون: ${invGetStock(p.id)}</span>
             <span style="font-size:12px;color:#0F172A;font-weight:600">${invFmt(invGetSellPrice(p))}</span>
-            <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="0.001" style="width:76px;padding:6px 8px"
+            <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="1" style="width:76px;padding:6px 8px"
                 onclick="event.stopPropagation()" oninput="invMultiSetQty('${p.id}',this.value)">
         </label>`;
     }).join('');
