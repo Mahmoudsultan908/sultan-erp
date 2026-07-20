@@ -9,6 +9,7 @@ let _cmList = [];
 let _cmFilterType = '';
 let _cmFrom = '';
 let _cmTo = '';
+let _cmTreasuries = [];
 
 const CASH_REF_LABELS = {
     sale: 'بيع', purchase: 'شراء', expense: 'مصروف',
@@ -43,21 +44,28 @@ async function cmFetchAllRows(table, select, applyFilters) {
 async function renderCashMovement(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل حركة الخزينة...</div>';
     try {
-        await cmLoadData(c, '', '', '');
+        // ★ جاي من زرار "📄 كشف حساب" جنب خزنة معيّنة فى treasury.js —
+        // pending flag بنفس فكرة custGoToDoc فى customers.js
+        const pendingTreasury = window._pendingTreasuryFilter || '';
+        window._pendingTreasuryFilter = null;
+        const { data: treasuries } = await sb.from('treasuries').select('id,name').order('name');
+        _cmTreasuries = treasuries || [];
+        await cmLoadData(c, '', '', '', pendingTreasury);
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
-async function cmLoadData(c, from, to, refType) {
+async function cmLoadData(c, from, to, refType, treasuryId) {
     try {
-        const { data: cashBalance } = await sb.rpc('get_cash_balance');
+        const { data: cashBalance } = await sb.rpc('get_cash_balance', treasuryId ? { p_treasury_id: treasuryId } : {});
 
         const { data: allRows, error } = await cmFetchAllRows('cash_transactions', '*', (q) => {
             q = q.order('created_at', { ascending: true });
             if (from) q = q.gte('created_at', from);
             if (to) q = q.lte('created_at', to + 'T23:59:59');
             if (refType) q = q.eq('ref_type', refType);
+            if (treasuryId) q = q.eq('treasury_id', treasuryId);
             return q;
         });
         if (error) throw error;
@@ -84,18 +92,27 @@ async function cmLoadData(c, from, to, refType) {
             <td style="text-align:left;font-weight:800;color:${tx.running>=0?'#0F172A':'#DC2626'}">${cmFmt(tx.running)}</td>
         </tr>`).join('');
 
+        const treasuryName = treasuryId ? (_cmTreasuries.find(t=>t.id===treasuryId)?.name || '') : '';
+
         c.innerHTML = `
-        <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">💰 حركة الخزينة التفصيلية</h2>
+        <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">💰 حركة الخزينة التفصيلية${treasuryName ? ` — ${treasuryName}` : ''}</h2>
         <p style="font-size:13px;color:#64748B;margin-top:4px">كل حركة دخول وخروج فلوس بالترتيب الزمني مع الرصيد المتحرك</p></div>
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">📈</div><div class="mod-card-val">${cmFmt(totalIn)}</div><div class="mod-card-lbl">إجمالي الداخل</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">📉</div><div class="mod-card-val">${cmFmt(totalOut)}</div><div class="mod-card-lbl">إجمالي الخارج</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">💰</div><div class="mod-card-val">${cmFmt(cashBalance)}</div><div class="mod-card-lbl">الرصيد الحالي</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">💰</div><div class="mod-card-val">${cmFmt(cashBalance)}</div><div class="mod-card-lbl">${treasuryName ? 'رصيد ' + treasuryName : 'الرصيد الحالي (كل الخزن)'}</div></div>
         </div>
 
         <div class="dash-card" style="padding:16px;margin-bottom:16px">
             <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+                <div style="min-width:160px">
+                    <label class="ob-label">الخزنة</label>
+                    <select id="cmTreasury" class="ob-input" style="margin:0">
+                        <option value="">كل الخزن</option>
+                        ${_cmTreasuries.map(t=>`<option value="${t.id}" ${treasuryId===t.id?'selected':''}>${t.name}</option>`).join('')}
+                    </select>
+                </div>
                 <div><label class="ob-label">من تاريخ</label><input type="date" id="cmFrom" class="ob-input" style="margin:0" value="${from}"></div>
                 <div><label class="ob-label">إلى تاريخ</label><input type="date" id="cmTo" class="ob-input" style="margin:0" value="${to}"></div>
                 <div style="min-width:180px">
@@ -123,7 +140,8 @@ async function cmLoadData(c, from, to, refType) {
             const f = document.getElementById('cmFrom').value;
             const t = document.getElementById('cmTo').value;
             const rt = document.getElementById('cmRefType').value;
-            cmLoadData(c, f, t, rt);
+            const trId = document.getElementById('cmTreasury').value;
+            cmLoadData(c, f, t, rt, trId);
         };
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;

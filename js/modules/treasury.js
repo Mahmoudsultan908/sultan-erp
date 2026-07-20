@@ -44,7 +44,10 @@ async function renderTreasury(c) {
                 <div class="mod-card-icon" style="background:${t.is_default?'#FFFBEB':'#F1F5F9'};color:${t.is_default?'#D97706':'#475569'}">🏦</div>
                 <div class="mod-card-val">${tsyFmt(t.balance)}</div>
                 <div class="mod-card-lbl">${t.treasury_name} ${t.is_default ? '<span style="background:#FFFBEB;color:#D97706;font-size:10px;padding:2px 6px;border-radius:5px;margin-right:4px">افتراضية</span>' : ''}</div>
-                ${!t.is_default ? `<button class="cc-edit" style="margin-top:8px;background:#FEE2E2;color:#DC2626" onclick="tsyToggleActive('${t.treasury_id}', true)">تعطيل الخزنة</button>` : ''}
+                <div style="display:flex;gap:6px;margin-top:8px">
+                    <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="tsyShowStatement('${t.treasury_id}')">📄 كشف حساب</button>
+                    ${!t.is_default ? `<button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="tsyToggleActive('${t.treasury_id}', true)">تعطيل الخزنة</button>` : ''}
+                </div>
             </div>`).join('')}
         </div>
 
@@ -133,6 +136,14 @@ window.tsySaveNew = async function() {
         renderTreasury(document.getElementById('app-content'));
     } catch (err) { alert('خطأ أثناء الحفظ: ' + err.message); }
     finally { btn.innerText = '💾 حفظ'; btn.disabled = false; }
+};
+
+// كشف حساب خزنة — بيفتح شاشة "حركة الخزينة التفصيلية" (cash-movement.js)
+// مفلترة على الخزنة دي بس، بنفس فكرة custGoToDoc فى customers.js (pending
+// flag + كليك على عنصر القائمة الجانبية)
+window.tsyShowStatement = function(treasuryId) {
+    window._pendingTreasuryFilter = treasuryId;
+    document.querySelector('[data-mod="cash-movement"]')?.click();
 };
 
 window.tsyToggleActive = async function(treasuryId, currentlyActive) {
