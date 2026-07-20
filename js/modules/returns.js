@@ -493,7 +493,7 @@ function retNotesCardHTML() {
                 ${RET_DB.reps.map(r => `<option value="${r.id}" ${r.id === retRepId ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
             </select>
         </div>` : ''}
-        ${retType === 'sales' && (RET_DB.priceLevels || []).length && retMode === 'manual' ? `
+        ${retType === 'sales' && (RET_DB.priceLevels || []).length ? `
         <div class="mod-form-group" style="margin-top:10px"><label>مستوى السعر (لتحديد سعر إعادة الحساب)</label>
             <select id="retPriceLevelSelect" class="mod-form-input" onchange="retSetPriceLevel(this.value)">
                 <option value="">الافتراضي (جملة ثم تجزئة)</option>
@@ -524,14 +524,14 @@ window.retTogglePayCash = function (checked) {
 };
 
 // تغيير مستوى السعر المستخدم في حساب أسعار مرتجع المبيعات (نفس فكرة
-// invSetPriceLevel في sales.js) — بيعيد حساب سعر كل صنف موجود بالفعل
-// في الفاتورة بالسعر الجديد (الأصناف اليدوية فقط، وضع "مستقل").
+// invSetPriceLevel في sales.js) — بيعيد حساب سعر كل صنف موجود بالفعل في
+// الفاتورة بالسعر الجديد. شغّالة فى الوضعين (مرتبط/مستقل) — فى الوضع
+// المرتبط الأسعار بتفضل زي الفاتورة الأصلية بالظبط لحد ما المستخدم
+// يغيّر المستوى بنفسه فعليًا، مش تلقائي.
 window.retSetPriceLevel = function (code) {
     retPriceLevelCode = code || '';
-    if (retMode === 'manual') {
-        retItems.forEach(it => { if (it.pid) { const p = RET_DB.products.find(x => x.id === it.pid); if (p) it.price = retGetPrice(p); } });
-        retRenderItems(); retUpdateSummary();
-    }
+    retItems.forEach(it => { if (it.pid) { const p = RET_DB.products.find(x => x.id === it.pid); if (p) it.price = retGetPrice(p); } });
+    retRenderItems(); retUpdateSummary();
 };
 
 function retRecentListHTML() {
