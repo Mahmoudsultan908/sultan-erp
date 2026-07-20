@@ -110,19 +110,35 @@ window.custShowStatement = async function(customerId) {
         // والمرتجعات كمان (كانوا ناقصين، فالمستخدم كان لازم يدوّر عليهم
         // في شاشة تانية) — النقدي بيظهر للمراجعة بس من غير أثر على
         // الرصيد المتحرك (لأنه اتقبض وقتها فعلاً).
+        // ★★ وكمان تحويلات الأرصدة (balance_transfers) والأرصدة الافتتاحية
+        // (opening_balances) — كانوا ناقصين خالص من الكشف، فلو عميل كان
+        // طرف في تحويل رصيد أو له رصيد افتتاحي، الرصيد المتحرك جوه الكشف
+        // كان بيختلف عن رصيده الحقيقي (customers.balance) من غير أي تفسير،
+        // وده بالظبط سبب "الكشف مش مظبوط" اللي اتلاحظ.
         const [
             { data: sales },
             { data: payments },
             { data: returns },
+            { data: transfersOut },
+            { data: transfersIn },
+            { data: openingBalances },
             docsResult,
             interactionsResult,
         ] = await Promise.all([
             sb.from('sales').select('invoice_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }),
-            sb.from('customer_payments').select('ref, amount, status, created_at')
+            sb.from('customer_payments').select('id, ref, amount, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
             sb.from('sales_returns').select('return_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
+            sb.from('balance_transfers').select('id, to_c:to_customer_id(name), amount, notes, created_at')
+                .eq('from_customer_id', customerId).eq('transfer_type', 'customer_to_customer')
+                .order('created_at', { ascending: true }),
+            sb.from('balance_transfers').select('id, from_c:from_customer_id(name), amount, notes, created_at')
+                .eq('to_customer_id', customerId).eq('transfer_type', 'customer_to_customer')
+                .order('created_at', { ascending: true }),
+            sb.from('opening_balances').select('id, amount, as_of_date, notes')
+                .eq('customer_id', customerId).eq('balance_type', 'customer').eq('status', 'confirmed'),
             // اختياري — لو جدول archive_documents لسه ما اتعملش، نتجاهل الخطأ بهدوء
             sb.from('archive_documents').select('id,title,file_url,category,created_at')
                 .eq('linked_type', 'customer').eq('linked_id', customerId)
@@ -135,29 +151,45 @@ window.custShowStatement = async function(customerId) {
         const docs = docsResult?.data || [];
         const interactions = interactionsResult?.data || [];
 
-        // دمج الحركات في timeline واحد + حساب الرصيد المتحرك
+        // دمج الحركات في timeline واحد + حساب الرصيد المتحرك — كل حركة معاها
+        // nav (نوع + مرجع) عشان أيقونة الانتقال المباشر للمعاملة تحت
         const moves = [];
         (sales||[]).forEach(s => {
             if (s.status !== 'confirmed') return;
             if (s.payment_type === 'credit') {
-                moves.push({ date: s.created_at, desc: `فاتورة بيع ${s.invoice_no}`, debit: Number(s.total)||0, credit: 0, type: 'sale-credit' });
+                moves.push({ date: s.created_at, desc: `فاتورة بيع ${s.invoice_no}`, debit: Number(s.total)||0, credit: 0, type: 'sale-credit', nav: { kind: 'sale', no: s.invoice_no } });
             } else {
                 // نقدي: بيتقيّد للمراجعة بس مالوش أثر على الرصيد (اتقبض وقتها)
-                moves.push({ date: s.created_at, desc: `فاتورة بيع نقدي ${s.invoice_no}`, debit: 0, credit: 0, type: 'sale-cash' });
+                moves.push({ date: s.created_at, desc: `فاتورة بيع نقدي ${s.invoice_no}`, debit: 0, credit: 0, type: 'sale-cash', nav: { kind: 'sale', no: s.invoice_no } });
             }
         });
         (returns||[]).forEach(r => {
             if (r.status !== 'confirmed') return;
             if (r.payment_type === 'credit') {
-                moves.push({ date: r.created_at, desc: `مرتجع بيع ${r.return_no}`, debit: 0, credit: Number(r.total)||0, type: 'return-credit' });
+                moves.push({ date: r.created_at, desc: `مرتجع بيع ${r.return_no}`, debit: 0, credit: Number(r.total)||0, type: 'return-credit', nav: { kind: 'return', no: r.return_no } });
             } else {
-                moves.push({ date: r.created_at, desc: `مرتجع بيع نقدي ${r.return_no}`, debit: 0, credit: 0, type: 'return-cash' });
+                moves.push({ date: r.created_at, desc: `مرتجع بيع نقدي ${r.return_no}`, debit: 0, credit: 0, type: 'return-cash', nav: { kind: 'return', no: r.return_no } });
             }
         });
         (payments||[]).forEach(p => {
             if (p.status === 'confirmed') {
-                moves.push({ date: p.created_at, desc: `تحصيل ${p.ref||''}`, debit: 0, credit: Number(p.amount)||0, type: 'payment' });
+                moves.push({ date: p.created_at, desc: `تحصيل ${p.ref||''}`, debit: 0, credit: Number(p.amount)||0, type: 'payment', nav: { kind: 'payment', id: p.id } });
             }
+        });
+        // تحويل رصيد "من" العميل ده لعميل تاني: بيقلل رصيده (دائن) — راجع
+        // fn_balance_transfer_apply (balance = balance - amount للمصدر)
+        (transfersOut||[]).forEach(t => {
+            moves.push({ date: t.created_at, desc: `تحويل رصيد إلى ${t.to_c?.name || '—'}${t.notes ? ' — '+t.notes : ''}`, debit: 0, credit: Number(t.amount)||0, type: 'transfer-out', nav: { kind: 'transfer' } });
+        });
+        // تحويل رصيد "إلى" العميل ده من عميل تاني: بيزود رصيده (مدين)
+        (transfersIn||[]).forEach(t => {
+            moves.push({ date: t.created_at, desc: `تحويل رصيد من ${t.from_c?.name || '—'}${t.notes ? ' — '+t.notes : ''}`, debit: Number(t.amount)||0, credit: 0, type: 'transfer-in', nav: { kind: 'transfer' } });
+        });
+        // رصيد افتتاحي — راجع fn_opening_balance_status_change (balance += amount)،
+        // فمبلغ سالب (نادر) معناه رصيد افتتاحي دائن، بنقسمه مدين/دائن حسب إشارته
+        (openingBalances||[]).forEach(o => {
+            const amt = Number(o.amount) || 0;
+            moves.push({ date: o.as_of_date, desc: `رصيد افتتاحي${o.notes ? ' — '+o.notes : ''}`, debit: Math.max(amt,0), credit: Math.max(-amt,0), type: 'opening', nav: { kind: 'opening' } });
         });
         moves.sort((a,b) => new Date(a.date) - new Date(b.date));
 
@@ -192,17 +224,28 @@ window.custShowStatement = async function(customerId) {
                     <th style="text-align:left">مدين</th>
                     <th style="text-align:left">دائن</th>
                     <th style="text-align:left">الرصيد</th>
+                    <th></th>
                 </tr></thead>
                 <tbody>
-                    ${moves.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
+                    ${moves.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
                     moves.map(m => {
                         const isCash = m.type.endsWith('-cash');
                         const bg = m.type==='sale-credit' ? '#FEF2F2' : m.type==='payment' ? '#ECFDF5'
-                            : m.type==='return-credit' || m.type==='return-cash' ? '#FFFBEB' : '#F8FAFC';
+                            : m.type==='return-credit' || m.type==='return-cash' ? '#FFFBEB'
+                            : m.type==='transfer-out' || m.type==='transfer-in' ? '#EFF6FF'
+                            : m.type==='opening' ? '#F5F3FF' : '#F8FAFC';
                         const icon = m.type==='sale-credit' ? '<span style="color:#DC2626">🛒</span>'
                             : m.type==='sale-cash' ? '<span style="color:#94A3B8">💰</span>'
                             : m.type.startsWith('return') ? '<span style="color:#D97706">↩️</span>'
+                            : m.type.startsWith('transfer') ? '<span style="color:#2563EB">🔀</span>'
+                            : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
                             : '<span style="color:#059669">💵</span>';
+                        const navBtn = m.nav?.kind === 'sale' ? `<button class="cc-edit" title="افتح الفاتورة" onclick="custGoToDoc('sales','${m.nav.no}')">🔗</button>`
+                            : m.nav?.kind === 'return' ? `<button class="cc-edit" title="افتح المرتجع" onclick="custGoToDoc('sales_return','${m.nav.no}')">🔗</button>`
+                            : m.nav?.kind === 'payment' ? `<button class="cc-edit" title="افتح سند التحصيل" onclick="custGoToPayment('${m.nav.id}')">🔗</button>`
+                            : m.nav?.kind === 'transfer' ? `<button class="cc-edit" title="افتح تحويل الأرصدة" onclick="custGoToModule('balance-transfer')">🔗</button>`
+                            : m.nav?.kind === 'opening' ? `<button class="cc-edit" title="افتح الأرصدة الافتتاحية" onclick="custGoToModule('opening-balances')">🔗</button>`
+                            : '';
                         return `<tr style="background:${bg}">
                         <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
                         <td>
@@ -212,6 +255,7 @@ window.custShowStatement = async function(customerId) {
                         <td style="text-align:left;font-weight:600;color:#DC2626">${m.debit?custFmt(m.debit):'—'}</td>
                         <td style="text-align:left;font-weight:600;color:#059669">${m.credit?custFmt(m.credit):'—'}</td>
                         <td style="text-align:left;font-weight:700">${custFmt(m.balance)}</td>
+                        <td style="text-align:center">${navBtn}</td>
                     </tr>`;
                     }).join('')}
                 </tbody>
@@ -220,9 +264,15 @@ window.custShowStatement = async function(customerId) {
                     <td style="text-align:left;color:#DC2626">${custFmt(totalDebit)}</td>
                     <td style="text-align:left;color:#059669">${custFmt(totalCredit)}</td>
                     <td style="text-align:left">${custFmt(balNow)}</td>
+                    <td></td>
                 </tr></tfoot>` : ''}
                 </table>
             </div>
+            ${Math.abs(moves.reduce((s,m)=>s+(m.debit-m.credit),0) - balNow) > 0.01 ? `
+            <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
+                ⚠️ مجموع حركات الكشف (${custFmt(moves.reduce((s,m)=>s+(m.debit-m.credit),0))}) لا يطابق رصيد العميل الفعلي (${custFmt(balNow)}) —
+                فيه حركة مؤثرة على الرصيد من نوع مش متضمّن فى الكشف لسه.
+            </div>` : ''}
 
             <div style="margin-top:16px">
                 <div style="font-size:13px;font-weight:800;color:#1E293B;margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
@@ -254,6 +304,23 @@ window.custGoEditProfile = function(customerId) {
     window._pendingCustomerEdit = customerId;
     custCloseModal('custStmtModal');
     document.querySelector('[data-mod="customers-manage"]')?.click();
+};
+
+// أيقونة الانتقال المباشر جنب كل حركة فى الكشف — بتاخد نفس فكرة
+// custGoEditProfile بالظبط (pending flag + كليك على عنصر القائمة الجانبية)
+window.custGoToDoc = function(revType, no) {
+    window._pendingInvoiceReviewSearch = { type: revType, no };
+    custCloseModal('custStmtModal');
+    document.querySelector('[data-mod="invoice-review"]')?.click();
+};
+window.custGoToPayment = function(paymentId) {
+    window._pendingCollectionEdit = paymentId;
+    custCloseModal('custStmtModal');
+    document.querySelector('[data-mod="collections"]')?.click();
+};
+window.custGoToModule = function(mod) {
+    custCloseModal('custStmtModal');
+    document.querySelector(`[data-mod="${mod}"]`)?.click();
 };
 
 // ════════════════════════════════════════════════════════════

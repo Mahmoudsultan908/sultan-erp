@@ -111,6 +111,14 @@ async function renderCollections(c) {
             </tbody></table>
         </div>
     `;
+
+    // ★ جاي من أيقونة "🔗" فى كشف حساب العميل (customers.js) — يفتح مودال
+    //   تعديل نفس سند التحصيل على طول بدل ما يدوّر عليه فى السجل يدوي
+    if (window._pendingCollectionEdit) {
+        const pid = window._pendingCollectionEdit;
+        window._pendingCollectionEdit = null;
+        colOpenEditModal(pid);
+    }
 }
 
 // فلترة سجل التحصيلات المعروض حسب اسم العميل (بحث فوري داخل الصفوف المعروضة فعلاً)

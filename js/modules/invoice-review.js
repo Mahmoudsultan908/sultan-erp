@@ -59,7 +59,11 @@ function revCfg() { return REV_CONFIG[revType]; }
 function revIsReturn() { return revType === 'sales_return' || revType === 'purchase_return'; }
 
 async function renderInvoiceReview(c) {
-    revType = 'sales';
+    // ★ جاي من أيقونة "🔗" فى كشف حساب العميل (customers.js) — بيفتح
+    //   النوع والرقم المطلوبين على طول بدل ما المستخدم يدوّر عليهم يدوي
+    const pending = window._pendingInvoiceReviewSearch;
+    window._pendingInvoiceReviewSearch = null;
+    revType = pending?.type || 'sales';
     c.innerHTML = `
     <div class="ob-wrap">
         <div class="dash-header">
@@ -67,11 +71,11 @@ async function renderInvoiceReview(c) {
             <p class="dash-sub">ابحث عن أي فاتورة أو مرتجع سابق، اعرض تفاصيله، أو عدّله</p></div>
         </div>
         <div class="ob-tabs">
-            ${REV_TYPES.map((t, i) => `<button class="ob-tab ${i === 0 ? 'active' : ''}" onclick="revSwitchType('${t}')">${REV_TAB_LABELS[t]}</button>`).join('')}
+            ${REV_TYPES.map((t) => `<button class="ob-tab ${t === revType ? 'active' : ''}" onclick="revSwitchType('${t}')">${REV_TAB_LABELS[t]}</button>`).join('')}
         </div>
         <div id="rev-content" style="margin-top:16px"></div>
     </div>`;
-    await revRenderBody();
+    await revRenderBody(pending?.no || '');
 }
 
 window.revSwitchType = function (type) {
@@ -80,13 +84,13 @@ window.revSwitchType = function (type) {
     revRenderBody();
 };
 
-async function revRenderBody() {
+async function revRenderBody(presetNo) {
     const cfg = revCfg();
     const c = document.getElementById('rev-content');
     c.innerHTML = `
         <div class="dash-card" style="padding:16px 18px;margin-bottom:16px">
             <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
-                <div><label class="ob-label">${revIsReturn() ? 'رقم المرتجع' : 'رقم الفاتورة'}</label><input id="rev-no" class="ob-input" style="margin:0;max-width:160px" dir="ltr" placeholder="${cfg.noPlaceholder}" onkeydown="if(event.key==='Enter')revSearch()"></div>
+                <div><label class="ob-label">${revIsReturn() ? 'رقم المرتجع' : 'رقم الفاتورة'}</label><input id="rev-no" class="ob-input" style="margin:0;max-width:160px" dir="ltr" placeholder="${cfg.noPlaceholder}" value="${presetNo||''}" onkeydown="if(event.key==='Enter')revSearch()"></div>
                 <div><label class="ob-label">${cfg.entityLabel}</label><input id="rev-name" class="ob-input" style="margin:0;max-width:200px" placeholder="بحث بالاسم" onkeydown="if(event.key==='Enter')revSearch()"></div>
                 <div><label class="ob-label">من تاريخ</label><input id="rev-from" type="date" class="ob-input" style="margin:0"></div>
                 <div><label class="ob-label">إلى تاريخ</label><input id="rev-to" type="date" class="ob-input" style="margin:0"></div>
