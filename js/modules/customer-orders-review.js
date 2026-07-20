@@ -291,7 +291,7 @@ window.corSaveBanner = async function(id) {
             const { error } = await sb.from('banners').update(payload).eq('id', id);
             if (error) throw error;
         } else {
-            const { error } = await sb.from('banners').insert({ ...payload, created_by: currentUser?.id || null });
+            const { error } = await sb.from('banners').insert(payload);
             if (error) throw error;
         }
         document.getElementById('corBannerModal').remove();
