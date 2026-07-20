@@ -27,6 +27,7 @@ let invEditingOldTotal = 0;
 let invEditingOldPayType = null;
 let invEditingOldCustId = null;
 let invEditingOldInvoiceNo = null;
+let invEditingOldSourceApp = null; // source_app الأصلي للفاتورة قبل التعديل — عشان نحافظ عليه (راجع التعليق فوق fn_create_sale)
 let invPendingQuoteId = null; // عرض سعر بيتحوّل حالياً — يتعلّم "تم التحويل" بعد نجاح الحفظ بس (مش قبله)
 let invPendingOrderId = null; // طلب سلطانو بيتحوّل حالياً — نفس المنطق، customer_orders.converted_sale_id بيتحدّث بعد الحفظ بس
 let invPendingOrderNo = null; // رقم/إجمالي الطلب الأصلي — بيتعرض في بانر تأكيد واضح فوق الفاتورة عشان مايتلخبطش مع طلب تاني
@@ -248,6 +249,19 @@ function invNormalizeRepId(v) {
     const s = String(v).trim();
     return s ? s : null;
 }
+// ★ لو بنعدّل فاتورة كانت أصلها جاي من عربية مندوب (source_app='rep_van')،
+//   والمندوب لسه متحدد بعد التعديل، لازم النسخة الجديدة تفضل rep_van كمان
+//   — وإلا خصم مخزون العربية بتاع fn_sale_item_van_stock مش بيتنفذ خالص
+//   للنسخة الجديدة (بيتنفذ بس لما source_app='rep_van' بالظبط)، بينما
+//   fn_sale_van_stock_reversal بيكون رجّع الكمية القديمة للعربية عند
+//   إلغاء الفاتورة الأصلية — فالنتيجة: مخزون العربية يفضل زيادة عن
+//   الحقيقة (اتحمّل زيادة وهمية) لأي فاتورة مندوب اتعدّلت من الـ ERP.
+//   لو المندوب اتشال من الفاتورة وقت التعديل، نرجع للسلوك العادي (erp)
+//   عشان المخزون يتخصم من المخزن الرئيسي زي أي فاتورة عادية.
+function invEffectiveSourceApp(repIdToSend) {
+    if (invEditingId && invEditingOldSourceApp === 'rep_van' && repIdToSend) return 'rep_van';
+    return 'erp';
+}
 function invOnRepChange() {
     const sel = document.getElementById('invRep');
     if (sel) invRepId = invNormalizeRepId(sel.value);
@@ -287,7 +301,7 @@ async function renderSales(c) {
     invTreasuryId = INV_DB.treasuries?.find(t => t.is_default)?.id || null;
     invPriceLevelCode = 'RETAIL';
     invRepId = null;
-    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
+    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null;
     invPendingQuoteId = null;
     invPendingOrderId = null;
     invPendingOrderNo = null;
@@ -309,6 +323,7 @@ async function renderSales(c) {
                 invEditingOldPayType = oldSale.payment_type;
                 invEditingOldCustId = oldSale.customer_id;
                 invEditingOldInvoiceNo = oldSale.invoice_no;
+                invEditingOldSourceApp = oldSale.source_app;
 
                 invItems = (oldSale.sale_items || []).map(it => ({
                     id: Date.now() + Math.random(), pid: it.product_id,
@@ -1300,7 +1315,7 @@ async function invSave(andNew) {
                     status: 'confirmed', warehouse_id: invWarehouseId,
                     rep_id: invNormalizeRepId(invRepId),
                     treasury_id: invPayType === 'cash' ? (document.getElementById('invTreasuryId')?.value || invTreasuryId || null) : null,
-                    source_app: 'erp', created_by: currentUser?.id || null,
+                    source_app: invEffectiveSourceApp(invNormalizeRepId(invRepId)), created_by: currentUser?.id || null,
                 },
                 items: filled.map(it => {
                     const prod = INV_DB.products.find(p=>p.id===it.pid);
@@ -1413,7 +1428,7 @@ async function invSave(andNew) {
             p_warehouse_id: invWarehouseId,
             p_rep_id: repIdToSend,
             p_treasury_id: invPayType === 'cash' ? (document.getElementById('invTreasuryId')?.value || invTreasuryId || null) : null,
-            p_source_app: 'erp',
+            p_source_app: invEffectiveSourceApp(repIdToSend),
             p_created_by: currentUser?.id || null,
             p_items: itemsPayload,
         });
@@ -1470,7 +1485,7 @@ async function invSave(andNew) {
         localStorage.removeItem(INV_AUTOSAVE_KEY);
         if (invEditingId) {
             invToast(`✅ تم إلغاء الفاتورة ${invEditingOldInvoiceNo} وتسجيل الفاتورة المعدّلة ${invoiceNo} — ${invFmt(net)} ج.م`, 'success');
-            invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null;
+            invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null;
         } else {
             invToast(`✅ تم حفظ الفاتورة ${invoiceNo} — ${invFmt(net)} ج.م`, 'success');
         }

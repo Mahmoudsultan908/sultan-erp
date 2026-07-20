@@ -123,7 +123,7 @@ const SETT_BACKUP_TABLES = [
     'journal_entries','journal_entry_lines','sales','sale_items','sales_returns','sale_return_items',
     'purchases','purchase_items','purchase_returns','purchase_return_items','purchase_orders',
     'purchase_order_items','quotations','quotation_items','expenses','expense_violations',
-    'customer_collections','customer_payments','supplier_payments','opening_balances',
+    'customer_payments','supplier_payments','opening_balances',
     'deferred_rebates','deferred_rebates_manual','deferred_rebate_settlements',
     'deferred_rebate_settlement_items','financial_events','inventory_transfers',
     'inventory_transfer_items','stock_transfers','stock_transfer_items','sales_reps',

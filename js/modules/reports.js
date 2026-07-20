@@ -166,7 +166,7 @@ async function renderReports(container) {
             const [{ data: sales }, { data: returns }, { data: collections }, { data: opening }] = await Promise.all([
                 sb.from('sales').select('invoice_no,total,created_at').eq('customer_id',id).eq('status','confirmed').eq('payment_type','credit').order('created_at'),
                 sb.from('sales_returns').select('return_no,total,created_at').eq('customer_id',id).eq('status','confirmed').eq('payment_type','credit').order('created_at'),
-                sb.from('customer_collections').select('ref,amount,created_at').eq('customer_id',id).eq('status','confirmed').order('created_at'),
+                sb.from('customer_payments').select('ref,amount,created_at').eq('customer_id',id).eq('status','confirmed').order('created_at'),
                 sb.from('opening_balances').select('amount,as_of_date').eq('customer_id',id).eq('balance_type','customer').eq('status','confirmed'),
             ]);
 

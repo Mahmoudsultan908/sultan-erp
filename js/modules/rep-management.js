@@ -74,7 +74,7 @@ async function repLinkRefreshBadge() {
         ];
         if (repIds.length) {
             queries.push(
-                sb.from('customer_collections').select('id', { count: 'exact', head: true })
+                sb.from('customer_payments').select('id', { count: 'exact', head: true })
                     .in('created_by', repIds).gt('created_at', lastSeen),
                 sb.from('expenses').select('id', { count: 'exact', head: true })
                     .in('created_by', repIds).gt('created_at', lastSeen),
