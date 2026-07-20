@@ -48,7 +48,7 @@ async function renderVanStockReturn(container) {
 async function vrLoadRecent() {
     try {
         const { data, error } = await sb.from('van_stock_returns')
-            .select('*, wh:warehouse_id(name), rep:rep_id(name), van_stock_return_items(qty)')
+            .select('*, wh:warehouse_id(name), rep:rep_id(name), van_stock_return_items(qty, unit_name, product:product_id(name))')
             .order('created_at', { ascending: false }).limit(30);
         if (error) throw error;
         VR_DB.list = data || [];
@@ -128,6 +128,10 @@ function vrHeaderHTML() {
         <button class="inv-top-btn inv-top-new" onclick="renderVanStockReturn(document.getElementById('app-content'))">➕ جديد</button>
     </div>`;
 }
+
+// شاشة إرجاع مخزون العربية مفيهاش طباعة/عرض للتفاصيل خالص، فمكانش فيه
+// طريقة تشوف بالظبط الأصناف اللي المندوب رجّعها بعد ما تتحفظ — نفس فكرة
+// vlSaveCore/vlReprint فى van-stock-load.js بالحرف.
 
 function vrSearchBarHTML() {
     return `
@@ -247,6 +251,7 @@ function vrActionsCardHTML() {
     return `
     <div class="inv-actions">
         <button class="inv-btn inv-btn-save" onclick="vrSave()">💾 حفظ الإرجاع</button>
+        <button class="inv-btn inv-btn-print" onclick="vrSaveAndPrint()">🖨️ حفظ وطباعة</button>
     </div>`;
 }
 
@@ -264,10 +269,10 @@ function vrRecentListHTML() {
     <div class="mod-table-wrap" style="margin-top:16px">
         <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر عمليات الإرجاع</div>
         <table class="mod-table"><thead><tr>
-            <th>رقم العملية</th><th>التاريخ</th><th>عربية المندوب</th><th>إلى مخزن</th><th>عدد الأصناف</th><th style="text-align:left">إجمالي الكمية</th><th>ملاحظات</th>
+            <th>رقم العملية</th><th>التاريخ</th><th>عربية المندوب</th><th>إلى مخزن</th><th>عدد الأصناف</th><th style="text-align:left">إجمالي الكمية</th><th>ملاحظات</th><th></th>
         </tr></thead>
         <tbody>
-            ${list.length ? list.map(t => {
+            ${list.length ? list.map((t, i) => {
                 const items = t.van_stock_return_items || [];
                 const totalQty = items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
                 return `<tr>
@@ -278,8 +283,9 @@ function vrRecentListHTML() {
                     <td>${items.length}</td>
                     <td style="text-align:left;font-weight:700">${vrFmt(totalQty)}</td>
                     <td style="color:#64748B">${t.notes || '—'}</td>
+                    <td><button class="cc-edit" onclick="vrReprint(${i})">🖨️</button></td>
                 </tr>`;
-            }).join('') : `<tr><td colspan="7" class="empty-state"><span>↩️</span>لا توجد عمليات إرجاع حتى الآن.</td></tr>`}
+            }).join('') : `<tr><td colspan="8" class="empty-state"><span>↩️</span>لا توجد عمليات إرجاع حتى الآن.</td></tr>`}
         </tbody></table>
     </div>`;
 }
@@ -392,14 +398,16 @@ function vrUpdateSummary() {
     set('vrSummaryQty', vrFmt(totalQty));
 }
 
-window.vrSave = async function () {
+// اللب المشترك بين "حفظ" و"حفظ وطباعة" — بيرجع بيانات الإرجاع المحفوظ
+// لو نجح (عشان الطباعة تستخدمها من غير ما تعمل استعلام تاني)، أو null لو فشل
+async function vrSaveCore() {
     const repId = vrRepId;
     const whId = vrWarehouseId;
-    if (!repId) return alert('يرجى اختيار المندوب');
-    if (!whId) return alert('يرجى اختيار المخزن');
+    if (!repId) { alert('يرجى اختيار المندوب'); return null; }
+    if (!whId) { alert('يرجى اختيار المخزن'); return null; }
 
     const filled = vrItems.filter(it => it.productId && (it.qty || 0) > 0);
-    if (!filled.length) return alert('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر');
+    if (!filled.length) { alert('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر'); return null; }
 
     const qtyByProduct = {};
     filled.forEach(it => { qtyByProduct[it.productId] = (qtyByProduct[it.productId] || 0) + it.qty; });
@@ -407,15 +415,13 @@ window.vrSave = async function () {
         const stock = vrGetStock(pid);
         if (qtyByProduct[pid] > stock) {
             const name = VR_DB.products.find(p => p.id === pid)?.name || pid;
-            return alert(`الكمية المطلوب إرجاعها من صنف "${name}" (${vrFmt(qtyByProduct[pid])}) أكبر من المتاح بعربية المندوب (${vrFmt(stock)})`);
+            alert(`الكمية المطلوب إرجاعها من صنف "${name}" (${vrFmt(qtyByProduct[pid])}) أكبر من المتاح بعربية المندوب (${vrFmt(stock)})`);
+            return null;
         }
     }
 
     const date = document.getElementById('vrDate')?.value || vrToday();
     const notes = document.getElementById('vrNotes')?.value.trim() || null;
-
-    const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-top-save');
-    saveBtns.forEach(b => { b.dataset._label = b.dataset._label || b.innerHTML; b.innerHTML = '⏳ جاري الإرجاع...'; b.disabled = true; });
 
     try {
         const returnNo = 'VR-' + Date.now();
@@ -442,16 +448,63 @@ window.vrSave = async function () {
             throw itemsErr;
         }
 
-        alert(`تم إرجاع مخزون العربية للمخزن بنجاح (${returnNo})`);
-        renderVanStockReturn(document.getElementById('app-content'));
+        return {
+            returnNo, date, notes,
+            repName: VR_DB.reps.find(r => r.id === repId)?.name || '',
+            whName: VR_DB.warehouses.find(w => w.id === whId)?.name || '',
+            items: filled.map(it => ({
+                name: VR_DB.products.find(p => p.id === it.productId)?.name || '',
+                qty: it.qty,
+                unit_name: VR_DB.products.find(p => p.id === it.productId)?.unit || '',
+            })),
+        };
     } catch (err) {
         alert('خطأ أثناء الإرجاع: ' + err.message);
+        return null;
+    }
+}
+
+window.vrSave = async function () {
+    const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-btn-print, .inv-top-save');
+    saveBtns.forEach(b => { b.dataset._label = b.dataset._label || b.innerHTML; b.disabled = true; });
+    document.querySelector('.inv-top-save').innerHTML = '⏳ جاري الإرجاع...';
+
+    const result = await vrSaveCore();
+    if (result) {
+        alert(`تم إرجاع مخزون العربية للمخزن بنجاح (${result.returnNo})`);
+        renderVanStockReturn(document.getElementById('app-content'));
+    } else {
+        saveBtns.forEach(b => { b.innerHTML = b.dataset._label; b.disabled = false; });
+    }
+};
+
+window.vrReprint = async function (idx) {
+    const t = VR_DB.list[idx];
+    if (!t) return;
+    await printThermalReceipt('van_return', {
+        returnNo: t.return_no, date: t.return_date,
+        repName: t.rep?.name || '', whName: t.wh?.name || '', notes: t.notes,
+        items: (t.van_stock_return_items || []).map(it => ({ name: it.product?.name || '', qty: it.qty, unit_name: it.unit_name })),
+    });
+};
+
+window.vrSaveAndPrint = async function () {
+    const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-btn-print, .inv-top-save');
+    saveBtns.forEach(b => { b.dataset._label = b.dataset._label || b.innerHTML; b.disabled = true; });
+    const printBtn = document.querySelector('.inv-btn-print');
+    if (printBtn) printBtn.innerHTML = '⏳ جاري الحفظ...';
+
+    const result = await vrSaveCore();
+    if (result) {
+        await printThermalReceipt('van_return', result);
+        renderVanStockReturn(document.getElementById('app-content'));
+    } else {
         saveBtns.forEach(b => { b.innerHTML = b.dataset._label; b.disabled = false; });
     }
 };
 
 Object.assign(window, {
     renderVanStockReturn,
-    vrAddRow, vrRemoveRow, vrOnProductChange, vrOnQtyInput, vrOnFilterChange, vrSave,
+    vrAddRow, vrRemoveRow, vrOnProductChange, vrOnQtyInput, vrOnFilterChange, vrSave, vrSaveAndPrint, vrReprint,
     vrOpenMultiPick, vrCloseMultiPick, vrRenderMultiPickList, vrMultiToggle, vrMultiSetQty, vrAddMultiPicked,
 });
