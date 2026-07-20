@@ -419,6 +419,9 @@ window.prodOpenCategoryManager = function() {
                     ${_prodCategories.map(cat=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;gap:8px">
                         <img src="${cat.image_url||''}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#F1F5F9;${cat.image_url?'':'display:none'}">
                         <span style="flex:1">${cat.name}</span>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748B;white-space:nowrap;cursor:pointer">
+                            <input type="checkbox" style="width:auto" ${cat.show_when_empty?'checked':''} onchange="prodToggleShowWhenEmpty('product_categories','${cat.id}',this.checked)">🔜 لو فاضي
+                        </label>
                         <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
                             📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_categories','${cat.id}',this)">
                         </label>
@@ -463,6 +466,18 @@ window.prodUploadLookupImage = async function(table, id, input) {
     } catch (e) { alert('خطأ في رفع الصورة: ' + e.message); }
 };
 
+// لو مفعّلة: القسم/الشركة يفضل ظاهر لعميل سلطانو حتى لو مفيش أي صنف متاح
+// فيه دلوقتي (بيشوف رسالة "لا توجد منتجات حالياً" بدل ما يختفي تمامًا)
+window.prodToggleShowWhenEmpty = async function(table, id, checked) {
+    try {
+        const { error } = await sb.from(table).update({ show_when_empty: checked }).eq('id', id);
+        if (error) throw error;
+        const list = table === 'product_categories' ? _prodCategories : _prodCompanies;
+        const row = list.find(x => x.id === id);
+        if (row) row.show_when_empty = checked;
+    } catch (e) { alert('خطأ: ' + e.message); }
+};
+
 // إعادة رسم صفحة الأصناف كاملة من الـ state المحلي الحالي (من غير أي fetch
 // جديد لـ Supabase) مع حفظ موضع التمرير قبلها وإرجاعه بعدها — مستخدمة في
 // الحالات اللي محتاجة إعادة بناء الصفحة كلها (مثلاً تحديث قوائم المجموعات/
@@ -492,6 +507,9 @@ window.prodOpenCompanyManager = function() {
                     ${_prodCompanies.map(co=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;gap:8px">
                         <img src="${co.image_url||''}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#F1F5F9;${co.image_url?'':'display:none'}">
                         <span style="flex:1">${co.name}</span>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748B;white-space:nowrap;cursor:pointer">
+                            <input type="checkbox" style="width:auto" ${co.show_when_empty?'checked':''} onchange="prodToggleShowWhenEmpty('product_companies','${co.id}',this.checked)">🔜 لو فاضي
+                        </label>
                         <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
                             📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_companies','${co.id}',this)">
                         </label>
