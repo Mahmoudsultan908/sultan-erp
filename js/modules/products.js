@@ -112,6 +112,7 @@ function prodRenderPage(c) {
             </select>
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCategoryManager()">📁 إدارة المجموعات</button>
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCompanyManager()">🏢 إدارة الشركات</button>
+            <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="prodOpenNewRestockedReport()">🆕 أصناف جديدة/اتشرت تاني</button>
             <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="loadMod(document.querySelector('[data-mod=&quot;product-import&quot;]'), 'product-import')">📥 استيراد Excel</button>
             <button class="mod-btn" style="background:#EFF6FF;color:#2563EB" onclick="prodExportXls()">📤 تصدير Excel</button>
         </div>
@@ -577,6 +578,74 @@ window.prodAddCompany = async function() {
     } catch(e) { alert('خطأ: ' + e.message); }
 };
 
+// ════════════════════════════════════════════════════════════
+// تقرير: أصناف جديدة + أصناف نفدت واتُشترت تاني (آخر 7 أيام)
+// ════════════════════════════════════════════════════════════
+// ملحوظة على تعريف "نفدت واتُشترت تاني": مفيش عندنا جدول سجل حركة مخزون
+// تاريخي (stock ledger) نقدر نسأله "كان الرصيد كام قبل تاريخ معيّن"، فبنقدّرها:
+// المخزون الحالي ناقص كمية آخر شراء خلال الفترة = المخزون التقديري قبل
+// الشراء ده. لو النتيجة صفر أو أقل، معناه الصنف كان نافد فعلاً قبل ما يتشترى.
+// تقدير معقول وليس دقيق 100% (ممكن يتأثر بمرتجعات/تحويلات حصلت في نفس الفترة).
+window.prodOpenNewRestockedReport = async function() {
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'prodNewRestockModal';
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:640px">
+            <div class="mod-modal-header"><h3>🆕 أصناف جديدة / اتشرت تاني</h3>
+                <button class="mod-modal-close" onclick="document.getElementById('prodNewRestockModal').remove()">&times;</button></div>
+            <div class="mod-modal-body"><div class="empty-state"><span>⏳</span>جاري التحميل...</div></div>
+        </div>`;
+    document.body.appendChild(modal);
+    const body = modal.querySelector('.mod-modal-body');
+    try {
+        const days = 7;
+        const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+        const { data: recentPurchases, error } = await sb.from('purchase_items')
+            .select('product_id, qty, units_per_carton_snapshot, purchases!inner(created_at, status)')
+            .eq('purchases.status', 'confirmed')
+            .gte('purchases.created_at', cutoff);
+        if (error) throw error;
+
+        // إجمالي كمية الشراء (بالوحدة الصغرى) لكل صنف خلال الفترة
+        const recentPurchaseQty = {};
+        (recentPurchases || []).forEach(pi => {
+            const smallest = (Number(pi.qty) || 0) * (Number(pi.units_per_carton_snapshot) || 1);
+            recentPurchaseQty[pi.product_id] = (recentPurchaseQty[pi.product_id] || 0) + smallest;
+        });
+
+        const newProducts = _prodList.filter(p => p.created_at && new Date(p.created_at) >= new Date(cutoff));
+        const newIds = new Set(newProducts.map(p => p.id));
+        const restocked = _prodList.filter(p => {
+            if (!recentPurchaseQty[p.id] || newIds.has(p.id)) return false;
+            const stockBeforePurchase = (p._totalStock || 0) - recentPurchaseQty[p.id];
+            return stockBeforePurchase <= 0;
+        });
+
+        const rowsHtml = (list, extraCol) => list.map(p => `<tr>
+            <td>${p.name}</td>
+            <td><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace;direction:ltr;display:inline-block">${p.code || '—'}</span></td>
+            <td style="text-align:left">${extraCol(p)}</td>
+        </tr>`).join('');
+
+        body.innerHTML = `
+            <p style="font-size:12px;color:#94A3B8;margin-bottom:14px">بيانات آخر ${days} أيام</p>
+            <h4 style="margin:0 0 8px;font-size:14px">🆕 أصناف جديدة (${newProducts.length})</h4>
+            ${newProducts.length ? `<div class="mod-table-wrap" style="margin-bottom:20px"><table class="mod-table"><thead><tr>
+                <th>الصنف</th><th>الكود</th><th style="text-align:left">تاريخ الإضافة</th>
+            </tr></thead><tbody>${rowsHtml(newProducts, p => new Date(p.created_at).toLocaleDateString('ar-EG'))}</tbody></table></div>`
+                : '<p class="dash-empty" style="margin-bottom:20px">مفيش أصناف جديدة فى الفترة دي</p>'}
+
+            <h4 style="margin:0 0 8px;font-size:14px">🔄 أصناف نفدت واتُشترت تاني (${restocked.length})</h4>
+            ${restocked.length ? `<div class="mod-table-wrap"><table class="mod-table"><thead><tr>
+                <th>الصنف</th><th>الكود</th><th style="text-align:left">المخزون الحالي</th>
+            </tr></thead><tbody>${rowsHtml(restocked, p => prodFmt(p._totalStock))}</tbody></table></div>`
+                : '<p class="dash-empty">مفيش أصناف نفدت واتُشترت تاني فى الفترة دي</p>'}`;
+    } catch (err) {
+        body.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+    }
+};
+
 // INSERT/UPDATE واحد لصف الصنف في products، بيرجّع { data, productId }
 async function prodSaveProductRow(payload, editingId) {
     if (editingId) {
@@ -729,4 +798,4 @@ window.prodToggleActive = async function(id, activate) {
     } catch(e) { alert('خطأ: ' + e.message); }
 };
 
-Object.assign(window, { renderProducts, prodOnSearch, prodOnFilterCat, prodOnFilterCompany, prodOpenAdd, prodOpenEdit, prodOpenDuplicate, prodCloseModal, prodSave, prodToggleActive, prodOpenCategoryManager, prodAddCategory, prodOpenCompanyManager, prodAddCompany });
+Object.assign(window, { renderProducts, prodOnSearch, prodOnFilterCat, prodOnFilterCompany, prodOpenAdd, prodOpenEdit, prodOpenDuplicate, prodCloseModal, prodSave, prodToggleActive, prodOpenCategoryManager, prodAddCategory, prodOpenCompanyManager, prodAddCompany, prodOpenNewRestockedReport });
