@@ -5,6 +5,9 @@
    ════════════════════════════════════════════════════════════ */
 
 let _custList = [];
+let _custRegionMap = {};
+let _custLastIntMap = {};
+let _custStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي — قائمة العملاء
@@ -19,13 +22,13 @@ async function renderCustomers(c) {
             sb.from('customer_interactions').select('customer_id, interaction_date').then(r => r, () => ({ data: [] })),
         ]);
         _custList = customers || [];
-        const regionMap = {};
-        (regions || []).forEach(r => { regionMap[r.id] = r.name; });
+        _custRegionMap = {};
+        (regions || []).forEach(r => { _custRegionMap[r.id] = r.name; });
         // آخر تفاعل لكل عميل — أحدث interaction_date من customer_interactions
-        const lastInteractionMap = {};
+        _custLastIntMap = {};
         (interactionsResult?.data || []).forEach(x => {
-            if (!lastInteractionMap[x.customer_id] || x.interaction_date > lastInteractionMap[x.customer_id]) {
-                lastInteractionMap[x.customer_id] = x.interaction_date;
+            if (!_custLastIntMap[x.customer_id] || x.interaction_date > _custLastIntMap[x.customer_id]) {
+                _custLastIntMap[x.customer_id] = x.interaction_date;
             }
         });
 
@@ -45,36 +48,29 @@ async function renderCustomers(c) {
                 <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💵</div><div class="mod-card-val">${custFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
             </div>
 
-            <div class="mod-table-wrap" style="margin-top:16px">
+            <div class="dash-card" style="padding:14px;margin-top:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+                <div style="min-width:130px">
+                    <label class="ob-label">فلتر الرصيد</label>
+                    <select id="custBalFilterOp" class="ob-input" style="margin:0">
+                        <option value="">الكل</option>
+                        <option value="gt">أكبر من</option>
+                        <option value="lt">أصغر من</option>
+                    </select>
+                </div>
+                <div style="min-width:130px">
+                    <input type="number" id="custBalFilterVal" class="ob-input" style="margin:0" placeholder="مبلغ..." dir="ltr">
+                </div>
+                <button class="ob-add-btn" onclick="custApplyBalanceFilter()">🔍 تطبيق</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('custBalFilterOp').value='';document.getElementById('custBalFilterVal').value='';custApplyBalanceFilter()">الكل</button>
+            </div>
+
+            <div class="mod-table-wrap" style="margin-top:10px">
                 <table class="mod-table"><thead><tr>
                     <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>آخر تفاعل</th>
                     <th style="text-align:left">الرصيد</th>
                     <th style="text-align:center">إجراءات</th>
                 </tr></thead>
-                <tbody>
-                    ${_custList.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>👥</span>لا يوجد عملاء.</td></tr>` :
-                    _custList.map(c => {
-                        const bal = Number(c.balance)||0;
-                        const balColor = bal > 0 ? '#DC2626' : bal < 0 ? '#059669' : '#64748B';
-                        const lastInt = lastInteractionMap[c.id];
-                        return `<tr>
-                            <td>
-                                <div style="display:flex;align-items:center;gap:8px">
-                                    <div style="width:32px;height:32px;border-radius:50%;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#475569">${(c.name||'?').charAt(0)}</div>
-                                    <div><div style="font-weight:600">${c.name}</div>${c.code?`<div style="font-size:11px;color:#94A3B8">${c.code}</div>`:''}</div>
-                                </div>
-                            </td>
-                            <td dir="ltr" style="text-align:right;color:#64748B">${c.phone||'—'}</td>
-                            <td style="color:#64748B">${regionMap[c.region_id] || '—'}</td>
-                            <td style="font-size:12px;color:#94A3B8">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
-                            <td style="text-align:left;font-weight:700;color:${balColor}">${custFmt(bal)}</td>
-                            <td style="text-align:center;white-space:nowrap">
-                                <button class="cc-edit" onclick="custShowStatement('${c.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
-                                ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenAdd('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="تسجيل تفاعل سريع">📞</button>` : ''}
-                            </td>
-                        </tr>`;
-                    }).join('')}
-                </tbody></table>
+                <tbody id="custListTbody">${custListRowsHtml(_custList)}</tbody></table>
             </div>
         `;
     } catch (err) {
@@ -231,6 +227,8 @@ window.custShowStatement = async function(customerId) {
         const tableDebit = displayMoves.reduce((s,m)=>s+m.debit,0);
         const tableCredit = displayMoves.reduce((s,m)=>s+m.credit,0);
 
+        _custStmtMoves = displayMoves;
+
         document.getElementById('custStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
                 <div class="mod-card" style="padding:14px">
@@ -248,6 +246,7 @@ window.custShowStatement = async function(customerId) {
                 </div>
             </div>
 
+            <input type="text" id="custStmtSearch" class="mod-form-input" style="margin-bottom:10px" placeholder="🔍 بحث في الحركات (اسم الفاتورة/المرتجع/البيان)..." oninput="custStmtFilterRows(this.value)">
             <div class="mod-table-wrap">
                 <table class="mod-table"><thead><tr>
                     <th>التاريخ</th><th>البيان</th>
@@ -256,41 +255,7 @@ window.custShowStatement = async function(customerId) {
                     <th style="text-align:left">الرصيد</th>
                     <th></th>
                 </tr></thead>
-                <tbody>
-                    ${displayMoves.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
-                    displayMoves.map(m => {
-                        const isCash = m.type.endsWith('-cash');
-                        const bg = m.type==='sale-credit' ? '#FEF2F2' : m.type==='payment' ? '#ECFDF5'
-                            : m.type==='return-credit' || m.type==='return-cash' ? '#FFFBEB'
-                            : m.type==='transfer-out' || m.type==='transfer-in' ? '#EFF6FF'
-                            : m.type==='opening' ? '#F5F3FF'
-                            : m.type==='legacy-carry' ? '#F1F5F9' : '#F8FAFC';
-                        const icon = m.type==='sale-credit' ? '<span style="color:#DC2626">🛒</span>'
-                            : m.type==='sale-cash' ? '<span style="color:#94A3B8">💰</span>'
-                            : m.type.startsWith('return') ? '<span style="color:#D97706">↩️</span>'
-                            : m.type.startsWith('transfer') ? '<span style="color:#2563EB">🔀</span>'
-                            : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
-                            : m.type==='legacy-carry' ? '<span style="color:#64748B">🗄️</span>'
-                            : '<span style="color:#059669">💵</span>';
-                        const navBtn = m.nav?.kind === 'sale' ? `<button class="cc-edit" title="افتح الفاتورة" onclick="custGoToDoc('sales','${m.nav.no}')">🔗</button>`
-                            : m.nav?.kind === 'return' ? `<button class="cc-edit" title="افتح المرتجع" onclick="custGoToDoc('sales_return','${m.nav.no}')">🔗</button>`
-                            : m.nav?.kind === 'payment' ? `<button class="cc-edit" title="افتح سند التحصيل" onclick="custGoToPayment('${m.nav.id}')">🔗</button>`
-                            : m.nav?.kind === 'transfer' ? `<button class="cc-edit" title="افتح تحويل الأرصدة" onclick="custGoToModule('balance-transfer')">🔗</button>`
-                            : m.nav?.kind === 'opening' ? `<button class="cc-edit" title="افتح الأرصدة الافتتاحية" onclick="custGoToModule('opening-balances')">🔗</button>`
-                            : '';
-                        return `<tr style="background:${bg}">
-                        <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
-                        <td>
-                            ${icon} ${m.desc}
-                            ${isCash ? '<span style="font-size:11.5px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
-                        </td>
-                        <td style="text-align:left;font-weight:600;color:#DC2626">${m.debit?custFmt(m.debit):'—'}</td>
-                        <td style="text-align:left;font-weight:600;color:#059669">${m.credit?custFmt(m.credit):'—'}</td>
-                        <td style="text-align:left;font-weight:700">${custFmt(m.balance)}</td>
-                        <td style="text-align:center">${navBtn}</td>
-                    </tr>`;
-                    }).join('')}
-                </tbody>
+                <tbody id="custStmtTbody">${custStmtRowsHtml(displayMoves)}</tbody>
                 ${displayMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
                     <td colspan="2">الإجمالي</td>
                     <td style="text-align:left;color:#DC2626">${custFmt(tableDebit)}</td>
@@ -327,6 +292,89 @@ window.custShowStatement = async function(customerId) {
 };
 
 window.custCloseModal = function(id) { const m = document.getElementById(id); if (m) m.remove(); };
+
+// بناء صفوف قائمة العملاء — دالة منفصلة عشان تتنادى من العرض الأول
+// ومن custApplyBalanceFilter من غير تكرار كود
+function custListRowsHtml(list) {
+    if (!list.length) return `<tr><td colspan="6" class="empty-state"><span>👥</span>لا يوجد عملاء.</td></tr>`;
+    return list.map(c => {
+        const bal = Number(c.balance)||0;
+        const balColor = bal > 0 ? '#DC2626' : bal < 0 ? '#059669' : '#64748B';
+        const lastInt = _custLastIntMap[c.id];
+        return `<tr>
+            <td>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <div style="width:32px;height:32px;border-radius:50%;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#475569">${(c.name||'?').charAt(0)}</div>
+                    <div><div style="font-weight:600">${c.name}</div>${c.code?`<div style="font-size:11px;color:#94A3B8">${c.code}</div>`:''}</div>
+                </div>
+            </td>
+            <td dir="ltr" style="text-align:right;color:#64748B">${c.phone||'—'}</td>
+            <td style="color:#64748B">${_custRegionMap[c.region_id] || '—'}</td>
+            <td style="font-size:12px;color:#94A3B8">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
+            <td style="text-align:left;font-weight:700;color:${balColor}">${custFmt(bal)}</td>
+            <td style="text-align:center;white-space:nowrap">
+                <button class="cc-edit" onclick="custShowStatement('${c.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
+                ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenAdd('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="تسجيل تفاعل سريع">📞</button>` : ''}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+window.custApplyBalanceFilter = function() {
+    const op = document.getElementById('custBalFilterOp')?.value;
+    const val = parseFloat(document.getElementById('custBalFilterVal')?.value);
+    let filtered = _custList;
+    if (op && !isNaN(val)) {
+        filtered = _custList.filter(c => op === 'gt' ? (Number(c.balance)||0) > val : (Number(c.balance)||0) < val);
+    }
+    const tbody = document.getElementById('custListTbody');
+    if (tbody) tbody.innerHTML = custListRowsHtml(filtered);
+};
+
+// بناء صفوف جدول كشف الحساب — دالة منفصلة عشان تتنادى من العرض الأول
+// ومن custStmtFilterRows (البحث) من غير تكرار كود
+function custStmtRowsHtml(moves) {
+    if (!moves.length) return `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>`;
+    return moves.map(m => {
+        const isCash = m.type.endsWith('-cash');
+        const bg = m.type==='sale-credit' ? '#FEF2F2' : m.type==='payment' ? '#ECFDF5'
+            : m.type==='return-credit' || m.type==='return-cash' ? '#FFFBEB'
+            : m.type==='transfer-out' || m.type==='transfer-in' ? '#EFF6FF'
+            : m.type==='opening' ? '#F5F3FF'
+            : m.type==='legacy-carry' ? '#F1F5F9' : '#F8FAFC';
+        const icon = m.type==='sale-credit' ? '<span style="color:#DC2626">🛒</span>'
+            : m.type==='sale-cash' ? '<span style="color:#94A3B8">💰</span>'
+            : m.type.startsWith('return') ? '<span style="color:#D97706">↩️</span>'
+            : m.type.startsWith('transfer') ? '<span style="color:#2563EB">🔀</span>'
+            : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
+            : m.type==='legacy-carry' ? '<span style="color:#64748B">🗄️</span>'
+            : '<span style="color:#059669">💵</span>';
+        const navBtn = m.nav?.kind === 'sale' ? `<button class="cc-edit" title="افتح الفاتورة" onclick="custGoToDoc('sales','${m.nav.no}')">🔗</button>`
+            : m.nav?.kind === 'return' ? `<button class="cc-edit" title="افتح المرتجع" onclick="custGoToDoc('sales_return','${m.nav.no}')">🔗</button>`
+            : m.nav?.kind === 'payment' ? `<button class="cc-edit" title="افتح سند التحصيل" onclick="custGoToPayment('${m.nav.id}')">🔗</button>`
+            : m.nav?.kind === 'transfer' ? `<button class="cc-edit" title="افتح تحويل الأرصدة" onclick="custGoToModule('balance-transfer')">🔗</button>`
+            : m.nav?.kind === 'opening' ? `<button class="cc-edit" title="افتح الأرصدة الافتتاحية" onclick="custGoToModule('opening-balances')">🔗</button>`
+            : '';
+        return `<tr style="background:${bg}">
+        <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
+        <td>
+            ${icon} ${m.desc}
+            ${isCash ? '<span style="font-size:11.5px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
+        </td>
+        <td style="text-align:left;font-weight:600;color:#DC2626">${m.debit?custFmt(m.debit):'—'}</td>
+        <td style="text-align:left;font-weight:600;color:#059669">${m.credit?custFmt(m.credit):'—'}</td>
+        <td style="text-align:left;font-weight:700">${custFmt(m.balance)}</td>
+        <td style="text-align:center">${navBtn}</td>
+    </tr>`;
+    }).join('');
+}
+
+window.custStmtFilterRows = function(query) {
+    const q = (query || '').trim().toLowerCase();
+    const filtered = q ? _custStmtMoves.filter(m => (m.desc || '').toLowerCase().includes(q)) : _custStmtMoves;
+    const tbody = document.getElementById('custStmtTbody');
+    if (tbody) tbody.innerHTML = custStmtRowsHtml(filtered);
+};
 
 // ينقل لصفحة "إدارة العملاء" (master-data.js) ويفتح نافذة تعديل بيانات
 // نفس العميل تلقائياً — قبل كده كانت الصفحتين منفصلتين تماماً من غير أي

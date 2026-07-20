@@ -5,6 +5,7 @@
    ════════════════════════════════════════════════════════════ */
 
 let _supList = [];
+let _supStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي — قائمة الموردين
@@ -203,6 +204,8 @@ window.supShowStatement = async function(supplierId) {
         const tableDebit = displayMoves.reduce((s,m)=>s+m.debit,0);
         const tableCredit = displayMoves.reduce((s,m)=>s+m.credit,0);
 
+        _supStmtMoves = displayMoves;
+
         document.getElementById('supStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
                 <div class="mod-card" style="padding:14px">
@@ -220,6 +223,7 @@ window.supShowStatement = async function(supplierId) {
                 </div>
             </div>
 
+            <input type="text" id="supStmtSearch" class="mod-form-input" style="margin-bottom:10px" placeholder="🔍 بحث في الحركات (اسم الفاتورة/المرتجع/البيان)..." oninput="supStmtFilterRows(this.value)">
             <div class="mod-table-wrap">
                 <table class="mod-table"><thead><tr>
                     <th>التاريخ</th><th>البيان</th>
@@ -227,35 +231,7 @@ window.supShowStatement = async function(supplierId) {
                     <th style="text-align:left">دائن (شراء)</th>
                     <th style="text-align:left">الرصيد</th>
                 </tr></thead>
-                <tbody>
-                    ${displayMoves.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
-                    displayMoves.map(m => {
-                        const isCash = m.type.endsWith('-cash');
-                        const bg = m.type==='purchase-credit' ? '#FEF3C7' : m.type==='payment' ? '#ECFDF5'
-                            : m.type.startsWith('return') ? '#FFFBEB'
-                            : m.type==='transfer-out' || m.type==='transfer-in' || m.type==='cash-refund' ? '#EFF6FF'
-                            : m.type==='opening' ? '#F5F3FF'
-                            : m.type==='legacy-carry' ? '#F1F5F9' : '#F8FAFC';
-                        const icon = m.type==='purchase-credit' ? '<span style="color:#D97706">📥</span>'
-                            : m.type==='purchase-cash' ? '<span style="color:#94A3B8">💰</span>'
-                            : m.type.startsWith('return') ? '<span style="color:#DC2626">↩️</span>'
-                            : m.type==='transfer-out' || m.type==='transfer-in' ? '<span style="color:#2563EB">🔀</span>'
-                            : m.type==='cash-refund' ? '<span style="color:#2563EB">💰</span>'
-                            : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
-                            : m.type==='legacy-carry' ? '<span style="color:#64748B">🗄️</span>'
-                            : '<span style="color:#059669">💸</span>';
-                        return `<tr style="background:${bg}">
-                        <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
-                        <td>
-                            ${icon} ${m.desc}
-                            ${isCash ? '<span style="font-size:11.5px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
-                        </td>
-                        <td style="text-align:left;font-weight:600;color:#059669">${m.debit?supFmt(m.debit):'—'}</td>
-                        <td style="text-align:left;font-weight:600;color:#D97706">${m.credit?supFmt(m.credit):'—'}</td>
-                        <td style="text-align:left;font-weight:700">${supFmt(m.balance)}</td>
-                    </tr>`;
-                    }).join('')}
-                </tbody>
+                <tbody id="supStmtTbody">${supStmtRowsHtml(displayMoves)}</tbody>
                 ${displayMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
                     <td colspan="2">الإجمالي</td>
                     <td style="text-align:left;color:#059669">${supFmt(tableDebit)}</td>
@@ -283,6 +259,45 @@ window.supShowStatement = async function(supplierId) {
 };
 
 window.supCloseModal = function(id) { const m = document.getElementById(id); if (m) m.remove(); };
+
+// بناء صفوف جدول كشف الحساب — دالة منفصلة عشان تتنادى من العرض الأول
+// ومن supStmtFilterRows (البحث) من غير تكرار كود
+function supStmtRowsHtml(moves) {
+    if (!moves.length) return `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>`;
+    return moves.map(m => {
+        const isCash = m.type.endsWith('-cash');
+        const bg = m.type==='purchase-credit' ? '#FEF3C7' : m.type==='payment' ? '#ECFDF5'
+            : m.type.startsWith('return') ? '#FFFBEB'
+            : m.type==='transfer-out' || m.type==='transfer-in' || m.type==='cash-refund' ? '#EFF6FF'
+            : m.type==='opening' ? '#F5F3FF'
+            : m.type==='legacy-carry' ? '#F1F5F9' : '#F8FAFC';
+        const icon = m.type==='purchase-credit' ? '<span style="color:#D97706">📥</span>'
+            : m.type==='purchase-cash' ? '<span style="color:#94A3B8">💰</span>'
+            : m.type.startsWith('return') ? '<span style="color:#DC2626">↩️</span>'
+            : m.type==='transfer-out' || m.type==='transfer-in' ? '<span style="color:#2563EB">🔀</span>'
+            : m.type==='cash-refund' ? '<span style="color:#2563EB">💰</span>'
+            : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
+            : m.type==='legacy-carry' ? '<span style="color:#64748B">🗄️</span>'
+            : '<span style="color:#059669">💸</span>';
+        return `<tr style="background:${bg}">
+        <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
+        <td>
+            ${icon} ${m.desc}
+            ${isCash ? '<span style="font-size:11.5px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
+        </td>
+        <td style="text-align:left;font-weight:600;color:#059669">${m.debit?supFmt(m.debit):'—'}</td>
+        <td style="text-align:left;font-weight:600;color:#D97706">${m.credit?supFmt(m.credit):'—'}</td>
+        <td style="text-align:left;font-weight:700">${supFmt(m.balance)}</td>
+    </tr>`;
+    }).join('');
+}
+
+window.supStmtFilterRows = function(query) {
+    const q = (query || '').trim().toLowerCase();
+    const filtered = q ? _supStmtMoves.filter(m => (m.desc || '').toLowerCase().includes(q)) : _supStmtMoves;
+    const tbody = document.getElementById('supStmtTbody');
+    if (tbody) tbody.innerHTML = supStmtRowsHtml(filtered);
+};
 
 // ينقل لصفحة "إدارة الموردين" (master-data.js) ويفتح نافذة تعديل بيانات
 // نفس المورد تلقائياً — نفس فكرة custGoEditProfile في customers.js.
