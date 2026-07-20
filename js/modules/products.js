@@ -416,8 +416,12 @@ window.prodOpenCategoryManager = function() {
                     <button class="mod-btn mod-btn-primary" style="white-space:nowrap" onclick="prodAddCategory()">+ إضافة</button>
                 </div>
                 <div id="catList">
-                    ${_prodCategories.map(cat=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9">
-                        <span>${cat.name}</span>
+                    ${_prodCategories.map(cat=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;gap:8px">
+                        <img src="${cat.image_url||''}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#F1F5F9;${cat.image_url?'':'display:none'}">
+                        <span style="flex:1">${cat.name}</span>
+                        <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
+                            📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_categories','${cat.id}',this)">
+                        </label>
                     </div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:20px">لا توجد مجموعات بعد</p>'}
                 </div>
             </div>
@@ -436,6 +440,27 @@ window.prodAddCategory = async function() {
         document.getElementById('prodCatModal').remove();
         prodRebuildPagePreserveScroll(); // إعادة رسم الصفحة من الـ state المحلي (بدون fetch كامل جديد)، مع الحفاظ على موضع التمرير
     } catch(e) { alert('خطأ: ' + e.message); }
+};
+
+// رفع صورة لمجموعة (قسم رئيسي) أو شركة (قسم فرعي في سلطانو) — نفس باكت
+// صور الأصناف، مستخدم من مودالي إدارة المجموعات والشركات
+window.prodUploadLookupImage = async function(table, id, input) {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+        const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+        const path = `${table}/${Date.now()}_${safeName}`;
+        const { error: upErr } = await sb.storage.from(PROD_IMAGE_BUCKET).upload(path, file);
+        if (upErr) throw upErr;
+        const { data: pub } = sb.storage.from(PROD_IMAGE_BUCKET).getPublicUrl(path);
+        const { error } = await sb.from(table).update({ image_url: pub.publicUrl }).eq('id', id);
+        if (error) throw error;
+        const list = table === 'product_categories' ? _prodCategories : _prodCompanies;
+        const row = list.find(x => x.id === id);
+        if (row) row.image_url = pub.publicUrl;
+        if (table === 'product_categories') { document.getElementById('prodCatModal')?.remove(); prodOpenCategoryManager(); }
+        else { document.getElementById('prodCompModal')?.remove(); prodOpenCompanyManager(); }
+    } catch (e) { alert('خطأ في رفع الصورة: ' + e.message); }
 };
 
 // إعادة رسم صفحة الأصناف كاملة من الـ state المحلي الحالي (من غير أي fetch
@@ -464,8 +489,12 @@ window.prodOpenCompanyManager = function() {
                     <button class="mod-btn mod-btn-primary" style="white-space:nowrap" onclick="prodAddCompany()">+ إضافة</button>
                 </div>
                 <div id="compList">
-                    ${_prodCompanies.map(co=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9">
-                        <span>${co.name}</span>
+                    ${_prodCompanies.map(co=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;gap:8px">
+                        <img src="${co.image_url||''}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#F1F5F9;${co.image_url?'':'display:none'}">
+                        <span style="flex:1">${co.name}</span>
+                        <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
+                            📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_companies','${co.id}',this)">
+                        </label>
                     </div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:20px">لا توجد شركات بعد</p>'}
                 </div>
             </div>
