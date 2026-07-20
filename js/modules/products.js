@@ -13,6 +13,7 @@ let _prodPricesMap = {};
 let _prodSuppliers = [];
 let _prodSearch = '';
 let _prodFilterCat = '';
+let _prodFilterCompany = '';
 let _prodEditingId = null;
 const PROD_IMAGE_BUCKET = 'product-images'; // باكت عام (Public) — عشان سلطانو يعرض الصورة للعميل من غير تسجيل دخول
 // المؤجل التقديري (مبلغ فعلي للوحدة) المستخدم في حساب هامش الربح داخل مودال
@@ -105,6 +106,10 @@ function prodRenderPage(c) {
                 <option value="">كل المجموعات</option>
                 ${_prodCategories.map(cat=>`<option value="${cat.id}">${cat.name}</option>`).join('')}
             </select>
+            <select id="prodCompanyFilter" class="mod-form-input" style="width:180px;margin:0" onchange="prodOnFilterCompany(this.value)">
+                <option value="">كل الشركات</option>
+                ${_prodCompanies.map(co=>`<option value="${co.id}">${co.name}</option>`).join('')}
+            </select>
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCategoryManager()">📁 إدارة المجموعات</button>
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCompanyManager()">🏢 إدارة الشركات</button>
             <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="loadMod(document.querySelector('[data-mod=&quot;product-import&quot;]'), 'product-import')">📥 استيراد Excel</button>
@@ -113,7 +118,7 @@ function prodRenderPage(c) {
 
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>الصنف</th><th>الكود</th><th>المجموعة</th><th>الوحدة</th>
+                <th>الصنف</th><th>الكود</th><th>المجموعة</th><th>الشركة</th><th>الوحدة</th>
                 <th style="text-align:left">سعر الشراء</th>
                 ${_prodPriceLevels.length
                     ? _prodPriceLevels.map(lvl => `<th style="text-align:left">${lvl.name}</th>`).join('')
@@ -132,25 +137,35 @@ function prodLevelPriceCell(p, levelId) {
     return (price != null && Number(price) > 0) ? prodFmt(price) : '<span style="color:#CBD5E1">—</span>';
 }
 
-function prodRenderRows() {
-    const tbody = document.getElementById('prodTbody');
-    if (!tbody) return;
+// فلترة الأصناف حسب المجموعة/الشركة/البحث المطبّقين حالياً — دالة واحدة
+// مشتركة بين عرض الجدول والتصدير، عشان تصدير الإكسل يطابق اللي ظاهر بالظبط.
+function prodGetFilteredRows() {
     let rows = _prodList;
     if (_prodFilterCat) rows = rows.filter(p => p.category_id === _prodFilterCat);
+    if (_prodFilterCompany) rows = rows.filter(p => p.company_id === _prodFilterCompany);
     if (_prodSearch) {
         const q = _prodSearch.toLowerCase();
         rows = rows.filter(p => (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q) || (p.barcode||'').toLowerCase().includes(q));
     }
-    const totalCols = 7 + (_prodPriceLevels.length ? _prodPriceLevels.length - 1 : 0);
+    return rows;
+}
+
+function prodRenderRows() {
+    const tbody = document.getElementById('prodTbody');
+    if (!tbody) return;
+    const rows = prodGetFilteredRows();
+    const totalCols = 8 + (_prodPriceLevels.length ? _prodPriceLevels.length - 1 : 0);
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="${totalCols}" class="empty-state"><span>🏷️</span>لا توجد أصناف مطابقة</td></tr>`; return; }
 
     tbody.innerHTML = rows.map(p => {
         const cat = _prodCategories.find(c=>c.id===p.category_id);
+        const co = _prodCompanies.find(c=>c.id===p.company_id);
         const stockColor = p._totalStock <= 0 ? '#DC2626' : p._totalStock <= (p.reorder_point||0) ? '#D97706' : '#059669';
         return `<tr>
             <td><strong>${p.name}</strong>${p.barcode?`<div style="font-size:11.5px;color:#94A3B8;direction:ltr;text-align:right">${p.barcode}</div>`:''}</td>
             <td><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace;direction:ltr;display:inline-block">${p.code||'—'}</span></td>
             <td>${cat?.name || '—'}</td>
+            <td>${co?.name || '—'}</td>
             <td>${p.unit || p.sale_unit || '—'}</td>
             <td style="text-align:left">${prodFmt(p.purchase_price)}</td>
             ${_prodPriceLevels.length
@@ -159,6 +174,7 @@ function prodRenderRows() {
             <td style="text-align:center;font-weight:700;color:${stockColor}">${prodFmt(p._totalStock)}</td>
             <td style="display:flex;gap:4px;justify-content:center">
                 <button class="cc-edit" onclick="prodOpenEdit('${p.id}')">✏️</button>
+                <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="prodOpenDuplicate('${p.id}')" title="تكرار الصنف">🔁</button>
                 <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="prodToggleActive('${p.id}', ${p.is_active===false})">${p.is_active===false?'↩️':'🗑️'}</button>
             </td>
         </tr>`;
@@ -175,16 +191,20 @@ function prodUpdateCards() {
     setTxt('prodCardCats', _prodCategories.length);
 }
 
-// تصدير كل الأصناف لإكسيل — عمود منفصل لكل مستوى سعر (نفس تنظيم الجدول)
+// تصدير الأصناف لإكسيل — بيصدّر بس الأصناف الظاهرة حاليًا بعد أي فلتر
+// (مجموعة/شركة/بحث) مطبّق، مش كل الأصناف دايمًا — عمود منفصل لكل مستوى سعر.
 window.prodExportXls = function() {
-    if (!_prodList.length) { alert('لا يوجد أصناف للتصدير'); return; }
-    const rows = _prodList.map(p => {
+    const filtered = prodGetFilteredRows();
+    if (!filtered.length) { alert('لا يوجد أصناف للتصدير'); return; }
+    const rows = filtered.map(p => {
         const cat = _prodCategories.find(c => c.id === p.category_id);
+        const co = _prodCompanies.find(c => c.id === p.company_id);
         const row = {
             'الكود': p.code || '',
             'الصنف': p.name,
             'الباركود': p.barcode || '',
             'المجموعة': cat?.name || '',
+            'الشركة': co?.name || '',
             'الوحدة': p.unit || p.sale_unit || '',
             'سعر الشراء': Number(p.purchase_price) || 0,
         };
@@ -207,6 +227,7 @@ window.prodExportXls = function() {
 
 window.prodOnSearch = function(v) { _prodSearch = v; prodRenderRows(); };
 window.prodOnFilterCat = function(v) { _prodFilterCat = v; prodRenderRows(); };
+window.prodOnFilterCompany = function(v) { _prodFilterCompany = v; prodRenderRows(); };
 
 // ════════════════════════════════════════════════════════════
 // 2) إضافة / تعديل صنف
@@ -221,8 +242,31 @@ window.prodOpenEdit = function(id) {
     _prodEditingId = id;
     prodOpenModal(p);
 };
+// تكرار صنف: بيفتح فورم "إضافة" (مش تعديل — _prodEditingId فاضل null)
+// معبّى مسبقًا من كل بيانات المصدر (الأسعار، المجموعة، الشركة، الوحدات...)
+// عدا الكود/الباركود (بيتولّدوا جدد تلقائي زي أي صنف جديد) — المستخدم
+// يعدّل بس الاسم بدل ما يدخل كل البيانات من الأول لصنف شبه صنف موجود.
+window.prodOpenDuplicate = async function(id) {
+    const src = _prodList.find(x=>x.id===id);
+    if (!src) return;
+    _prodEditingId = null;
+    await prodOpenModal(src, { isDuplicate: true });
+};
 
-async function prodOpenModal(p) {
+// أعلى كود رقمي مُستخدم حاليًا + 1 — بيتجاهل الأكواد اللي مش أرقام صرفة
+// (زي أكواد قديمة بصيغة "P-001") عشان الحساب يفضل صحيح مع بيانات قديمة مختلطة.
+function prodNextCode() {
+    let max = 0;
+    (_prodList || []).forEach(p => {
+        const raw = String(p.code || '').trim();
+        if (/^\d+$/.test(raw)) { const n = parseInt(raw, 10); if (n > max) max = n; }
+    });
+    return String(max + 1);
+}
+
+async function prodOpenModal(p, opts) {
+    const isDuplicate = !!opts?.isDuplicate;
+    const isNewCode = !p || isDuplicate; // نفس حالة "إضافة" بالنسبة للكود/الباركود التلقائي
     // لو في تعديل، نجيب الأسعار الحالية لكل المستويات + آخر نسبة مؤجل اتسجلت
     // لهذا الصنف في فواتير الشراء (تقريب لهامش الربح — المؤجل مرتبط بالمورد/
     // الفاتورة مش بالصنف نفسه، فبناخد آخر نسبة مؤجل استُخدمت فعلياً لآخر
@@ -254,7 +298,7 @@ async function prodOpenModal(p) {
     modal.id = 'prodModal';
     modal.innerHTML = `
         <div class="mod-modal" style="max-width:560px">
-            <div class="mod-modal-header"><h3>${p?'✏️ تعديل صنف':'🏷️ إضافة صنف جديد'}</h3>
+            <div class="mod-modal-header"><h3>${isDuplicate ? '🔁 تكرار صنف' : p ? '✏️ تعديل صنف' : '🏷️ إضافة صنف جديد'}</h3>
                 <button class="mod-modal-close" onclick="prodCloseModal()">&times;</button></div>
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>اسم الصنف *</label>
@@ -284,9 +328,9 @@ async function prodOpenModal(p) {
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>الكود</label>
-                        <input type="text" id="prodCode" class="mod-form-input" value="${p?.code||''}" placeholder="مثال: P-001" dir="ltr"></div>
+                        <input type="text" id="prodCode" class="mod-form-input" value="${isNewCode ? prodNextCode() : (p?.code||'')}" placeholder="مثال: P-001" dir="ltr"></div>
                     <div class="mod-form-group"><label>الباركود</label>
-                        <input type="text" id="prodBarcode" class="mod-form-input" value="${p?.barcode||''}" placeholder="اختياري" dir="ltr"></div>
+                        <input type="text" id="prodBarcode" class="mod-form-input" value="${isNewCode ? prodNextCode() : (p?.barcode||'')}" placeholder="اختياري" dir="ltr"></div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>المجموعة</label>
@@ -349,7 +393,7 @@ async function prodOpenModal(p) {
             </div>
             <div class="mod-modal-footer">
                 <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodCloseModal()">إلغاء</button>
-                <button class="mod-btn mod-btn-primary" onclick="prodSave()">💾 ${p?'حفظ التعديلات':'إضافة الصنف'}</button>
+                <button class="mod-btn mod-btn-primary" onclick="prodSave()">💾 ${(p && !isDuplicate) ? 'حفظ التعديلات' : 'إضافة الصنف'}</button>
             </div>
         </div>`;
     document.body.appendChild(modal);
@@ -566,6 +610,17 @@ window.prodSave = async function() {
     if (!name) return alert('اسم الصنف مطلوب');
     if (purchase_price <= 0) return alert('سعر الشراء يجب أن يكون أكبر من صفر');
 
+    // منع تكرار الاسم/الكود — مقارنة محلية (تطابق تام، بعد trim ومن غير حساسية
+    // لحالة الأحرف) قبل الحفظ، عشان رسالة واضحة بدل خطأ قاعدة بيانات خام.
+    // الكود له UNIQUE constraint فعلي في قاعدة البيانات (products_code_key)،
+    // لكن الفحص هنا بيمسك المشكلة الأول ويوضّح السبب بالعربي.
+    const dupName = _prodList.find(x => x.id !== _prodEditingId && (x.name||'').trim().toLowerCase() === name.toLowerCase());
+    if (dupName) return alert(`⚠️ فيه صنف تاني بنفس الاسم بالظبط: "${dupName.name}"\nلو الصنف مشابه بس مختلف (نكهة/حجم مختلف مثلاً)، عدّل الاسم شوية عشان يتميّز.`);
+    if (code) {
+        const dupCode = _prodList.find(x => x.id !== _prodEditingId && (x.code||'').trim().toLowerCase() === code.toLowerCase());
+        if (dupCode) return alert(`⚠️ الكود "${code}" مستخدم بالفعل للصنف: "${dupCode.name}"`);
+    }
+
     const btn = document.querySelector('#prodModal .mod-btn-primary');
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
 
@@ -652,7 +707,10 @@ window.prodSave = async function() {
         prodRenderRows();   // إعادة رسم صفوف الجدول من الـ state المحلي فقط (من غير fetch جديد ومن غير ما نفقد موضع التمرير)
         prodUpdateCards();
     } catch (err) {
-        alert('❌ خطأ أثناء الحفظ: ' + err.message);
+        // احتياطي: لو الفحص المحلي اتفوّت لأي سبب (زي تصادم حفظين فى نفس اللحظة)
+        // وقاعدة البيانات رفضت بسبب products_code_key، نوضّح السبب بالعربي.
+        const msg = /products_code_key/i.test(err.message||'') ? 'الكود ده مستخدم بالفعل لصنف تاني' : err.message;
+        alert('❌ خطأ أثناء الحفظ: ' + msg);
         btn.innerText = '💾 حفظ'; btn.disabled = false;
     }
 };
@@ -671,4 +729,4 @@ window.prodToggleActive = async function(id, activate) {
     } catch(e) { alert('خطأ: ' + e.message); }
 };
 
-Object.assign(window, { renderProducts, prodOnSearch, prodOnFilterCat, prodOpenAdd, prodOpenEdit, prodCloseModal, prodSave, prodToggleActive, prodOpenCategoryManager, prodAddCategory, prodOpenCompanyManager, prodAddCompany });
+Object.assign(window, { renderProducts, prodOnSearch, prodOnFilterCat, prodOnFilterCompany, prodOpenAdd, prodOpenEdit, prodOpenDuplicate, prodCloseModal, prodSave, prodToggleActive, prodOpenCategoryManager, prodAddCategory, prodOpenCompanyManager, prodAddCompany });
