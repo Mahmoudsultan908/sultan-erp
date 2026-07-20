@@ -452,7 +452,7 @@ window.prodOpenCategoryManager = function() {
     modal.className = 'mod-modal-bg active';
     modal.id = 'prodCatModal';
     modal.innerHTML = `
-        <div class="mod-modal" style="max-width:420px">
+        <div class="mod-modal" style="max-width:560px">
             <div class="mod-modal-header"><h3>📁 إدارة المجموعات</h3>
                 <button class="mod-modal-close" onclick="document.getElementById('prodCatModal').remove()">&times;</button></div>
             <div class="mod-modal-body">
@@ -470,6 +470,8 @@ window.prodOpenCategoryManager = function() {
                         <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
                             📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_categories','${cat.id}',this)">
                         </label>
+                        <button class="cc-edit" style="background:#FFFBEB;color:#D97706;padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_categories','${cat.id}')">✏️</button>
+                        <button class="cc-edit" style="background:#FEE2E2;color:#DC2626;padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_categories','${cat.id}')">🗑️</button>
                     </div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:20px">لا توجد مجموعات بعد</p>'}
                 </div>
             </div>
@@ -523,6 +525,54 @@ window.prodToggleShowWhenEmpty = async function(table, id, checked) {
     } catch (e) { alert('خطأ: ' + e.message); }
 };
 
+// إعادة فتح مودال المجموعة/الشركة بعد تعديل — نفس الحل المستخدم فعلاً
+// في prodUploadLookupImage، مركزّاه هنا عشان prodEditLookup/prodDeleteLookup يستخدموه
+function prodReopenLookupModal(table) {
+    if (table === 'product_categories') { document.getElementById('prodCatModal')?.remove(); prodOpenCategoryManager(); }
+    else { document.getElementById('prodCompModal')?.remove(); prodOpenCompanyManager(); }
+}
+
+window.prodEditLookup = async function(table, id) {
+    const list = table === 'product_categories' ? _prodCategories : _prodCompanies;
+    const row = list.find(x => x.id === id);
+    if (!row) return;
+    const name = prompt('الاسم الجديد:', row.name);
+    if (name == null) return; // المستخدم دوس إلغاء
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === row.name) return;
+    try {
+        const { error } = await sb.from(table).update({ name: trimmed }).eq('id', id);
+        if (error) throw error;
+        row.name = trimmed;
+        list.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ar'));
+        prodReopenLookupModal(table);
+        prodRebuildPagePreserveScroll();
+    } catch (e) {
+        if (e.code === '23505') alert('❌ فيه واحدة بنفس الاسم ده بالظبط بالفعل — اختار اسم تاني.');
+        else alert('خطأ: ' + e.message);
+    }
+};
+
+window.prodDeleteLookup = async function(table, id) {
+    const list = table === 'product_categories' ? _prodCategories : _prodCompanies;
+    const row = list.find(x => x.id === id);
+    if (!row) return;
+    const label = table === 'product_categories' ? 'المجموعة' : 'الشركة';
+    if (!confirm(`تأكيد حذف ${label} "${row.name}"؟`)) return;
+    try {
+        const { error } = await sb.from(table).delete().eq('id', id);
+        if (error) throw error;
+        const idx = list.findIndex(x => x.id === id);
+        if (idx > -1) list.splice(idx, 1);
+        prodReopenLookupModal(table);
+        prodRebuildPagePreserveScroll();
+    } catch (e) {
+        // فشل الحذف الأرجح لوجود أصناف مرتبطة (foreign key constraint) —
+        // رسالة أوضح للمستخدم من خطأ Postgres الخام
+        alert(`❌ مينفعش تحذف "${row.name}" — فيه أصناف مرتبطة بيها. لازم تنقلهم لـ${label==='المجموعة'?'مجموعة':'شركة'} تانية الأول.`);
+    }
+};
+
 // إعادة رسم صفحة الأصناف كاملة من الـ state المحلي الحالي (من غير أي fetch
 // جديد لـ Supabase) مع حفظ موضع التمرير قبلها وإرجاعه بعدها — مستخدمة في
 // الحالات اللي محتاجة إعادة بناء الصفحة كلها (مثلاً تحديث قوائم المجموعات/
@@ -540,7 +590,7 @@ window.prodOpenCompanyManager = function() {
     modal.className = 'mod-modal-bg active';
     modal.id = 'prodCompModal';
     modal.innerHTML = `
-        <div class="mod-modal" style="max-width:420px">
+        <div class="mod-modal" style="max-width:560px">
             <div class="mod-modal-header"><h3>🏢 إدارة الشركات</h3>
                 <button class="mod-modal-close" onclick="document.getElementById('prodCompModal').remove()">&times;</button></div>
             <div class="mod-modal-body">
@@ -558,6 +608,8 @@ window.prodOpenCompanyManager = function() {
                         <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
                             📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_companies','${co.id}',this)">
                         </label>
+                        <button class="cc-edit" style="background:#FFFBEB;color:#D97706;padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_companies','${co.id}')">✏️</button>
+                        <button class="cc-edit" style="background:#FEE2E2;color:#DC2626;padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_companies','${co.id}')">🗑️</button>
                     </div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:20px">لا توجد شركات بعد</p>'}
                 </div>
             </div>
