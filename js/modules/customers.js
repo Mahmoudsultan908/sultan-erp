@@ -193,13 +193,43 @@ window.custShowStatement = async function(customerId) {
         });
         moves.sort((a,b) => new Date(a.date) - new Date(b.date));
 
-        // حساب الرصيد المتحرك
-        let running = 0;
-        moves.forEach(m => { running += (m.debit - m.credit); m.balance = running; });
-
+        // ★ إجماليات "المبيعات/التحصيلات" فى الكروت لازم تفضل حقيقية 100%
+        //   (مبنية بس على حركات فعلية)، فبنحسبها هنا قبل أي إضافة صناعية تحت.
         const balNow = Number(cust.balance)||0;
         const totalDebit = moves.reduce((s,m)=>s+m.debit,0);
         const totalCredit = moves.reduce((s,m)=>s+m.credit,0);
+
+        // ★ حل جذري لعدم تطابق الكشف مع الرصيد الحقيقي عند عملاء منقولين من
+        //   نظام قديم (رصيدهم اتحط رقم مباشر وقت النقل من غير ما يتسجل أي
+        //   مستند يفسّره فى سلطان — مفيش صف حركة يمثّله). بدل ما نسيب عمود
+        //   "الرصيد" جنب كل صف يوصل لرقم مختلف عن رصيد العميل الحقيقي فى
+        //   آخر الكشف (مربك ومش دقيق)، بنضيف سطر واحد صناعي "رصيد مرحّل من
+        //   النظام القديم" بالفرق بالظبط، فيتصالح الرصيد المتحرك تمامًا مع
+        //   customers.balance الحقيقي — من غير ما نلمس قاعدة البيانات خالص
+        //   (عرض بس، مفيش أي تعديل على رصيد العميل الفعلي).
+        const displayMoves = [...moves];
+        const rawTotal = moves.reduce((s,m)=>s+(m.debit-m.credit),0);
+        const legacyDiff = balNow - rawTotal;
+        if (Math.abs(legacyDiff) > 0.01) {
+            // لازم يتحط قبل أول حركة حقيقية زمنيًا (زي رصيد افتتاحي حقيقي) —
+            // مش وقت إنشاء سجل العميل نفسه فى سلطان (وقت الهجرة)، لأن ده
+            // ممكن يكون متأخر عن تواريخ المستندات القديمة المُعاد تشغيلها فعليًا
+            const earliestDate = moves.length ? new Date(new Date(moves[0].date).getTime() - 1000).toISOString() : (cust.created_at || new Date(0).toISOString());
+            displayMoves.push({
+                date: earliestDate,
+                desc: 'رصيد مرحّل من النظام القديم (قبل سلطان)',
+                debit: Math.max(legacyDiff, 0), credit: Math.max(-legacyDiff, 0),
+                type: 'legacy-carry', nav: null,
+            });
+        }
+        displayMoves.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+        // حساب الرصيد المتحرك — على displayMoves (تشمل السطر الصناعي لو موجود)
+        // عشان عمود "الرصيد" جنب كل صف يتصالح صح مع الرصيد الحقيقي فى الآخر
+        let running = 0;
+        displayMoves.forEach(m => { running += (m.debit - m.credit); m.balance = running; });
+        const tableDebit = displayMoves.reduce((s,m)=>s+m.debit,0);
+        const tableCredit = displayMoves.reduce((s,m)=>s+m.credit,0);
 
         document.getElementById('custStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
@@ -227,18 +257,20 @@ window.custShowStatement = async function(customerId) {
                     <th></th>
                 </tr></thead>
                 <tbody>
-                    ${moves.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
-                    moves.map(m => {
+                    ${displayMoves.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
+                    displayMoves.map(m => {
                         const isCash = m.type.endsWith('-cash');
                         const bg = m.type==='sale-credit' ? '#FEF2F2' : m.type==='payment' ? '#ECFDF5'
                             : m.type==='return-credit' || m.type==='return-cash' ? '#FFFBEB'
                             : m.type==='transfer-out' || m.type==='transfer-in' ? '#EFF6FF'
-                            : m.type==='opening' ? '#F5F3FF' : '#F8FAFC';
+                            : m.type==='opening' ? '#F5F3FF'
+                            : m.type==='legacy-carry' ? '#F1F5F9' : '#F8FAFC';
                         const icon = m.type==='sale-credit' ? '<span style="color:#DC2626">🛒</span>'
                             : m.type==='sale-cash' ? '<span style="color:#94A3B8">💰</span>'
                             : m.type.startsWith('return') ? '<span style="color:#D97706">↩️</span>'
                             : m.type.startsWith('transfer') ? '<span style="color:#2563EB">🔀</span>'
                             : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
+                            : m.type==='legacy-carry' ? '<span style="color:#64748B">🗄️</span>'
                             : '<span style="color:#059669">💵</span>';
                         const navBtn = m.nav?.kind === 'sale' ? `<button class="cc-edit" title="افتح الفاتورة" onclick="custGoToDoc('sales','${m.nav.no}')">🔗</button>`
                             : m.nav?.kind === 'return' ? `<button class="cc-edit" title="افتح المرتجع" onclick="custGoToDoc('sales_return','${m.nav.no}')">🔗</button>`
@@ -259,19 +291,19 @@ window.custShowStatement = async function(customerId) {
                     </tr>`;
                     }).join('')}
                 </tbody>
-                ${moves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
+                ${displayMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
                     <td colspan="2">الإجمالي</td>
-                    <td style="text-align:left;color:#DC2626">${custFmt(totalDebit)}</td>
-                    <td style="text-align:left;color:#059669">${custFmt(totalCredit)}</td>
+                    <td style="text-align:left;color:#DC2626">${custFmt(tableDebit)}</td>
+                    <td style="text-align:left;color:#059669">${custFmt(tableCredit)}</td>
                     <td style="text-align:left">${custFmt(balNow)}</td>
                     <td></td>
                 </tr></tfoot>` : ''}
                 </table>
             </div>
-            ${Math.abs(moves.reduce((s,m)=>s+(m.debit-m.credit),0) - balNow) > 0.01 ? `
-            <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
-                ⚠️ مجموع حركات الكشف (${custFmt(moves.reduce((s,m)=>s+(m.debit-m.credit),0))}) لا يطابق رصيد العميل الفعلي (${custFmt(balNow)}) —
-                فيه حركة مؤثرة على الرصيد من نوع مش متضمّن فى الكشف لسه.
+            ${Math.abs(legacyDiff) > 0.01 ? `
+            <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:#475569;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
+                🗄️ سطر "رصيد مرحّل من النظام القديم" (${custFmt(legacyDiff)}) هو الفرق بين رصيد العميل الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
+                غالبًا عميل منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد العميل نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.
             </div>` : ''}
 
             <div style="margin-top:16px">

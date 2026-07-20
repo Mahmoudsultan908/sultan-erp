@@ -96,6 +96,10 @@ window.supShowStatement = async function(supplierId) {
             { data: purchases },
             { data: payments },
             { data: returns },
+            { data: transfersOut },
+            { data: transfersIn },
+            { data: cashRefunds },
+            { data: openingBalances },
             docsResult,
         ] = await Promise.all([
             sb.from('purchases').select('invoice_no, total, payment_type, status, created_at')
@@ -104,6 +108,19 @@ window.supShowStatement = async function(supplierId) {
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
             sb.from('purchase_returns').select('return_no, total, status, created_at, purchases(payment_type)')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }).limit(100),
+            // تحويلات رصيد بين موردين + استرداد نقدي من رصيد مورد لخزنة — كانوا
+            // ناقصين تمامًا من الكشف (راجع fn_balance_transfer_apply للاتجاهات)
+            sb.from('balance_transfers').select('id, to_s:to_supplier_id(name), amount, notes, created_at')
+                .eq('from_supplier_id', supplierId).eq('transfer_type', 'supplier_to_supplier')
+                .order('created_at', { ascending: true }),
+            sb.from('balance_transfers').select('id, from_s:from_supplier_id(name), amount, notes, created_at')
+                .eq('to_supplier_id', supplierId).eq('transfer_type', 'supplier_to_supplier')
+                .order('created_at', { ascending: true }),
+            sb.from('balance_transfers').select('id, amount, notes, created_at')
+                .eq('from_supplier_id', supplierId).eq('transfer_type', 'supplier_to_treasury')
+                .order('created_at', { ascending: true }),
+            sb.from('opening_balances').select('id, amount, as_of_date, notes')
+                .eq('supplier_id', supplierId).eq('balance_type', 'supplier').eq('status', 'confirmed'),
             // اختياري — لو جدول archive_documents لسه ما اتعملش، نتجاهل الخطأ بهدوء
             sb.from('archive_documents').select('id,title,file_url,category,created_at')
                 .eq('linked_type', 'supplier').eq('linked_id', supplierId)
@@ -136,14 +153,55 @@ window.supShowStatement = async function(supplierId) {
                 moves.push({ date: p.created_at, desc: `سداد ${p.ref||''}`, debit: Number(p.amount)||0, credit: 0, type: 'payment' });
             }
         });
+        // تحويل رصيد "من" المورد ده لمورد تاني: بيقلل رصيده — راجع
+        // fn_balance_transfer_apply (balance = balance - amount للمصدر)
+        (transfersOut||[]).forEach(t => {
+            moves.push({ date: t.created_at, desc: `تحويل رصيد إلى ${t.to_s?.name || '—'}${t.notes ? ' — '+t.notes : ''}`, debit: Number(t.amount)||0, credit: 0, type: 'transfer-out' });
+        });
+        // تحويل رصيد "إلى" المورد ده من مورد تاني: بيزود رصيده
+        (transfersIn||[]).forEach(t => {
+            moves.push({ date: t.created_at, desc: `تحويل رصيد من ${t.from_s?.name || '—'}${t.notes ? ' — '+t.notes : ''}`, debit: 0, credit: Number(t.amount)||0, type: 'transfer-in' });
+        });
+        // استرداد نقدي من رصيد مورد للخزنة — راجع fn_balance_transfer_apply
+        // (balance = balance + amount للمورد، supplier_to_treasury)
+        (cashRefunds||[]).forEach(t => {
+            moves.push({ date: t.created_at, desc: `استرداد نقدي لخزنة${t.notes ? ' — '+t.notes : ''}`, debit: 0, credit: Number(t.amount)||0, type: 'cash-refund' });
+        });
+        // رصيد افتتاحي — راجع fn_opening_balance_status_change (balance += amount)
+        (openingBalances||[]).forEach(o => {
+            const amt = Number(o.amount) || 0;
+            moves.push({ date: o.as_of_date, desc: `رصيد افتتاحي${o.notes ? ' — '+o.notes : ''}`, debit: Math.max(-amt,0), credit: Math.max(amt,0), type: 'opening' });
+        });
         moves.sort((a,b) => new Date(a.date) - new Date(b.date));
-
-        let running = 0;
-        moves.forEach(m => { running += (m.credit - m.debit); m.balance = running; });
 
         const balNow = Number(sup.balance)||0;
         const totalDebit = moves.reduce((s,m)=>s+m.debit,0);   // المدفوع للمورد
         const totalCredit = moves.reduce((s,m)=>s+m.credit,0); // المشتريات الآجلة
+
+        // ★ نفس الحل الجذري المستخدم فى كشف حساب العميل (customers.js) —
+        //   موردين منقولين من نظام قديم برصيد مباشر من غير تاريخ عمليات
+        //   وراه. سطر صناعي واحد يصالح الرصيد المتحرك مع suppliers.balance
+        //   الحقيقي، من غير أي لمس لقاعدة البيانات.
+        const displayMoves = [...moves];
+        const rawTotal = moves.reduce((s,m)=>s+(m.credit-m.debit),0);
+        const legacyDiff = balNow - rawTotal;
+        if (Math.abs(legacyDiff) > 0.01) {
+            // لازم يتحط قبل أول حركة حقيقية زمنيًا — مش وقت إنشاء سجل المورد
+            // نفسه فى سلطان (وقت الهجرة)، راجع نفس الملاحظة فى customers.js
+            const earliestDate = moves.length ? new Date(new Date(moves[0].date).getTime() - 1000).toISOString() : (sup.created_at || new Date(0).toISOString());
+            displayMoves.push({
+                date: earliestDate,
+                desc: 'رصيد مرحّل من النظام القديم (قبل سلطان)',
+                debit: Math.max(-legacyDiff, 0), credit: Math.max(legacyDiff, 0),
+                type: 'legacy-carry',
+            });
+        }
+        displayMoves.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+        let running = 0;
+        displayMoves.forEach(m => { running += (m.credit - m.debit); m.balance = running; });
+        const tableDebit = displayMoves.reduce((s,m)=>s+m.debit,0);
+        const tableCredit = displayMoves.reduce((s,m)=>s+m.credit,0);
 
         document.getElementById('supStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
@@ -170,14 +228,21 @@ window.supShowStatement = async function(supplierId) {
                     <th style="text-align:left">الرصيد</th>
                 </tr></thead>
                 <tbody>
-                    ${moves.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
-                    moves.map(m => {
+                    ${displayMoves.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>` :
+                    displayMoves.map(m => {
                         const isCash = m.type.endsWith('-cash');
                         const bg = m.type==='purchase-credit' ? '#FEF3C7' : m.type==='payment' ? '#ECFDF5'
-                            : m.type.startsWith('return') ? '#FFFBEB' : '#F8FAFC';
+                            : m.type.startsWith('return') ? '#FFFBEB'
+                            : m.type==='transfer-out' || m.type==='transfer-in' || m.type==='cash-refund' ? '#EFF6FF'
+                            : m.type==='opening' ? '#F5F3FF'
+                            : m.type==='legacy-carry' ? '#F1F5F9' : '#F8FAFC';
                         const icon = m.type==='purchase-credit' ? '<span style="color:#D97706">📥</span>'
                             : m.type==='purchase-cash' ? '<span style="color:#94A3B8">💰</span>'
                             : m.type.startsWith('return') ? '<span style="color:#DC2626">↩️</span>'
+                            : m.type==='transfer-out' || m.type==='transfer-in' ? '<span style="color:#2563EB">🔀</span>'
+                            : m.type==='cash-refund' ? '<span style="color:#2563EB">💰</span>'
+                            : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
+                            : m.type==='legacy-carry' ? '<span style="color:#64748B">🗄️</span>'
                             : '<span style="color:#059669">💸</span>';
                         return `<tr style="background:${bg}">
                         <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
@@ -191,14 +256,19 @@ window.supShowStatement = async function(supplierId) {
                     </tr>`;
                     }).join('')}
                 </tbody>
-                ${moves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
+                ${displayMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
                     <td colspan="2">الإجمالي</td>
-                    <td style="text-align:left;color:#059669">${supFmt(totalDebit)}</td>
-                    <td style="text-align:left;color:#D97706">${supFmt(totalCredit)}</td>
+                    <td style="text-align:left;color:#059669">${supFmt(tableDebit)}</td>
+                    <td style="text-align:left;color:#D97706">${supFmt(tableCredit)}</td>
                     <td style="text-align:left">${supFmt(Math.abs(balNow))}</td>
                 </tr></tfoot>` : ''}
                 </table>
             </div>
+            ${Math.abs(legacyDiff) > 0.01 ? `
+            <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:#475569;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
+                🗄️ سطر "رصيد مرحّل من النظام القديم" (${supFmt(Math.abs(legacyDiff))}) هو الفرق بين رصيد المورد الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
+                غالبًا مورد منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد المورد نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.
+            </div>` : ''}
 
             <div style="margin-top:16px">
                 <div style="font-size:13px;font-weight:800;color:#1E293B;margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
