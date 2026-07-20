@@ -9,21 +9,28 @@
 
 let _tsyList = [];
 let _tsyTransfers = [];
+let _tsyRepByTreasury = {}; // treasury_id => اسم المندوب صاحب الخزنة دي
 
 function tsyFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 async function renderTreasury(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل الخزن...</div>';
     try {
-        const [{ data: balances, error: balErr }, { data: transfers }] = await Promise.all([
+        const [{ data: balances, error: balErr }, { data: transfers }, { data: reps }] = await Promise.all([
             sb.rpc('get_treasury_balances'),
             sb.from('treasury_transfers').select('*, from_t:from_treasury_id(name), to_t:to_treasury_id(name)')
                 .order('created_at', { ascending: false }).limit(30),
+            sb.from('sales_reps').select('id,name,treasury_id').eq('is_active', true),
         ]);
         if (balErr) throw balErr;
 
         _tsyList = balances || [];
         _tsyTransfers = transfers || [];
+        // خزنة المصدر بتاعة تحويل = خزنة المندوب نفسه فى حالة "توريد" من
+        // تطبيق سلطانو (راجع deposit handler هناك) — نستخدمها لمعرفة مين
+        // المندوب اللي ورّد الكاش ده من غير ما نعتمد على created_by
+        _tsyRepByTreasury = {};
+        (reps || []).forEach(r => { if (r.treasury_id) _tsyRepByTreasury[r.treasury_id] = r.name; });
 
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
@@ -73,13 +80,16 @@ async function renderTreasury(c) {
             </tr></thead>
             <tbody>
                 ${_tsyTransfers.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>🔀</span>لا توجد تحويلات بعد.</td></tr>` :
-                _tsyTransfers.map(t => `<tr>
+                _tsyTransfers.map(t => {
+                    const repName = _tsyRepByTreasury[t.from_treasury_id];
+                    return `<tr>
                     <td>${new Date(t.created_at).toLocaleString('ar-EG', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</td>
-                    <td>${t.from_t?.name || '—'}</td>
+                    <td>${t.from_t?.name || '—'}${repName ? ` <span style="font-size:11px;color:#2563EB">🚗 ${repName}</span>` : ''}</td>
                     <td>${t.to_t?.name || '—'}</td>
                     <td style="text-align:left;font-weight:700">${tsyFmt(t.amount)}</td>
                     <td>${t.notes || '—'}</td>
-                </tr>`).join('')}
+                </tr>`;
+                }).join('')}
             </tbody></table>
         </div>`;
     } catch (err) {

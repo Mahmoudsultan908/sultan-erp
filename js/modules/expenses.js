@@ -7,6 +7,7 @@ let _expGlobalLimit = 0;   // الحد الإجمالي الشهري لكل ال
 let _expUserRole = 'admin'; // افتراضياً admin (هيحدد من session)
 let _expList = [];         // آخر قائمة مصروفات محمّلة — للطباعة (expPrintVoucher)
 let _expModalCategories = []; // بنود المصروفات المحمّلة لمودال "تسجيل مصروف جديد" — لخانة البحث
+let _expRepById = {};      // created_by => اسم المندوب، لو المصروف مسجّل من تطبيق سلطانو
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -19,7 +20,7 @@ async function renderExpenses(container) {
     let expenses = [], categories = [], monthExpenses = [], globalLimitRow = null;
     let isOfflineData = false, offlineDataAge = null;
     try {
-        const [r1, r2, r3, r4] = await Promise.all([
+        const [r1, r2, r3, r4, r5] = await Promise.all([
             sb.from('expenses').select('*, expense_categories(name, monthly_limit)').order('expense_date', { ascending: false }).limit(50),
             sb.from('expense_categories').select('*').order('name'),
             // كل مصروفات الشهر الحالي
@@ -28,12 +29,15 @@ async function renderExpenses(container) {
                 .lt('expense_date', _expMonthEnd())
                 .eq('status', 'confirmed'),
             sb.from('app_settings').select('value').eq('key', 'expense_global_monthly_limit').single(),
+            sb.from('sales_reps').select('id,name').eq('is_active', true),
         ]);
         if (r1.error || !r1.data || r2.error || !r2.data) throw (r1.error || r2.error || new Error('no data'));
         expenses = r1.data;
         categories = r2.data;
         monthExpenses = r3.data || [];
         globalLimitRow = r4.data;
+        _expRepById = {};
+        (r5.data || []).forEach(r => { _expRepById[r.id] = r.name; });
         if (typeof dbSetCache === 'function') {
             dbSetCache('expenses', expenses);
             dbSetCache('expense_categories', categories);
@@ -132,7 +136,7 @@ function _expMonthExpTableHTML(expenses) {
             expenses.map(e => `<tr>
                 <td>${new Date(e.expense_date).toLocaleDateString('ar-EG')}</td>
                 <td><span style="background:#F1F5F9;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600">${e.expense_categories?.name || '—'}</span></td>
-                <td style="color:#475569">${e.description || '—'}</td>
+                <td style="color:#475569">${_expRepById[e.created_by] ? `<span style="font-size:11px;color:#2563EB">🚗 ${_expRepById[e.created_by]}</span> ` : ''}${e.description || '—'}</td>
                 <td style="text-align:left;font-weight:700;color:#DC2626">${_expFmt(e.amount)}</td>
                 <td>${e._queue
                     ? (e.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')

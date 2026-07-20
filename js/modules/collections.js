@@ -12,6 +12,7 @@ let _colSelectedId = null;
 let _colList = [];
 let _colTreasuries = [];
 let _colEditingId = null; // معرّف سند التحصيل الجاري تعديله (مودال التعديل)
+let _colRepById = {}; // created_by => اسم المندوب، لو التحصيل مسجّل من تطبيق سلطانو
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -32,6 +33,9 @@ async function renderCollections(c) {
         }
         const { data: treasuriesData } = await sb.from('treasuries').select('*').eq('is_active', true).order('is_default', { ascending: false });
         _colTreasuries = treasuriesData || [];
+        const { data: repsData } = await sb.from('sales_reps').select('id,name').eq('is_active', true);
+        _colRepById = {};
+        (repsData || []).forEach(r => { _colRepById[r.id] = r.name; });
         // كاش للمراجعة الأوفلاين (offline.js) — قراءة فقط، بيتحدّث تلقائياً كل ما الصفحة تفتح أونلاين
         if (typeof dbSetCache === 'function') dbSetCache('customers', customers);
     } catch (err) {
@@ -100,7 +104,7 @@ async function renderCollections(c) {
                 ${displayRows.length === 0 ? `<tr><td colspan="6" class="empty-state"><span>💵</span>لا توجد تحصيلات.</td></tr>` :
                 displayRows.map(p => `<tr data-name="${(p.customers?.name||'').toLowerCase()}">
                     <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
-                    <td><strong>${p.customers?.name || '—'}</strong></td>
+                    <td><strong>${p.customers?.name || '—'}</strong>${_colRepById[p.created_by] ? ` <span style="font-size:11px;color:#2563EB">🚗 ${_colRepById[p.created_by]}</span>` : ''}</td>
                     <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
                     <td style="text-align:left;font-weight:700;color:#059669">${colFmt(p.amount)}</td>
                     <td>${p._queue
