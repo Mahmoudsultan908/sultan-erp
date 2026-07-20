@@ -82,7 +82,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="customers" onclick="loadMod(this, 'customers')">📇 كشف حساب عميل</div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء <span id="crmOverdueBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
-        <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">🚗 مندوب سلطان</div>
+        <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">🚗 مندوب سلطان <span id="repLinkBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span>المشتريات والموردين</span><span class="nav-group-arrow">▾</span></div>
@@ -234,6 +234,10 @@ async function setupApp() {
             const el = document.getElementById('crmOverdueBadge');
             if (el && count) { el.textContent = count; el.style.display = 'inline-block'; }
         }).catch(() => {});
+
+    // ★ إشعار "حدث خارجي جديد" جنب تبويب "🚗 مندوب سلطان" — نفس فكرة عداد
+    //   CRM فوق، بيجري فى الخلفية من غير ما يأخر تحميل الصفحة
+    if (typeof repLinkRefreshBadge === 'function') repLinkRefreshBadge();
 
     loadMod(document.querySelector('[data-mod="dashboard"]'), 'dashboard');
 }

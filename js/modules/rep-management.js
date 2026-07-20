@@ -14,8 +14,10 @@
    ════════════════════════════════════════════════════════════ */
 
 let _repMgmtTab = 'list'; // 'list' | 'load' | 'stock' | 'return' | 'requests' | 'visits' | 'closing'
+const REP_LINK_LAST_SEEN_KEY = 'sultan_replink_last_seen';
 
 async function renderRepAppLink(c) {
+    repLinkMarkSeen();
     c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">🚗 مندوب سلطان</h2>
@@ -51,4 +53,47 @@ window.repMgmtSwitchTab = async function (tab) {
     await renderRepAppLink(document.getElementById('app-content'));
 };
 
-Object.assign(window, { renderRepAppLink, repMgmtSwitchTab });
+// ════════════════════════════════════════════════════════════
+// إشعار "حدث خارجي جديد" جنب تبويب "🚗 مندوب سلطان" فى القائمة الجانبية —
+// عدّاد أي حاجة جت من تطبيق سلطانو/مندوب سلطان (طلبات تعديل عملاء معلّقة،
+// فواتير بيع، تحصيلات، مصروفات) من بعد آخر مرة الأدمن فتح التبويب ده.
+// آخر مرة اتشاف بتتخزن فى localStorage (مفيش جدول "مستخدم/تفضيلات" فى
+// السكيمة يصلح لده)، وبيتصفّر بمجرد فتح التبويب — مش لما الطلب يتحسم.
+// ════════════════════════════════════════════════════════════
+async function repLinkRefreshBadge() {
+    try {
+        const lastSeen = localStorage.getItem(REP_LINK_LAST_SEEN_KEY) || new Date(Date.now() - 86400000).toISOString();
+        const { data: reps } = await sb.from('sales_reps').select('id').eq('is_active', true);
+        const repIds = (reps || []).map(r => r.id);
+
+        const queries = [
+            sb.from('customer_change_requests').select('id', { count: 'exact', head: true })
+                .eq('status', 'pending').gt('created_at', lastSeen),
+            sb.from('sales').select('id', { count: 'exact', head: true })
+                .eq('source_app', 'rep_van').gt('created_at', lastSeen),
+        ];
+        if (repIds.length) {
+            queries.push(
+                sb.from('customer_collections').select('id', { count: 'exact', head: true })
+                    .in('created_by', repIds).gt('created_at', lastSeen),
+                sb.from('expenses').select('id', { count: 'exact', head: true })
+                    .in('created_by', repIds).gt('created_at', lastSeen),
+            );
+        }
+        const results = await Promise.all(queries);
+        const total = results.reduce((s, r) => s + (r.count || 0), 0);
+
+        const el = document.getElementById('repLinkBadge');
+        if (!el) return;
+        if (total > 0) { el.textContent = total; el.style.display = 'inline-block'; }
+        else el.style.display = 'none';
+    } catch (err) { /* بهدوء — إشعار جانبي، مش لازم يوقف التطبيق */ }
+}
+
+function repLinkMarkSeen() {
+    localStorage.setItem(REP_LINK_LAST_SEEN_KEY, new Date().toISOString());
+    const el = document.getElementById('repLinkBadge');
+    if (el) el.style.display = 'none';
+}
+
+Object.assign(window, { renderRepAppLink, repMgmtSwitchTab, repLinkRefreshBadge, repLinkMarkSeen });
