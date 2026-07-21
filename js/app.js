@@ -143,9 +143,6 @@ function buildLayout() {
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">⚙️</span><span class="ng-label">الإعدادات</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
-        <div class="nav-item" data-mod="general-import-export" onclick="loadMod(this, 'general-import-export')">🔄 استيراد/تصدير عام</div>
-        <div class="nav-item" data-mod="print-center" onclick="loadMod(this, 'print-center')">🖨️ مركز الطباعة</div>
-        <div class="nav-item" data-mod="opening-balances" onclick="loadMod(this, 'opening-balances')">📋 الأرصدة الافتتاحية</div>
         <div class="nav-item" data-mod="settings-hub" onclick="loadMod(this, 'settings-hub')">⚙️ الإعدادات</div>
         </div>
 
@@ -174,6 +171,7 @@ function buildLayout() {
         <div class="content-host" id="appContentHost"></div>
       </div>
     </div>`;
+    navApplyDefaultCollapseOnce();
     navRestoreCollapsedGroups();
     railInitFlyouts();
 
@@ -203,6 +201,21 @@ const appTabCleanupHooks = {
 //   سابها بين الجلسات. الافتراضي: كل الأقسام مفتوحة (نفس الشكل القديم
 //   بالظبط) — ده إضافة بس، مفيش أي تغيير في السلوك الحالي لحد ما
 //   المستخدم يطوي قسم بنفسه.
+// ★ أول مرة يفتح فيها أي مستخدم البرنامج (localStorage فاضي تمامًا من
+//   تفضيل الطي)، بنخلي كل الأقسام مطوية ما عدا "لوحة التحكم" النشطة
+//   افتراضيًا — بدل ما يشوف الـ14 قسم مفتوحين مع بعض أول ما يدخل.
+//   أي مستخدم لمس الطي قبل كده (حتى لو قسم واحد بس) بنسيب تفضيله
+//   زي ما هو من غير أي تغيير — الفحص على وجود المفتاح مش على قيمته.
+function navApplyDefaultCollapseOnce() {
+    if (localStorage.getItem('navCollapsedGroups') !== null) return;
+    const defaultCollapsed = [];
+    document.querySelectorAll('.nav-group').forEach(headerEl => {
+        const label = headerEl.textContent.trim();
+        if (!label.includes('لوحة التحكم')) defaultCollapsed.push(label);
+    });
+    localStorage.setItem('navCollapsedGroups', JSON.stringify(defaultCollapsed));
+}
+
 function navToggleGroup(headerEl) {
     const itemsEl = headerEl.nextElementSibling;
     if (!itemsEl || !itemsEl.classList.contains('nav-group-items')) return;
