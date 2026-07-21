@@ -447,9 +447,10 @@ body.inv-fullscreen .content { padding: 12px !important; }
   .badge-cash { padding: 5px 10px; font-size: 10.5px; white-space: nowrap; flex-shrink: 0; }
   .btn-logout { padding: 5px 8px; font-size: 10.5px; flex-shrink: 0; }
 }
-@media (min-width: 1101px) {
-  #sidebarToggle { display: none; }
-}
+/* ملحوظة: #sidebarToggle (☰) كان مخفي على الديسكتوب قبل كده لأن الطي
+   القديم كان بيخفي القائمة بالكامل (مفيش فايدة منه لو القائمة أصلاً
+   ظاهرة على الديسكتوب دايمًا) — دلوقتي بقى طي القائمة لشريط أيقونات
+   (rail mode) مفيد على الديسكتوب برضه، فالزرار لازم يفضل ظاهر هناك. */
 
 /* ── كثافة الأعمدة (Density) ── */
 .inv-root.density-compact .inv-table tbody td,
