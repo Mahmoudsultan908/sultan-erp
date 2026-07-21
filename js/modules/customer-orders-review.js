@@ -36,6 +36,7 @@ window.corUpdateDeliveryStatus = async function(id, status) {
 };
 
 async function renderCustomerOrdersLink(c) {
+    corLinkMarkSeen();
     c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">🔗 ربط برنامج طلبات العملاء</h2>
@@ -313,8 +314,70 @@ window.corDeleteBanner = async function(id) {
     }
 };
 
+// ════════════════════════════════════════════════════════════
+// إشعار "طلب/عميل جديد من سلطانو" جنب تبويب "🔗 طلبات العملاء" فى
+// القائمة الجانبية — بند 8، تقرير 2026-07-21. نفس فكرة repLinkBadge
+// (rep-management.js) بالظبط: عداد واحد بيجمع الطلبات الجديدة +
+// طلبات تسجيل عملاء سلطانو المعلّقة من بعد آخر مرة فتحت الصفحة دي،
+// ويتصفّر بمجرد الفتح (مش لما الطلب يتحسم). كمان بيعمل poll دوري
+// (كل دقيقة ونص) وبيطلق صوت + إشعار متصفح لو العدد زاد عن آخر مرة
+// اتفحص، عشان محدش يفوّته وهو شغال في صفحة تانية.
+// ════════════════════════════════════════════════════════════
+const COR_LINK_LAST_SEEN_KEY = 'sultan_corlink_last_seen';
+let _corLastNotifiedCount = 0;
+
+async function corLinkRefreshBadge() {
+    try {
+        const lastSeen = localStorage.getItem(COR_LINK_LAST_SEEN_KEY) || new Date(Date.now() - 86400000).toISOString();
+        const [{ count: newOrders }, { count: newCustReqs }] = await Promise.all([
+            sb.from('customer_orders').select('id', { count: 'exact', head: true }).gt('created_at', lastSeen),
+            sb.from('customer_change_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending').gt('created_at', lastSeen),
+        ]);
+        const total = (newOrders || 0) + (newCustReqs || 0);
+
+        const el = document.getElementById('corLinkBadge');
+        if (el) {
+            if (total > 0) { el.textContent = total; el.style.display = 'inline-block'; }
+            else el.style.display = 'none';
+        }
+
+        // إشعار وصوت بس لو العدد زاد عن آخر فحص (مش كل poll، وإلا هيتكرر كل دقيقة ونص لنفس الطلبات)
+        if (total > _corLastNotifiedCount) {
+            corPlayNotifySound();
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                try { new Notification('🔗 حدث جديد في طلبات العملاء', { body: `عندك ${total} حدث جديد (طلبات/تسجيلات سلطانو) محتاج مراجعة`, icon: './icon-192.png' }); } catch (e) {}
+            }
+        }
+        _corLastNotifiedCount = total;
+    } catch (err) { /* بهدوء — إشعار جانبي، مش لازم يوقف التطبيق */ }
+}
+
+function corPlayNotifySound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880; gain.gain.value = 0.15;
+        osc.start(); osc.stop(ctx.currentTime + 0.18);
+    } catch (e) { /* المتصفحات القديمة أو لو الصوت متمنوع */ }
+}
+
+function corLinkMarkSeen() {
+    localStorage.setItem(COR_LINK_LAST_SEEN_KEY, new Date().toISOString());
+    _corLastNotifiedCount = 0;
+    const el = document.getElementById('corLinkBadge');
+    if (el) el.style.display = 'none';
+}
+
+// ★ poll دوري كل 90 ثانية — بيبدأ لما setupApp() يستدعي corLinkStartPolling()
+// أول مرة بعد الدخول، مش من غير قصد لو الموديول ده لسه ما اتحمّلش
+function corLinkStartPolling() {
+    corLinkRefreshBadge();
+    setInterval(corLinkRefreshBadge, 90000);
+}
+
 Object.assign(window, {
     renderCustomerOrdersLink, corSwitchTab, corApproveOrder, corRejectOrder,
     corOpenBannerModal, corPreviewBannerImage, corSaveBanner, corDeleteBanner,
-    corUpdateDeliveryStatus,
+    corUpdateDeliveryStatus, corLinkRefreshBadge, corLinkMarkSeen, corLinkStartPolling,
 });

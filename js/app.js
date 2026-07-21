@@ -87,7 +87,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء <span id="crmOverdueBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">🚗 مندوب سلطان <span id="repLinkBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
-        <div class="nav-item" data-mod="customer-orders-link" onclick="loadMod(this, 'customer-orders-link')">🔗 طلبات العملاء</div>
+        <div class="nav-item" data-mod="customer-orders-link" onclick="loadMod(this, 'customer-orders-link')">🔗 طلبات العملاء <span id="corLinkBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📥</span><span class="ng-label">المشتريات والموردين</span></span><span class="nav-group-arrow">▾</span></div>
@@ -320,6 +320,15 @@ async function setupApp() {
     // ★ إشعار "حدث خارجي جديد" جنب تبويب "🚗 مندوب سلطان" — نفس فكرة عداد
     //   CRM فوق، بيجري فى الخلفية من غير ما يأخر تحميل الصفحة
     if (typeof repLinkRefreshBadge === 'function') repLinkRefreshBadge();
+
+    // ★ إشعار "طلب/عميل جديد" جنب تبويب "🔗 طلبات العملاء" — بند 8،
+    //   تقرير 2026-07-21. بعكس repLinkRefreshBadge (فحصة واحدة بس عند
+    //   الدخول)، ده بيعمل poll دوري كل 90 ثانية + صوت/إشعار متصفح لو
+    //   العدد زاد، عشان محدش يفوّت طلب سلطانو وهو شغال في صفحة تانية.
+    if (typeof corLinkStartPolling === 'function') corLinkStartPolling();
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        try { Notification.requestPermission(); } catch (e) {}
+    }
 
     loadMod(document.querySelector('[data-mod="dashboard"]'), 'dashboard');
 }
