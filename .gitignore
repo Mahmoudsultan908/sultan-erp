@@ -12,3 +12,4 @@ HANDOVER_FOR_CLAUDE.md
 *.xlsx
 ~$*
 dexef_migration_data/
+sultan_backup_*.json
