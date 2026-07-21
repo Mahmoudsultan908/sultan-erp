@@ -48,6 +48,7 @@ const AP_PAGE_GROUPS = [
     ]},
     { title: 'الموظفين', pages: [
         ['payroll', '👥 الموظفون والرواتب'], ['employee-evaluation', '⭐ تقييم الموظفين'],
+        ['attendance', '🕐 الحضور والانصراف'],
     ]},
     { title: 'المحاسبة', pages: [
         ['coa', '📒 شجرة الحسابات'],

@@ -119,6 +119,7 @@ function buildLayout() {
         <div class="nav-group-items">
         <div class="nav-item" data-mod="payroll" onclick="loadMod(this, 'payroll')">👥 الموظفون والرواتب</div>
         <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
+        <div class="nav-item" data-mod="attendance" onclick="loadMod(this, 'attendance')">🕐 الحضور والانصراف</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📒</span><span class="ng-label">المحاسبة</span></span><span class="nav-group-arrow">▾</span></div>
@@ -361,6 +362,7 @@ const titles = {
         'whatsapp': 'تكامل واتساب',
         'ai-dashboard': 'لوحة الذكاء الاصطناعي',
         'employee-evaluation': 'تقييم الموظفين',
+        'attendance': 'الحضور والانصراف',
         'customer-orders-link': 'طلبات العملاء',
         'rep-app-link': 'مندوب سلطان',
         'reports-hub': 'التقارير',
@@ -399,6 +401,7 @@ async function _dispatchRender(modName, c) {
     if (modName === 'whatsapp' && typeof renderWhatsAppIntegration === 'function') await renderWhatsAppIntegration(c);
     if (modName === 'ai-dashboard' && typeof renderAIDashboard === 'function') await renderAIDashboard(c);
     if (modName === 'employee-evaluation' && typeof renderEmployeeEvaluation === 'function') await renderEmployeeEvaluation(c);
+    if (modName === 'attendance' && typeof renderAttendance === 'function') await renderAttendance(c);
     if (modName === 'customer-orders-link' && typeof renderCustomerOrdersLink === 'function') await renderCustomerOrdersLink(c);
     if (modName === 'rep-app-link' && typeof renderRepAppLink === 'function') await renderRepAppLink(c);
     if (modName === 'reports-hub' && typeof renderReportsHub === 'function') await renderReportsHub(c);
