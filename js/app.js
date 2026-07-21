@@ -122,23 +122,15 @@ function buildLayout() {
         <div class="nav-item" data-mod="attendance" onclick="loadMod(this, 'attendance')">🕐 الحضور والانصراف</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📒</span><span class="ng-label">المحاسبة</span></span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📒</span><span class="ng-label">المحاسبة والتقارير</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="coa" onclick="loadMod(this, 'coa')">📒 شجرة الحسابات</div>
         <div class="nav-item" data-mod="accounting-books" onclick="loadMod(this, 'accounting-books')">📖 الدفاتر</div>
         <div class="nav-item" data-mod="accounting-monitoring" onclick="loadMod(this, 'accounting-monitoring')">🔍 المراقبة والأرشفة</div>
         <div class="nav-item" data-mod="investors" onclick="loadMod(this, 'investors')">🤝 المستثمرين</div>
-        </div>
-
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🔜</span><span class="ng-label">قريباً</span></span><span class="nav-group-arrow">▾</span></div>
-        <div class="nav-group-items">
-        <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب</div>
-        <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي</div>
-        </div>
-
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📈</span><span class="ng-label">التقارير</span></span><span class="nav-group-arrow">▾</span></div>
-        <div class="nav-group-items">
         <div class="nav-item" data-mod="reports-hub" onclick="loadMod(this, 'reports-hub')">📈 التقارير</div>
+        <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب <span class="nav-soon-badge">قريباً</span></div>
+        <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي <span class="nav-soon-badge">قريباً</span></div>
         </div>
 
         <div class="nav-item" data-mod="settings-hub" onclick="loadMod(this, 'settings-hub')"><span class="nav-icon">⚙️</span><span class="nav-label">الإعدادات</span></div>
