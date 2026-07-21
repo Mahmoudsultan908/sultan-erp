@@ -219,6 +219,8 @@ function repOpenModal(x) {
                     <div class="mod-form-group"><label>🏪 هدف الزيارات اليومي</label>
                         <input type="number" id="repVisitsTarget" class="mod-form-input" value="${x?.daily_visits_target || 0}" min="0" step="1"></div>
                 </div>
+                <div class="mod-form-group"><label>🔒 PIN تحميل العربية <small style="color:#94A3B8;font-weight:400">(تأكيد إضافي قبل ما المندوب يحمّل عربيته بنفسه من تطبيقه — سيبه فاضي لو مش عايزه يقدر يحمّل نفسه)</small></label>
+                    <input type="text" id="repVanLoadPin" class="mod-form-input" value="${x?.van_load_pin || ''}" placeholder="مثال: 1234" dir="ltr" maxlength="8"></div>
                 <div class="mod-form-group"><label>ملاحظات</label>
                     <input type="text" id="repNotes" class="mod-form-input" value="${x?.notes || ''}" placeholder="اختياري"></div>
             </div>
@@ -242,6 +244,7 @@ window.repSave = async function () {
         price_level_id: document.getElementById('repPriceLevel').value || null,
         daily_sales_target: parseFloat(document.getElementById('repDailyTarget').value) || 0,
         daily_visits_target: parseInt(document.getElementById('repVisitsTarget').value) || 0,
+        van_load_pin: document.getElementById('repVanLoadPin').value.trim() || null,
         notes: document.getElementById('repNotes').value.trim() || null,
     };
 
