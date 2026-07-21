@@ -58,8 +58,16 @@ function custRenderPage(c) {
                 <button class="mod-btn mod-btn-primary" onclick="custOpenAdd()">+ إضافة عميل</button>
             </div>
         </div>
-        <div class="mod-card" style="margin-bottom:16px">
-            <input type="text" id="custMgSearch" class="mod-form-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="custMgSearch(this.value)">
+        <div class="mod-card" style="margin-bottom:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+                <input type="text" id="custMgSearch" class="mod-form-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="custMgSearch(this.value)">
+            </div>
+            <select id="custMgBalOp" class="mod-form-input" style="margin:0;min-width:130px" onchange="custRenderRows()">
+                <option value="">فلتر الرصيد: الكل</option>
+                <option value="gt">أكبر من</option>
+                <option value="lt">أصغر من</option>
+            </select>
+            <input type="number" id="custMgBalVal" class="mod-form-input" style="margin:0;min-width:120px" placeholder="مبلغ..." dir="ltr" oninput="custRenderRows()">
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
@@ -78,7 +86,17 @@ function custRenderRows() {
         const q = _mgCustSearch.toLowerCase();
         rows = rows.filter(x => (x.name||'').toLowerCase().includes(q) || (x.phone||'').includes(q));
     }
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`; return; }
+    const balOp = document.getElementById('custMgBalOp')?.value;
+    const balVal = parseFloat(document.getElementById('custMgBalVal')?.value);
+    if (balOp && !isNaN(balVal)) {
+        rows = rows.filter(x => balOp === 'gt' ? (Number(x.balance)||0) > balVal : (Number(x.balance)||0) < balVal);
+    }
+    if (!rows.length) {
+        tbody.innerHTML = _mgCustList.length
+            ? `<tr><td colspan="9" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين للبحث/الفلتر الحالي</td></tr>`
+            : `<tr><td colspan="9" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`;
+        return;
+    }
 
     tbody.innerHTML = rows.map(x => {
         const region = _mgCustRegions.find(r=>r.id===x.region_id);

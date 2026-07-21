@@ -8,6 +8,7 @@ let _custList = [];
 let _custRegionMap = {};
 let _custLastIntMap = {};
 let _custStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
+let _custListSearch = ''; // بحث بالاسم/الهاتف في تبويب "كشف حساب" — بيتطبق مع فلتر الرصيد مع بعض (AND)
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي — قائمة العملاء
@@ -49,6 +50,10 @@ async function renderCustomers(c) {
             </div>
 
             <div class="dash-card" style="padding:14px;margin-top:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+                <div style="flex:1;min-width:200px">
+                    <label class="ob-label">بحث</label>
+                    <input type="text" id="custListSearch" class="ob-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="custListSearchInput(this.value)">
+                </div>
                 <div style="min-width:130px">
                     <label class="ob-label">فلتر الرصيد</label>
                     <select id="custBalFilterOp" class="ob-input" style="margin:0">
@@ -331,12 +336,17 @@ window.custApplyBalanceFilter = function() {
     const op = document.getElementById('custBalFilterOp')?.value;
     const val = parseFloat(document.getElementById('custBalFilterVal')?.value);
     let filtered = _custList;
+    if (_custListSearch) {
+        const q = _custListSearch.toLowerCase();
+        filtered = filtered.filter(c => (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q));
+    }
     if (op && !isNaN(val)) {
-        filtered = _custList.filter(c => op === 'gt' ? (Number(c.balance)||0) > val : (Number(c.balance)||0) < val);
+        filtered = filtered.filter(c => op === 'gt' ? (Number(c.balance)||0) > val : (Number(c.balance)||0) < val);
     }
     const tbody = document.getElementById('custListTbody');
     if (tbody) tbody.innerHTML = custListRowsHtml(filtered);
 };
+window.custListSearchInput = function(v) { _custListSearch = v; window.custApplyBalanceFilter(); };
 
 // بناء صفوف جدول كشف الحساب — دالة منفصلة عشان تتنادى من العرض الأول
 // ومن custStmtFilterRows (البحث) من غير تكرار كود
