@@ -550,8 +550,12 @@ function purFastSearch(val) {
     if (!ac) return;
     // من غير كتابة: تعرض أول 8 أصناف زي ما هم، عشان القائمة تظهر على طول
     // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
+    // بحث مرن: بيقسم النص المكتوب لأجزاء بالمسافة، وأي صنف اسمه فيه كل
+    // الأجزاء دي (مش لازم بالترتيب ولا كلمة كاملة) بيتوافق — نفس منطق
+    // invFastSearch فى sales.js بالحرف
+    const terms = val.trim().split(/\s+/).filter(Boolean);
     const m = (val.length ? PUR_DB.products.filter(p =>
-        (p.name||'').includes(val) || (p.code||'').includes(val) || (p.barcode||'').includes(val)
+        terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(val) || (p.barcode||'').includes(val)
     ) : PUR_DB.products).slice(0,8);
     if (m.length) {
         ac.innerHTML = m.map((p,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="purPickProduct('${p.id}')" onmouseenter="purFastHover(${i})">
@@ -716,7 +720,8 @@ function purRenderMultiPickList(val) {
     const box = document.getElementById('purMultiPickList');
     if (!box) return;
     const v = (val||'').trim();
-    const list = v ? PUR_DB.products.filter(p => (p.name||'').includes(v) || (p.code||'').includes(v)) : PUR_DB.products;
+    const terms = v.split(/\s+/).filter(Boolean);
+    const list = v ? PUR_DB.products.filter(p => terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(v)) : PUR_DB.products;
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _purMultiSelected[p.id];
