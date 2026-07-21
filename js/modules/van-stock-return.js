@@ -25,7 +25,7 @@ async function renderVanStockReturn(container) {
             sb.from('warehouses').select('*').order('name'),
             sb.from('products').select('id,name,code,unit').eq('is_active', true).order('name'),
             sb.from('van_stock').select('rep_id,product_id,qty'),
-            sb.from('sales_reps').select('id,name').eq('is_active', true).order('name'),
+            sb.from('sales_reps').select('id,name,phone').eq('is_active', true).order('name'),
         ]);
         VR_DB.warehouses = warehouses || [];
         VR_DB.products = products || [];
@@ -107,25 +107,34 @@ function vrRenderScreen(c) {
 }
 
 function vrHeaderHTML() {
+    const selRep = VR_DB.reps.find(r => r.id === vrRepId);
     return `
-    <div class="inv-header">
-        <div class="inv-header-brand">
-            <div class="ic">↩️</div>
-            <div class="ttl">إرجاع مخزون عربية للمخزن<small> نقل فيزيائي من عربية المندوب للمخزن — بدون تأثير مالي</small></div>
+    <div class="inv-header inv-header-2row">
+        <div class="inv-header-row1">
+            <div class="inv-header-brand">
+                <div class="ic">↩️</div>
+                <div class="ttl">إرجاع مخزون عربية للمخزن<small> نقل فيزيائي من عربية المندوب للمخزن — بدون تأثير مالي</small></div>
+            </div>
+
+            <input type="date" class="inv-date-input" id="vrDate" value="${vrToday()}" title="تاريخ الإرجاع">
+
+            <select class="inv-date-input" id="vrWarehouse" title="إلى مخزن" onchange="vrOnFilterChange()" style="cursor:pointer">
+                ${VR_DB.warehouses.map(w => `<option value="${w.id}" ${w.id === vrWarehouseId ? 'selected' : ''}>📥 إلى: ${w.name}${w.is_main ? ' (رئيسي)' : ''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
+            </select>
+
+            <div class="inv-header-spacer"></div>
+            <button class="inv-top-btn inv-top-new" onclick="renderVanStockReturn(document.getElementById('app-content'))">➕ جديد</button>
+            <button class="inv-top-btn inv-top-save inv-top-save-strong" onclick="vrSave()">💾 حفظ الإرجاع</button>
         </div>
-
-        <input type="date" class="inv-date-input" id="vrDate" value="${vrToday()}" title="تاريخ الإرجاع">
-
-        <select class="inv-date-input" id="vrRep" title="من عربية المندوب" onchange="vrOnFilterChange()" style="cursor:pointer">
-            ${VR_DB.reps.map(r => `<option value="${r.id}" ${r.id === vrRepId ? 'selected' : ''}>🚗 من: ${r.name}</option>`).join('')}
-        </select>
-        <select class="inv-date-input" id="vrWarehouse" title="إلى مخزن" onchange="vrOnFilterChange()" style="cursor:pointer">
-            ${VR_DB.warehouses.map(w => `<option value="${w.id}" ${w.id === vrWarehouseId ? 'selected' : ''}>📥 إلى: ${w.name}${w.is_main ? ' (رئيسي)' : ''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
-        </select>
-
-        <div class="inv-header-spacer"></div>
-        <button class="inv-top-btn inv-top-save" onclick="vrSave()">💾 حفظ الإرجاع</button>
-        <button class="inv-top-btn inv-top-new" onclick="renderVanStockReturn(document.getElementById('app-content'))">➕ جديد</button>
+        <div class="inv-header-row2">
+            <div class="inv-cust-avatar">🚗</div>
+            <div class="inv-cust-body">
+                <select class="inv-cust-search-lg" id="vrRep" title="من عربية المندوب" onchange="vrOnFilterChange()" style="cursor:pointer">
+                    ${VR_DB.reps.map(r => `<option value="${r.id}" ${r.id === vrRepId ? 'selected' : ''}>${r.name}</option>`).join('')}
+                </select>
+                <div class="inv-cust-addr">${selRep?.phone || 'عربية المندوب اللي هيترجّع منها الصنف'}</div>
+            </div>
+        </div>
     </div>`;
 }
 
@@ -300,6 +309,9 @@ function vrOnFilterChange() {
     const whSel = document.getElementById('vrWarehouse');
     if (repSel) vrRepId = repSel.value;
     if (whSel) vrWarehouseId = whSel.value;
+    const selRep = VR_DB.reps.find(r => r.id === vrRepId);
+    const subEl = repSel?.parentElement.querySelector('.inv-cust-addr');
+    if (subEl) subEl.textContent = selRep?.phone || 'عربية المندوب اللي هيترجّع منها الصنف';
     // تغيير المندوب بيغيّر قائمة الأصناف المتاحة للإرجاع، فبنصفر السطور القديمة
     vrItems = [{ id: Date.now() + Math.random(), productId: null, qty: 1 }];
     vrRenderItems();
