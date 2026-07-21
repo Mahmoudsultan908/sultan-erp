@@ -126,6 +126,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="coa" onclick="loadMod(this, 'coa')">📒 شجرة الحسابات</div>
         <div class="nav-item" data-mod="accounting-books" onclick="loadMod(this, 'accounting-books')">📖 الدفاتر</div>
         <div class="nav-item" data-mod="accounting-monitoring" onclick="loadMod(this, 'accounting-monitoring')">🔍 المراقبة والأرشفة</div>
+        <div class="nav-item" data-mod="investors" onclick="loadMod(this, 'investors')">🤝 المستثمرين</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🔜</span><span class="ng-label">قريباً</span></span><span class="nav-group-arrow">▾</span></div>
@@ -342,6 +343,7 @@ const titles = {
         'coa': 'شجرة الحسابات',
         'accounting-books': 'الدفاتر',
         'accounting-monitoring': 'المراقبة والأرشفة',
+        'investors': 'المستثمرين',
         'treasury': 'الخزن',
         'balance-transfer': 'تحويل الأرصدة',
         'general-import-export': 'استيراد وتصدير عام',
@@ -379,6 +381,7 @@ async function _dispatchRender(modName, c) {
     if (modName === 'coa' && typeof renderChartOfAccounts === 'function') await renderChartOfAccounts(c);
     if (modName === 'accounting-books' && typeof renderAccountingBooksHub === 'function') await renderAccountingBooksHub(c);
     if (modName === 'accounting-monitoring' && typeof renderAccountingMonitoringHub === 'function') await renderAccountingMonitoringHub(c);
+    if (modName === 'investors' && typeof renderInvestors === 'function') await renderInvestors(c);
     if (modName === 'treasury' && typeof renderTreasury === 'function') await renderTreasury(c);
     if (modName === 'balance-transfer' && typeof renderBalanceTransfer === 'function') await renderBalanceTransfer(c);
     if (modName === 'general-import-export' && typeof renderGeneralImportExport === 'function') await renderGeneralImportExport(c);
