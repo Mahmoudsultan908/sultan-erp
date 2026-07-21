@@ -60,10 +60,7 @@ function buildLayout() {
             <div class="logo-icon">🏪</div>
             <div class="logo-text"><h1>Sultan ERP</h1><span>SMART EDITION V2.0</span></div>
         </div>
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🏠</span><span class="ng-label">لوحة التحكم</span></span><span class="nav-group-arrow">▾</span></div>
-        <div class="nav-group-items">
-        <div class="nav-item active" data-mod="dashboard" onclick="loadMod(this, 'dashboard')">🏠 الرئيسية</div>
-        </div>
+        <div class="nav-item active" data-mod="dashboard" onclick="loadMod(this, 'dashboard')"><span class="nav-icon">🏠</span><span class="nav-label">لوحة التحكم</span></div>
 
         <div class="nav-item" data-mod="products" onclick="loadMod(this, 'products')"><span class="nav-icon">🏷️</span><span class="nav-label">الأصناف</span></div>
 
