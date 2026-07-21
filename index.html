@@ -223,12 +223,15 @@ body.inv-fullscreen .content { padding: 12px !important; }
 
 .inv-root { display: flex; flex-direction: column; height: 100%; gap: 14px; min-height: 0; }
 
-/* ── الشريط العلوي (Header) ── */
+/* ── الشريط العلوي (Header) — صفين: تشغيلي فوق + العميل تحت (بند 2،
+   تقرير 2026-07-21) ── */
 .inv-header {
   background: linear-gradient(135deg, var(--inv-navy) 0%, var(--inv-navy-deep) 100%);
-  border-radius: 16px; padding: 12px 18px; display: flex; align-items: center; gap: 14px;
+  border-radius: 16px; padding: 12px 18px 14px; display: flex; flex-direction: column; gap: 12px;
   color: #fff; box-shadow: 0 4px 14px rgba(15,23,42,0.18); flex-shrink: 0;
 }
+.inv-header-row1 { display: flex; align-items: center; gap: 14px; }
+.inv-header-row2 { display: flex; align-items: center; gap: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); }
 .inv-header-brand { display: flex; align-items: center; gap: 10px; }
 .inv-header-brand .ic { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, var(--inv-gold), var(--inv-gold-light)); display: flex; align-items: center; justify-content: center; font-size: 19px; box-shadow: 0 4px 12px rgba(217,119,6,0.4); }
 .inv-header-brand .ttl { font-size: 14px; font-weight: 700; line-height: 1.2; }
@@ -236,6 +239,12 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .inv-no-badge { background: rgba(217,119,6,0.18); color: var(--inv-gold-soft); border: 1px solid rgba(217,119,6,0.35); padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 13px; letter-spacing: 0.4px; direction: ltr; }
 .inv-date-input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff; border-radius: 9px; padding: 7px 11px; font-size: 12.5px; outline: none; font-family: inherit; cursor: pointer; }
 .inv-date-input::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.7; cursor: pointer; }
+.inv-cust-avatar { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; }
+.inv-cust-body { flex: 1; min-width: 0; }
+/* ── وحدة بحث/شريحة العميل-المورد المشتركة (purchases.js/returns.js لسه
+   بيستخدموها بشكلها الأصلي — سطر واحد + أيقونة داخلية) — الشكل الجديد
+   الأكبر لصف العميل في sales.js (بند 2) له كلاسات منفصلة تحت بدل ما
+   يعدّل في دول، عشان مايكسرش شاشتي الشراء والمرتجعات. ── */
 .inv-cust-pick { position: relative; }
 .inv-cust-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 9px; padding: 7px 12px 7px 32px; font-size: 13px; outline: none; font-family: inherit; width: 200px; transition: 0.2s; }
 .inv-cust-input::placeholder { color: #94A3B8; }
@@ -246,11 +255,27 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .inv-cust-chip .nm { font-size: 12.5px; font-weight: 700; color: var(--inv-gold-soft); }
 .inv-cust-chip .bal { font-size: 11px; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 50px; color: #CBD5E1; }
 .inv-cust-chip .x { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 11px; line-height: 1; }
+/* ── شريط بحث العميل الأكبر في صف 2 بتاع فاتورة المبيعات — كلاس منفصل
+   بدل .inv-cust-input عشان الحجم الجديد مايأثرش على purchases/returns ── */
+.inv-cust-search-lg { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 9px; padding: 9px 14px; font-size: 14px; outline: none; font-family: inherit; width: 100%; max-width: 320px; transition: 0.2s; }
+.inv-cust-search-lg::placeholder { color: #94A3B8; }
+.inv-cust-search-lg:focus { background: rgba(255,255,255,0.15); border-color: var(--inv-gold); }
+.inv-cust-display { display: none; }
+.inv-cust-display.show { display: block; }
+.inv-cust-name-big { font-size: 18px; font-weight: 800; line-height: 1.3; }
+.inv-cust-addr { font-size: 12px; color: #94A3B8; margin-top: 2px; }
+.inv-cust-bal-card { display: none; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 8px 8px 8px 16px; flex-shrink: 0; transition: 0.15s; }
+.inv-cust-bal-card.show { display: flex; }
+.inv-cust-bal-card .bal { font-size: 13.5px; font-weight: 800; color: #6EE7B7; white-space: nowrap; }
+.inv-cust-bal-card.inv-cust-bal-due { background: rgba(220,38,38,0.18); border-color: rgba(248,113,113,0.5); }
+.inv-cust-bal-card.inv-cust-bal-due .bal { color: #FCA5A5; }
+.inv-cust-bal-card .x { background: rgba(255,255,255,0.15); border: none; color: #fff; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 11px; font-weight: 700; white-space: nowrap; font-family: inherit; }
 .inv-header-spacer { flex: 1; }
 .inv-top-btn { border: none; border-radius: 9px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; transition: 0.15s; white-space: nowrap; }
 .inv-top-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
 .inv-top-btn kbd { background: rgba(255,255,255,0.2); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-family: inherit; }
 .inv-top-save { background: var(--inv-gold); color: #fff; box-shadow: 0 3px 10px rgba(217,119,6,0.4); }
+.inv-top-save-strong { font-size: 13.5px; padding: 9px 18px; box-shadow: 0 4px 16px rgba(217,119,6,0.55); }
 .inv-top-new { background: var(--inv-green); color: #fff; }
 .inv-top-print { background: var(--inv-navy-light); color: #fff; }
 .inv-top-help { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.2); }

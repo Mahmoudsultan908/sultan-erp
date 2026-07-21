@@ -424,8 +424,12 @@ async function renderSales(c) {
     invUpdateCustomerChip();
     invRenderDrafts();
     invStartAutoSave();
+    // ★ من غير invFocusSearch() هنا عمداً — كانت بتفوكس شريط البحث تلقائي
+    //   لحظة فتح أي فاتورة جديدة، والفوكس بيطلق حدث 'focus' اللي بيفتح
+    //   قائمة أول 8 أصناف تلقائي (زي invSelectCustomer بالظبط فوق) — يعني
+    //   شريط البحث كان بيفتح لوحده من غير ما المستخدم يلمسه. دلوقتي
+    //   بيفتح بس لما المستخدم يدوس عليه بالماوس أو يستخدم Alt+F.
     setTimeout(() => {
-        invFocusSearch();
         invCheckAutoSaveRestore();
     }, 150);
 }
@@ -435,38 +439,47 @@ async function renderSales(c) {
 // ════════════════════════════════════════════════════════════
 function invHeaderHTML() {
     return `
-    <div class="inv-header">
-        <div class="inv-header-brand">
-            <div class="ic">🧾</div>
-            <div class="ttl">فاتورة مبيعات<small> Sultan ERP</small></div>
+    <div class="inv-header inv-header-2row">
+        <div class="inv-header-row1">
+            <div class="inv-header-brand">
+                <div class="ic">🧾</div>
+                <div class="ttl">فاتورة مبيعات<small> Sultan ERP</small></div>
+            </div>
+            <span class="inv-no-badge">${invEditingId ? '✏️ ' + invEditingOldInvoiceNo : 'INV-' + String(INV_DB.invoiceNo).padStart(4,'0')}</span>
+            <select class="inv-date-input" id="invWarehouse" title="المخزن" onchange="invOnWarehouseChange()" style="cursor:pointer">
+                ${(INV_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===invWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
+            </select>
+            <input type="date" class="inv-date-input" id="invDate" value="${invToday()}">
+            <div class="inv-header-spacer"></div>
+            <button class="inv-top-btn inv-top-help"   onclick="invShowShortcuts()" title="الاختصارات (F1)">⌨️</button>
+            <button class="inv-top-btn" id="invFullscreenBtn" onclick="invToggleFullscreen()" title="إخفاء القائمة والشريط العلوي">${document.body.classList.contains('inv-fullscreen') ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة'}</button>
+            <button class="inv-top-btn inv-top-new"    onclick="invSave(true)">➕ جديدة <kbd>Alt+N</kbd></button>
+            <button class="inv-top-btn inv-top-save inv-top-save-strong" onclick="invSave(false)">💾 حفظ <kbd>F4</kbd></button>
+            <button class="inv-top-btn inv-top-print"  onclick="invPrint()">🖨️ طباعة</button>
+            <button class="inv-top-btn inv-top-close"  onclick="invClose()">✕</button>
         </div>
-        <span class="inv-no-badge">${invEditingId ? '✏️ ' + invEditingOldInvoiceNo : 'INV-' + String(INV_DB.invoiceNo).padStart(4,'0')}</span>
-        <select class="inv-date-input" id="invWarehouse" title="المخزن" onchange="invOnWarehouseChange()" style="cursor:pointer">
-            ${(INV_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===invWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
-        </select>
-        <input type="date" class="inv-date-input" id="invDate" value="${invToday()}">
-        ${(INV_DB.reps || []).length ? `
-        <select class="inv-date-input" id="invRep" title="المندوب" onchange="invOnRepChange()" style="cursor:pointer">
-            <option value="">🚗 بدون مندوب</option>
-            ${INV_DB.reps.map(r => `<option value="${r.id}" ${r.id === invRepId ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
-        </select>` : ''}
-        <div class="inv-cust-pick">
-            <span class="inv-cust-input-icon">👤</span>
-            <input class="inv-cust-input" id="invCustSearch" placeholder="بحث عميل: اسم / هاتف..." autocomplete="off">
-            <div class="inv-ac" id="invCustAC"></div>
+        <div class="inv-header-row2">
+            <div class="inv-cust-avatar">👤</div>
+            <div class="inv-cust-body">
+                <div class="inv-cust-pick" id="invCustPickWrap">
+                    <input class="inv-cust-search-lg" id="invCustSearch" placeholder="بحث عن العميل: الاسم أو رقم الهاتف..." autocomplete="off">
+                    <div class="inv-ac" id="invCustAC"></div>
+                </div>
+                <div class="inv-cust-display" id="invCustDisplay">
+                    <div class="inv-cust-name-big" id="invCustName"></div>
+                    <div class="inv-cust-addr" id="invCustAddr"></div>
+                </div>
+            </div>
+            ${(INV_DB.reps || []).length ? `
+            <select class="inv-date-input" id="invRep" title="المندوب" onchange="invOnRepChange()" style="cursor:pointer">
+                <option value="">🚗 بدون مندوب</option>
+                ${INV_DB.reps.map(r => `<option value="${r.id}" ${r.id === invRepId ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
+            </select>` : ''}
+            <div class="inv-cust-bal-card" id="invCustChip">
+                <span class="bal" id="invCustBal"></span>
+                <button class="x" onclick="invClearCustomer()" title="تغيير العميل">✕</button>
+            </div>
         </div>
-        <div class="inv-cust-chip" id="invCustChip">
-            <span class="nm" id="invCustName"></span>
-            <span class="bal" id="invCustBal"></span>
-            <button class="x" onclick="invClearCustomer()">✕</button>
-        </div>
-        <div class="inv-header-spacer"></div>
-        <button class="inv-top-btn inv-top-help"   onclick="invShowShortcuts()" title="الاختصارات (F1)">⌨️</button>
-        <button class="inv-top-btn" id="invFullscreenBtn" onclick="invToggleFullscreen()" title="إخفاء القائمة والشريط العلوي">${document.body.classList.contains('inv-fullscreen') ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة'}</button>
-        <button class="inv-top-btn inv-top-save"   onclick="invSave(false)">💾 حفظ <kbd>F4</kbd></button>
-        <button class="inv-top-btn inv-top-new"    onclick="invSave(true)">➕ جديدة <kbd>Alt+N</kbd></button>
-        <button class="inv-top-btn inv-top-print"  onclick="invPrint()">🖨️ طباعة</button>
-        <button class="inv-top-btn inv-top-close"  onclick="invClose()">✕</button>
     </div>`;
 }
 
@@ -822,14 +835,25 @@ function invSelectCustomer(id) {
 }
 function invUpdateCustomerChip() {
     const chip = document.getElementById('invCustChip');
+    const pickWrap = document.getElementById('invCustPickWrap');
+    const display = document.getElementById('invCustDisplay');
     const c = invCustId ? INV_DB.customers.find(x=>x.id===invCustId) : null;
     if (c) {
         chip.classList.add('show');
+        pickWrap.style.display = 'none';
+        display.classList.add('show');
         document.getElementById('invCustName').textContent = c.name;
+        document.getElementById('invCustAddr').textContent = c.address || c.phone || '';
         const balEl = document.getElementById('invCustBal');
-        balEl.textContent = (c.balance>=0?'رصيد ':'مديونية ') + invFmt(Math.abs(c.balance));
-        balEl.style.color = c.balance < 0 ? '#FCA5A5' : '#6EE7B7';
-    } else chip.classList.remove('show');
+        const owesUs = Number(c.balance) > 0;
+        balEl.textContent = (owesUs ? 'مديونية ' : c.balance < 0 ? 'رصيد له ' : 'الرصيد ') + invFmt(Math.abs(c.balance));
+        chip.classList.toggle('inv-cust-bal-due', owesUs);
+    } else {
+        chip.classList.remove('show');
+        chip.classList.remove('inv-cust-bal-due');
+        pickWrap.style.display = '';
+        display.classList.remove('show');
+    }
 }
 function invClearCustomer() {
     invCustId = null;
@@ -1688,7 +1712,6 @@ function invToArabicWords(num) {
 // ════════════════════════════════════════════════════════════
 function invFmt(n) { return (n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function invToday() { return new Date().toISOString().slice(0,10); }
-function invFocusSearch() { document.getElementById('invFastSearch')?.focus(); }
 
 function invToast(msg, type='info') {
     let t = document.getElementById('invToast');
