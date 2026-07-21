@@ -67,21 +67,18 @@ function buildLayout() {
 
         <div class="nav-item" data-mod="products" onclick="loadMod(this, 'products')"><span class="nav-icon">🏷️</span><span class="nav-label">الأصناف</span></div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">👤</span><span class="ng-label">العملاء</span></span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">👤</span><span class="ng-label">العملاء والموردين</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="customers-hub" onclick="loadMod(this, 'customers-hub')">👤 العملاء</div>
-        </div>
-
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🏭</span><span class="ng-label">الموردين</span></span><span class="nav-group-arrow">▾</span></div>
-        <div class="nav-group-items">
+        <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء (سندات قبض)</div>
         <div class="nav-item" data-mod="suppliers-hub" onclick="loadMod(this, 'suppliers-hub')">🏭 الموردين</div>
+        <div class="nav-item" data-mod="payments" onclick="loadMod(this, 'payments')">💸 دفع الموردين (سندات صرف)</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🧾</span><span class="ng-label">المبيعات والعملاء</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="sales" onclick="loadMod(this, 'sales')">🧾 فاتورة المبيعات</div>
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
-        <div class="nav-item" data-mod="collections" onclick="loadMod(this, 'collections')">💵 تحصيل العملاء</div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء <span id="crmOverdueBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">🚗 مندوب سلطان <span id="repLinkBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         <div class="nav-item" data-mod="customer-orders-link" onclick="loadMod(this, 'customer-orders-link')">🔗 طلبات العملاء <span id="corLinkBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
@@ -91,7 +88,6 @@ function buildLayout() {
         <div class="nav-group-items">
         <div class="nav-item" data-mod="purchases" onclick="loadMod(this, 'purchases')">📥 فاتورة المشتريات</div>
         <div class="nav-item" data-mod="purchase-orders" onclick="loadMod(this, 'purchase-orders')">📋 أوامر الشراء</div>
-        <div class="nav-item" data-mod="payments" onclick="loadMod(this, 'payments')">💸 دفع الموردين</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🔍</span><span class="ng-label">المراجعة والمرتجعات</span></span><span class="nav-group-arrow">▾</span></div>
