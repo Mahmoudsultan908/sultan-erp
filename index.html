@@ -411,6 +411,21 @@ body.inv-fullscreen .content { padding: 12px !important; }
     z-index: 40; animation: fadeIn .2s ease;
   }
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  /* ── الشريط العلوي كان بيطفح بره الشاشة على الموبايل/التابلت (رصيد
+     الخزينة + حالة الاتصال + بيانات المستخدم + زرار خروج + 🔍/📌 كانوا
+     أعرض من الشاشة مجتمعين)، وده كان بيودّي الصفحة كلها معاه أفقيًا.
+     الحل: نخفي التفاصيل الأقل أهمية (إيميل المستخدم) ونصغّر الباقي
+     بدل ما نمسح أي وظيفة — كل حاجة تفضل قابلة للنقر زي الأول. ── */
+  .topbar { padding: 0 10px; gap: 6px; }
+  .topbar > div:first-child { min-width: 0; flex: 1; gap: 6px; }
+  .topbar-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .topbar-actions { gap: 6px; flex-shrink: 0; }
+  .user-info { display: none; }
+  .user-profile { padding: 4px; }
+  .badge-offline { padding: 5px 10px; font-size: 10.5px; white-space: nowrap; flex-shrink: 0; }
+  .badge-cash { padding: 5px 10px; font-size: 10.5px; white-space: nowrap; flex-shrink: 0; }
+  .btn-logout { padding: 5px 8px; font-size: 10.5px; flex-shrink: 0; }
 }
 @media (min-width: 1101px) {
   .sidebar-toggle { display: none; }
