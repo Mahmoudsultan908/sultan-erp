@@ -80,6 +80,13 @@ async function renderProducts(c) {
         });
 
         prodRenderPage(c);
+
+        // ★ جاي من بحث Ctrl+K (app.js) — افتح تعديل نفس الصنف تلقائياً
+        if (window._pendingProductEdit) {
+            const pendId = window._pendingProductEdit;
+            window._pendingProductEdit = null;
+            prodOpenEdit(pendId);
+        }
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }

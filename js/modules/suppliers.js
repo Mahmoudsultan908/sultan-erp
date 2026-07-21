@@ -59,6 +59,13 @@ async function renderSuppliers(c) {
                 </tbody></table>
             </div>
         `;
+
+        // ★ جاي من بحث Ctrl+K (app.js) — افتح كشف حساب نفس المورد تلقائياً
+        if (window._pendingSupplierStatement) {
+            const pendId = window._pendingSupplierStatement;
+            window._pendingSupplierStatement = null;
+            supShowStatement(pendId);
+        }
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }

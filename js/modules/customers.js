@@ -73,6 +73,13 @@ async function renderCustomers(c) {
                 <tbody id="custListTbody">${custListRowsHtml(_custList)}</tbody></table>
             </div>
         `;
+
+        // ★ جاي من بحث Ctrl+K (app.js) — افتح كشف حساب نفس العميل تلقائياً
+        if (window._pendingCustomerStatement) {
+            const pendId = window._pendingCustomerStatement;
+            window._pendingCustomerStatement = null;
+            custShowStatement(pendId);
+        }
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }

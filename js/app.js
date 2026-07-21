@@ -154,8 +154,10 @@ function buildLayout() {
           <div style="display:flex;align-items:center;gap:10px">
             <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="إظهار/إخفاء القائمة (Alt+H)">☰</button>
             <div class="topbar-title" id="topbarTitle">لوحة التحكم</div>
+            <button class="sidebar-toggle" id="pinTabBtn" onclick="pinCurrentTab()" title="افتح في تبويب منفصل (تفضل شغال في الخلفية وانت بتتنقل لشاشة تانية)">📌</button>
           </div>
           <div class="topbar-actions">
+            <button class="sidebar-toggle" onclick="searchOpenPalette()" title="بحث سريع (Ctrl+K)">🔍</button>
             <div class="badge-offline" id="topbarOffline" onclick="offlineOpenPanel()" title="حالة الاتصال والمزامنة">🟢 متصل</div>
             <div class="badge-cash" id="topbarCash">جاري التحميل...</div>
             <div class="user-profile">
@@ -165,11 +167,32 @@ function buildLayout() {
             <button class="btn-logout" onclick="handleLogout()">خروج</button>
           </div>
         </div>
-        <div class="content" id="app-content"></div>
+        <div class="tab-strip" id="tabStrip" style="display:none"></div>
+        <div class="content-host" id="appContentHost"></div>
       </div>
     </div>`;
     navRestoreCollapsedGroups();
+
+    // ★ نظام التبويبات الداخلية (keep-alive) — الـpane الأساسية اللي كل
+    //   تنقّل عادي (مش مثبّت كتبويب) بيتعاد استخدامها فيها، ودايمًا هي
+    //   اللي حاملة id="app-content" لحد ما يتثبّت تبويب. راجع loadMod/
+    //   pinCurrentTab تحت لتفاصيل الآلية.
+    window.appTabs = new Map(); // modName -> {modName, title, paneEl, tabBtnEl}
+    window._activeBaseMod = null; // اسم الموديول المعروض دلوقتي في الـpane الأساسية (مش تبويب مثبّت)
+    window._basePaneEl = document.createElement('div');
+    window._basePaneEl.className = 'content tab-pane';
+    window._basePaneEl.id = 'app-content';
+    document.getElementById('appContentHost').appendChild(window._basePaneEl);
 }
+
+// أي شاشة عندها تايمر/اشتراك خلفية لازم يتوقف لما تبويبها يتقفل، وإلا
+// هيفضل شغال في الخلفية من غير داعي. راجع invStopAutoSave/purStopAutoSave
+// (sales.js/purchases.js) — الدالتين دول implicit globals بالفعل زي أي
+// function مصرّح بيها top-level في الملف (راجع CLAUDE.md).
+const appTabCleanupHooks = {
+    sales: () => { if (typeof window.invStopAutoSave === 'function') window.invStopAutoSave(); },
+    purchases: () => { if (typeof window.purStopAutoSave === 'function') window.purStopAutoSave(); },
+};
 
 // ★ أقسام القائمة الجانبية قابلة للطي — الحالة (مطوي/مفتوح) بتتخزن في
 //   localStorage بمفتاح نص عنوان القسم نفسه، عشان تفضل زي ما المستخدم
@@ -238,22 +261,7 @@ async function setupApp() {
     loadMod(document.querySelector('[data-mod="dashboard"]'), 'dashboard');
 }
 
-window.loadMod = async function(el, modName) {
-    if (el) {
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        el.classList.add('active');
-    }
-    if (window.innerWidth <= 1100) document.body.classList.remove('sidebar-open');
-    // ★ وضع ملء الشاشة (فاتورة المبيعات) بيتصفّر مع أي تنقّل لصفحة تانية —
-    //   عشان المستخدم ميتقفلش على شاشة من غير سايد بار/توب بار لو خرج
-    //   من صفحة المبيعات وهو لسه في وضع ملء الشاشة.
-    document.body.classList.remove('inv-fullscreen');
-
-    const c = document.getElementById('app-content');
-    if (!c) return;
-    c.innerHTML = '<p style="text-align:center;padding:40px;">جاري تحميل الواجهة...</p>';
-    
-    const titles = {
+const titles = {
         'dashboard': 'لوحة التحكم',
         'products': 'إدارة الأصناف',
         'customers-hub': 'العملاء',
@@ -285,9 +293,12 @@ window.loadMod = async function(el, modName) {
         'reports-hub': 'التقارير',
         'opening-balances': 'الأرصدة الافتتاحية',
         'settings-hub': 'الإعدادات'
-    };
-    if (titles[modName]) document.getElementById('topbarTitle').innerText = titles[modName];
-    
+};
+
+// نفس منطق التوجيه القديم بالظبط (if-chain واحد لكل موديول) — اتقص هنا
+// كما هو من غير أي تغيير منطقي، عشان يشتغل سواء الاستدعاء جاي من مسار
+// التنقّل العادي أو من تبويب مثبّت.
+async function _dispatchRender(modName, c) {
     if (modName === 'dashboard' && typeof renderDashboard === 'function') await renderDashboard(c);
     if (modName === 'products' && typeof renderProductsHub === 'function') await renderProductsHub(c);
     if (modName === 'customers-hub' && typeof renderCustomersHub === 'function') await renderCustomersHub(c);
@@ -320,6 +331,106 @@ window.loadMod = async function(el, modName) {
     if (modName === 'opening-balances' && typeof renderOpeningBalances === 'function') await renderOpeningBalances(c);
     if (modName === 'settings-hub' && typeof renderSettingsHub === 'function') await renderSettingsHub(c);
 }
+
+// إظهار pane واحدة بس (id="app-content") وإخفاء كل الباقي — أي دالة في
+// أي موديول بتعمل document.getElementById('app-content') من جوّاها
+// للـrefresh هتلاقي دايمًا الـpane الصح اللي المستخدم شايفها فعليًا،
+// من غير أي تعديل في الموديولات نفسها.
+function _activatePane(paneEl) {
+    document.querySelectorAll('#appContentHost .tab-pane').forEach(p => {
+        if (p === paneEl) { p.id = 'app-content'; p.style.display = ''; }
+        else { if (p.id === 'app-content') p.removeAttribute('id'); p.style.display = 'none'; }
+    });
+}
+
+function _updateTabStripActive(activeModName) {
+    document.querySelectorAll('#tabStrip .tab-item').forEach(b => {
+        b.classList.toggle('active', b.dataset.mod === activeModName);
+    });
+}
+
+window.loadMod = async function(el, modName) {
+    if (el) {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        el.classList.add('active');
+    }
+    if (window.innerWidth <= 1100) document.body.classList.remove('sidebar-open');
+    // ★ وضع ملء الشاشة (فاتورة المبيعات) بيتصفّر مع أي تنقّل لصفحة تانية —
+    //   عشان المستخدم ميتقفلش على شاشة من غير سايد بار/توب بار لو خرج
+    //   من صفحة المبيعات وهو لسه في وضع ملء الشاشة.
+    document.body.classList.remove('inv-fullscreen');
+
+    if (titles[modName]) document.getElementById('topbarTitle').innerText = titles[modName];
+
+    // ★ الموديول ده مثبّت كتبويب بالفعل — بس فوكس على الـpane الحية بتاعته
+    //   من غير أي re-render، عشان أي بيانات في نص الكتابة تفضل زي ما هي.
+    //   ده كمان اللي بيمنع فتح نسختين من نفس الشاشة في نفس الوقت (لو
+    //   حاولت، بترجعلك لنفس التبويب المفتوح بدل ما تعمل واحد جديد).
+    if (window.appTabs.has(modName)) {
+        _activatePane(window.appTabs.get(modName).paneEl);
+        _updateTabStripActive(modName);
+        document.getElementById('pinTabBtn').style.display = 'none';
+        return;
+    }
+
+    _activatePane(window._basePaneEl);
+    _updateTabStripActive(null);
+    document.getElementById('pinTabBtn').style.display = '';
+    window._activeBaseMod = modName;
+    const c = window._basePaneEl;
+    c.innerHTML = '<p style="text-align:center;padding:40px;">جاري تحميل الواجهة...</p>';
+    await _dispatchRender(modName, c);
+};
+
+// ── تثبيت الشاشة الحالية كتبويب منفصل تفضل شغالة في الخلفية ──
+window.pinCurrentTab = function () {
+    const modName = window._activeBaseMod;
+    if (!modName || window.appTabs.has(modName)) return;
+    const pane = window._basePaneEl;
+    const title = titles[modName] || modName;
+
+    const tabBtn = document.createElement('button');
+    tabBtn.className = 'tab-item';
+    tabBtn.dataset.mod = modName;
+    tabBtn.onclick = () => window.focusAppTab(modName);
+    tabBtn.innerHTML = `<span>${title}</span><span class="tab-close" onclick="event.stopPropagation();closeAppTab('${modName}')" title="إغلاق التبويب">✕</span>`;
+    document.getElementById('tabStrip').appendChild(tabBtn);
+    document.getElementById('tabStrip').style.display = 'flex';
+    window.appTabs.set(modName, { modName, title, paneEl: pane, tabBtnEl: tabBtn });
+    window._activeBaseMod = null;
+
+    // الـpane الأساسية بقت تبويب مثبّت — نستبدلها بواحدة جديدة فاضية
+    // للتنقّل العادي، ونرجع للوحة التحكم فيها.
+    window._basePaneEl = document.createElement('div');
+    window._basePaneEl.className = 'content tab-pane';
+    document.getElementById('appContentHost').appendChild(window._basePaneEl);
+    loadMod(document.querySelector('[data-mod="dashboard"]'), 'dashboard');
+};
+
+window.focusAppTab = function (modName) {
+    const entry = window.appTabs.get(modName);
+    if (!entry) return;
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelector(`.nav-item[data-mod="${modName}"]`)?.classList.add('active');
+    if (window.innerWidth <= 1100) document.body.classList.remove('sidebar-open');
+    document.body.classList.remove('inv-fullscreen');
+    document.getElementById('topbarTitle').innerText = entry.title;
+    document.getElementById('pinTabBtn').style.display = 'none';
+    _activatePane(entry.paneEl);
+    _updateTabStripActive(modName);
+};
+
+window.closeAppTab = function (modName) {
+    const entry = window.appTabs.get(modName);
+    if (!entry) return;
+    const wasActive = entry.paneEl.id === 'app-content';
+    appTabCleanupHooks[modName]?.();
+    entry.paneEl.remove();
+    entry.tabBtnEl.remove();
+    window.appTabs.delete(modName);
+    if (window.appTabs.size === 0) document.getElementById('tabStrip').style.display = 'none';
+    if (wasActive) loadMod(document.querySelector('[data-mod="dashboard"]'), 'dashboard');
+};
 
 window.handleLogout = async function() {
     await sb.auth.signOut();
@@ -369,7 +480,132 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         window.toggleSidebar();
     }
+    // Ctrl+K / Cmd+K → بحث سريع عام (عملاء/موردين/أصناف/فواتير) — e.code
+    // بنفس منطق Alt+H فوق، شغال مهما كانت لغة الكيبورد النشطة.
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') {
+        e.preventDefault();
+        if (document.getElementById('searchPaletteBg')) window.searchClosePalette();
+        else if (document.getElementById('app-content')) window.searchOpenPalette();
+    }
 });
+
+// ════════════════════════════════════════════════════════════
+// بحث سريع عام (Ctrl+K) — عملاء/موردين/أصناف/أرقام فواتير، نتيجة
+// واحدة بتفتحلك الشاشة الصح على طول (نفس فكرة الـpending flags
+// المستخدمة في custGoEditProfile وأخواتها عبر الموديولات).
+// ════════════════════════════════════════════════════════════
+function searchEsc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+window.searchOpenPalette = function () {
+    if (document.getElementById('searchPaletteBg')) return;
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'searchPaletteBg';
+    modal.addEventListener('click', (e) => { if (e.target === modal) window.searchClosePalette(); });
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:560px;align-self:flex-start;margin-top:90px">
+            <div class="mod-modal-header" style="gap:10px">
+                <input type="text" id="searchPaletteInput" class="mod-form-input" style="flex:1;margin:0;border:none;box-shadow:none;font-size:15px;padding:0" placeholder="🔍 ابحث عن عميل، مورد، صنف، أو رقم فاتورة..." oninput="searchHandleInput(this.value)">
+                <button class="mod-modal-close" onclick="searchClosePalette()">×</button>
+            </div>
+            <div class="mod-modal-body" id="searchPaletteResults" style="min-height:60px;max-height:60vh">
+                <div class="empty-state" style="padding:30px 10px"><span>⌨️</span>اكتب حرفين على الأقل للبحث</div>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('searchPaletteInput').focus();
+    document.addEventListener('keydown', _searchEscHandler);
+};
+
+function _searchEscHandler(e) {
+    if (e.key === 'Escape') window.searchClosePalette();
+}
+
+window.searchClosePalette = function () {
+    clearTimeout(window._searchDebounceTimer);
+    document.getElementById('searchPaletteBg')?.remove();
+    document.removeEventListener('keydown', _searchEscHandler);
+};
+
+window.searchHandleInput = function (v) {
+    clearTimeout(window._searchDebounceTimer);
+    const term = v.trim();
+    const results = document.getElementById('searchPaletteResults');
+    if (!results) return;
+    if (term.length < 2) {
+        results.innerHTML = '<div class="empty-state" style="padding:30px 10px"><span>⌨️</span>اكتب حرفين على الأقل للبحث</div>';
+        return;
+    }
+    results.innerHTML = '<div class="empty-state" style="padding:30px 10px"><span>⏳</span>جاري البحث...</div>';
+    window._searchDebounceTimer = setTimeout(() => _searchRun(term), 300);
+};
+
+let _searchReqId = 0;
+async function _searchRun(term) {
+    const reqId = ++_searchReqId;
+    const like = `%${term}%`;
+    const safe = (p) => p.then((r) => r, () => ({ data: [] }));
+    const [custR, suppR, prodR, salesR, purR] = await Promise.all([
+        safe(sb.from('customers').select('id,name,phone').or(`name.ilike.${like},phone.ilike.${like}`).limit(6)),
+        safe(sb.from('suppliers').select('id,name,phone').or(`name.ilike.${like},phone.ilike.${like}`).limit(6)),
+        safe(sb.from('products').select('id,name,code,barcode').or(`name.ilike.${like},code.ilike.${like},barcode.ilike.${like}`).limit(6)),
+        safe(sb.from('sales').select('id,invoice_no').ilike('invoice_no', like).limit(6)),
+        safe(sb.from('purchases').select('id,invoice_no').ilike('invoice_no', like).limit(6)),
+    ]);
+    if (reqId !== _searchReqId) return; // نتيجة بحث قديمة اتجاوزها بحث أحدث، اتجاهلها
+    const results = document.getElementById('searchPaletteResults');
+    if (!results) return;
+
+    const row = (icon, title, sub, onclick) => `
+        <div class="cat-card" style="cursor:pointer" onclick="${onclick}">
+            <div class="cc-ic">${icon}</div>
+            <div class="cc-info"><div class="cc-name">${searchEsc(title)}</div>${sub ? `<div class="cc-sub">${searchEsc(sub)}</div>` : ''}</div>
+        </div>`;
+    const section = (label, itemsHtml) => itemsHtml
+        ? `<div style="font-size:11px;font-weight:800;color:var(--inv-muted-light);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px">${label}</div>${itemsHtml}`
+        : '';
+
+    const custHtml = (custR.data || []).map(x => row('👤', x.name, x.phone, `searchGoCustomer('${x.id}')`)).join('');
+    const suppHtml = (suppR.data || []).map(x => row('🏭', x.name, x.phone, `searchGoSupplier('${x.id}')`)).join('');
+    const prodHtml = (prodR.data || []).map(x => row('🏷️', x.name, [x.code, x.barcode].filter(Boolean).join(' — '), `searchGoProduct('${x.id}')`)).join('');
+    const salesHtml = (salesR.data || []).map(x => row('🧾', x.invoice_no, '', `searchGoInvoice('sales', '${x.invoice_no}')`)).join('');
+    const purHtml = (purR.data || []).map(x => row('📥', x.invoice_no, '', `searchGoInvoice('purchase', '${x.invoice_no}')`)).join('');
+
+    const html = [
+        section('👤 عملاء', custHtml),
+        section('🏭 موردين', suppHtml),
+        section('🏷️ أصناف', prodHtml),
+        section('🧾 فواتير مبيعات', salesHtml),
+        section('📥 فواتير مشتريات', purHtml),
+    ].join('');
+
+    results.innerHTML = html || `<div class="empty-state" style="padding:30px 10px"><span>🔍</span>لا نتائج لـ"${searchEsc(term)}"</div>`;
+}
+
+window.searchGoCustomer = function (id) {
+    window._pendingCustomerStatement = id;
+    window._pendingCustHubTab = 'statement';
+    window.searchClosePalette();
+    document.querySelector('[data-mod="customers-hub"]')?.click();
+};
+window.searchGoSupplier = function (id) {
+    window._pendingSupplierStatement = id;
+    window._pendingSuppHubTab = 'statement';
+    window.searchClosePalette();
+    document.querySelector('[data-mod="suppliers-hub"]')?.click();
+};
+window.searchGoProduct = function (id) {
+    window._pendingProductEdit = id;
+    window.searchClosePalette();
+    document.querySelector('[data-mod="products"]')?.click();
+};
+window.searchGoInvoice = function (type, no) {
+    window._pendingInvoiceReviewSearch = { type, no };
+    window.searchClosePalette();
+    document.querySelector('[data-mod="invoice-review"]')?.click();
+};
 // إقفال تلقائي للقائمة بعد اختيار صفحة في الشاشات الصغيرة (تجربة استخدام أفضل)
 const _origLoadModForSidebar = window.loadMod;
 
