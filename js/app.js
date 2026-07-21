@@ -60,27 +60,27 @@ function buildLayout() {
             <div class="logo-icon">🏪</div>
             <div class="logo-text"><h1>Sultan ERP</h1><span>SMART EDITION V2.0</span></div>
         </div>
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>لوحة التحكم</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🏠</span><span class="ng-label">لوحة التحكم</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item active" data-mod="dashboard" onclick="loadMod(this, 'dashboard')">🏠 الرئيسية</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>الأصناف</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🏷️</span><span class="ng-label">الأصناف</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="products" onclick="loadMod(this, 'products')">🏷️ الأصناف</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>العملاء</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">👤</span><span class="ng-label">العملاء</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="customers-hub" onclick="loadMod(this, 'customers-hub')">👤 العملاء</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>الموردين</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🏭</span><span class="ng-label">الموردين</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="suppliers-hub" onclick="loadMod(this, 'suppliers-hub')">🏭 الموردين</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>المبيعات والعملاء</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🧾</span><span class="ng-label">المبيعات والعملاء</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="sales" onclick="loadMod(this, 'sales')">🧾 فاتورة المبيعات</div>
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
@@ -90,56 +90,56 @@ function buildLayout() {
         <div class="nav-item" data-mod="customer-orders-link" onclick="loadMod(this, 'customer-orders-link')">🔗 طلبات العملاء</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>المشتريات والموردين</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📥</span><span class="ng-label">المشتريات والموردين</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="purchases" onclick="loadMod(this, 'purchases')">📥 فاتورة المشتريات</div>
         <div class="nav-item" data-mod="purchase-orders" onclick="loadMod(this, 'purchase-orders')">📋 أوامر الشراء</div>
         <div class="nav-item" data-mod="payments" onclick="loadMod(this, 'payments')">💸 دفع الموردين</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>المراجعة والمرتجعات</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🔍</span><span class="ng-label">المراجعة والمرتجعات</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="invoice-review" onclick="loadMod(this, 'invoice-review')">🔍 مراجعة الفواتير</div>
         <div class="nav-item" data-mod="returns" onclick="loadMod(this, 'returns')">↩️ المرتجعات</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>المالية</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">💰</span><span class="ng-label">المالية</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="expenses" onclick="loadMod(this, 'expenses')">💸 المصروفات</div>
         <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="balance-transfer" onclick="loadMod(this, 'balance-transfer')">🔀 تحويل أرصدة</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>المخزون</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📦</span><span class="ng-label">المخزون</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="inventory-hub" onclick="loadMod(this, 'inventory-hub')">📦 المخزون</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>الموظفين</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">👥</span><span class="ng-label">الموظفين</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="payroll" onclick="loadMod(this, 'payroll')">👥 الموظفون والرواتب</div>
         <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>المحاسبة</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📒</span><span class="ng-label">المحاسبة</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="coa" onclick="loadMod(this, 'coa')">📒 شجرة الحسابات</div>
         <div class="nav-item" data-mod="accounting-books" onclick="loadMod(this, 'accounting-books')">📖 الدفاتر</div>
         <div class="nav-item" data-mod="accounting-monitoring" onclick="loadMod(this, 'accounting-monitoring')">🔍 المراقبة والأرشفة</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>🔜 قريباً</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🔜</span><span class="ng-label">قريباً</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب</div>
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>التقارير</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📈</span><span class="ng-label">التقارير</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="reports-hub" onclick="loadMod(this, 'reports-hub')">📈 التقارير</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span>الإعدادات</span><span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">⚙️</span><span class="ng-label">الإعدادات</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="general-import-export" onclick="loadMod(this, 'general-import-export')">🔄 استيراد/تصدير عام</div>
         <div class="nav-item" data-mod="print-center" onclick="loadMod(this, 'print-center')">🖨️ مركز الطباعة</div>
@@ -149,6 +149,7 @@ function buildLayout() {
 
         <div class="sidebar-footer"><span>© 2026 Sultan Food</span><span style="color:var(--inv-gold-light)">v2.0</span></div>
       </aside>
+      <div id="railFlyout"><div class="rf-title" id="railFlyoutTitle"></div></div>
       <div class="main">
         <div class="topbar">
           <div style="display:flex;align-items:center;gap:10px">
@@ -172,6 +173,7 @@ function buildLayout() {
       </div>
     </div>`;
     navRestoreCollapsedGroups();
+    railInitFlyouts();
 
     // ★ نظام التبويبات الداخلية (keep-alive) — الـpane الأساسية اللي كل
     //   تنقّل عادي (مش مثبّت كتبويب) بيتعاد استخدامها فيها، ودايمًا هي
@@ -223,6 +225,66 @@ function navRestoreCollapsedGroups() {
         itemsEl.classList.add('collapsed');
         headerEl.classList.add('collapsed');
     });
+}
+
+// ★ نافذة القائمة العائمة لوضع طي القائمة الجانبية لأيقونات (rail mode) —
+//   بدل استنساخ nav-group-items (بيكسر ربطها بحالة .active/.collapsed
+//   الحقيقية)، بننقل العنصر الحقيقي نفسه مؤقتًا جوه #railFlyout ونرجعه
+//   لمكانه الأصلي (قبل عنصر placeholder بنسيبه) لما الماوس يسيب المجموعة.
+let _railHome = null; // { itemsEl, placeholder, wasCollapsed }
+let _railHideTimer = null;
+
+function railInitFlyouts() {
+    document.querySelectorAll('.sidebar .nav-group').forEach(headerEl => {
+        headerEl.addEventListener('mouseenter', () => {
+            if (!document.querySelector('.sidebar')?.classList.contains('collapsed')) return;
+            clearTimeout(_railHideTimer);
+            railShowFlyout(headerEl);
+        });
+        headerEl.addEventListener('mouseleave', railScheduleHide);
+    });
+    const flyout = document.getElementById('railFlyout');
+    if (flyout) {
+        flyout.addEventListener('mouseenter', () => clearTimeout(_railHideTimer));
+        flyout.addEventListener('mouseleave', railScheduleHide);
+    }
+}
+
+function railShowFlyout(headerEl) {
+    const itemsEl = headerEl.nextElementSibling;
+    if (!itemsEl || !itemsEl.classList.contains('nav-group-items')) return;
+    railRestoreHome();
+    const placeholder = document.createComment('rail-home');
+    itemsEl.parentNode.insertBefore(placeholder, itemsEl);
+    _railHome = { itemsEl, placeholder, wasCollapsed: itemsEl.classList.contains('collapsed') };
+    itemsEl.classList.remove('collapsed');
+    document.getElementById('railFlyoutTitle').textContent = headerEl.querySelector('.ng-label')?.textContent || '';
+    document.getElementById('railFlyout').appendChild(itemsEl);
+
+    const rect = headerEl.getBoundingClientRect();
+    const flyout = document.getElementById('railFlyout');
+    flyout.style.top = Math.max(8, rect.top) + 'px';
+    flyout.style.right = (window.innerWidth - rect.left) + 'px';
+    flyout.classList.add('show');
+}
+
+function railRestoreHome() {
+    if (!_railHome) return;
+    const { itemsEl, placeholder, wasCollapsed } = _railHome;
+    placeholder.parentNode.insertBefore(itemsEl, placeholder);
+    placeholder.remove();
+    itemsEl.classList.toggle('collapsed', wasCollapsed);
+    _railHome = null;
+}
+
+function railHideFlyout() {
+    document.getElementById('railFlyout')?.classList.remove('show');
+    railRestoreHome();
+}
+
+function railScheduleHide() {
+    clearTimeout(_railHideTimer);
+    _railHideTimer = setTimeout(railHideFlyout, 200);
 }
 
 async function setupApp() {
@@ -452,6 +514,9 @@ window.toggleSidebar = function(force) {
         localStorage.setItem('sidebar_collapsed', collapse ? '1' : '0');
         const btn = document.getElementById('sidebarToggle');
         if (btn) btn.textContent = collapse ? '◗' : '☰';
+        // ★ لو كانت قائمة فرعية عائمة مفتوحة (rail flyout) وقت التبديل، نقفلها
+        //   ونرجّع عناصرها لمكانها — وإلا هتفضل "مسروقة" جوه القائمة الموسّعة
+        if (typeof railHideFlyout === 'function') railHideFlyout();
     }
 };
 function restoreSidebarState() {
