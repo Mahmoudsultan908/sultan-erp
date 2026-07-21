@@ -203,32 +203,41 @@ async function renderPurchases(c) {
 // ════════════════════════════════════════════════════════════
 function purHeaderHTML() {
     return `
-    <div class="inv-header">
-        <div class="inv-header-brand">
-            <div class="ic" style="background:linear-gradient(135deg,#16A34A,#22C55E);box-shadow:0 4px 12px rgba(22,163,74,0.4)">📥</div>
-            <div class="ttl">فاتورة مشتريات<small> Sultan ERP</small></div>
+    <div class="inv-header inv-header-2row">
+        <div class="inv-header-row1">
+            <div class="inv-header-brand">
+                <div class="ic" style="background:linear-gradient(135deg,#16A34A,#22C55E);box-shadow:0 4px 12px rgba(22,163,74,0.4)">📥</div>
+                <div class="ttl">فاتورة مشتريات<small> Sultan ERP</small></div>
+            </div>
+            <span class="inv-no-badge" style="background:rgba(22,163,74,0.18);color:#4ADE80;border-color:rgba(22,163,74,0.35)">${purEditingId ? '✏️ ' + purEditingOldInvoiceNo : 'PUR-' + String(PUR_DB.purchaseNo).padStart(4,'0')}</span>
+            <select class="inv-date-input" id="purWarehouse" title="المخزن" onchange="purOnWarehouseChange()" style="cursor:pointer">
+                ${(PUR_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===purWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
+            </select>
+            <input type="date" class="inv-date-input" id="purDate" value="${new Date().toISOString().split('T')[0]}">
+            <div class="inv-header-spacer"></div>
+            <button class="inv-top-btn inv-top-help" onclick="purShowShortcuts()" title="الاختصارات (F1)">⌨️</button>
+            <button class="inv-top-btn" id="purFullscreenBtn" onclick="purToggleFullscreen()" title="إخفاء القائمة والشريط العلوي">${document.body.classList.contains('inv-fullscreen') ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة'}</button>
+            <button class="inv-top-btn inv-top-new" onclick="purSave(true)">➕ جديدة <kbd>Alt+N</kbd></button>
+            <button class="inv-top-btn inv-top-save inv-top-save-strong" onclick="purSave(false)" style="background:#16A34A;box-shadow:0 4px 16px rgba(22,163,74,0.55)">💾 حفظ <kbd>F4</kbd></button>
+            <button class="inv-top-btn inv-top-close" onclick="purClose()">✕</button>
         </div>
-        <span class="inv-no-badge" style="background:rgba(22,163,74,0.18);color:#4ADE80;border-color:rgba(22,163,74,0.35)">${purEditingId ? '✏️ ' + purEditingOldInvoiceNo : 'PUR-' + String(PUR_DB.purchaseNo).padStart(4,'0')}</span>
-        <select class="inv-date-input" id="purWarehouse" title="المخزن" onchange="purOnWarehouseChange()" style="cursor:pointer">
-            ${(PUR_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===purWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
-        </select>
-        <input type="date" class="inv-date-input" id="purDate" value="${new Date().toISOString().split('T')[0]}">
-        <div class="inv-cust-pick">
-            <span class="inv-cust-input-icon">🏭</span>
-            <input class="inv-cust-input" id="purSuppSearch" placeholder="بحث مورد: اسم / هاتف..." autocomplete="off">
-            <div class="inv-ac" id="purSuppAC"></div>
+        <div class="inv-header-row2">
+            <div class="inv-cust-avatar">🏭</div>
+            <div class="inv-cust-body">
+                <div class="inv-cust-pick" id="purSuppPickWrap">
+                    <input class="inv-cust-search-lg" id="purSuppSearch" placeholder="بحث عن المورد: الاسم أو رقم الهاتف..." autocomplete="off">
+                    <div class="inv-ac" id="purSuppAC"></div>
+                </div>
+                <div class="inv-cust-display" id="purSuppDisplay">
+                    <div class="inv-cust-name-big" id="purSuppName"></div>
+                    <div class="inv-cust-addr" id="purSuppAddr"></div>
+                </div>
+            </div>
+            <div class="inv-cust-bal-card" id="purSuppChip">
+                <span class="bal" id="purSuppBal"></span>
+                <button class="x" onclick="purClearSupplier()" title="تغيير المورد">✕</button>
+            </div>
         </div>
-        <div class="inv-cust-chip" id="purSuppChip">
-            <span class="nm" id="purSuppName"></span>
-            <span class="bal" id="purSuppBal"></span>
-            <button class="x" onclick="purClearSupplier()">✕</button>
-        </div>
-        <div class="inv-header-spacer"></div>
-        <button class="inv-top-btn inv-top-help" onclick="purShowShortcuts()" title="الاختصارات (F1)">⌨️</button>
-        <button class="inv-top-btn" id="purFullscreenBtn" onclick="purToggleFullscreen()" title="إخفاء القائمة والشريط العلوي">${document.body.classList.contains('inv-fullscreen') ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة'}</button>
-        <button class="inv-top-btn inv-top-save" onclick="purSave(false)" style="background:#16A34A;box-shadow:0 3px 10px rgba(22,163,74,0.4)">💾 حفظ <kbd>F4</kbd></button>
-        <button class="inv-top-btn inv-top-new" onclick="purSave(true)">➕ جديدة <kbd>Alt+N</kbd></button>
-        <button class="inv-top-btn inv-top-close" onclick="purClose()">✕</button>
     </div>`;
 }
 
@@ -508,12 +517,27 @@ function purSelectSupplier(id) {
 }
 function purUpdateSupplierChip() {
     const chip = document.getElementById('purSuppChip');
+    const pickWrap = document.getElementById('purSuppPickWrap');
+    const display = document.getElementById('purSuppDisplay');
     const s = purSupplierId ? PUR_DB.suppliers.find(x=>x.id===purSupplierId) : null;
     if (s) {
         chip.classList.add('show');
+        pickWrap.style.display = 'none';
+        display.classList.add('show');
         document.getElementById('purSuppName').textContent = s.name;
-        document.getElementById('purSuppBal').textContent = 'مستحق: ' + purFmt(Math.abs(s.balance));
-    } else chip.classList.remove('show');
+        document.getElementById('purSuppAddr').textContent = s.address || s.phone || '';
+        const balEl = document.getElementById('purSuppBal');
+        // نفس اتجاه لون رصيد المورد المستخدم فى suppliers.js/master-data.js:
+        // موجب = مستحق عليه لنا (أحمر) — سالب = لنا عنده مقدّم (أخضر)
+        const owesUs = Number(s.balance) > 0;
+        balEl.textContent = (owesUs ? 'مستحق عليه لنا ' : s.balance < 0 ? 'لنا عنده ' : 'مسدد ') + purFmt(Math.abs(s.balance));
+        chip.classList.toggle('inv-cust-bal-due', owesUs);
+    } else {
+        chip.classList.remove('show');
+        chip.classList.remove('inv-cust-bal-due');
+        pickWrap.style.display = '';
+        display.classList.remove('show');
+    }
 }
 function purClearSupplier() { purSupplierId = null; purUpdateSupplierChip(); }
 
