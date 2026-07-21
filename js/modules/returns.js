@@ -75,8 +75,8 @@ async function renderReturns(c) {
     RET_DB.offlineDataAge = null;
     try {
         const [r1, r2, r3, r4, r5, r6, r7, r8, r9] = await Promise.all([
-            sb.from('customers').select('id,name,phone,balance').eq('is_active', true).order('name'),
-            sb.from('suppliers').select('id,name,phone,balance').eq('is_active', true).order('name'),
+            sb.from('customers').select('id,name,phone,address,balance').eq('is_active', true).order('name'),
+            sb.from('suppliers').select('id,name,phone,address,balance').eq('is_active', true).order('name'),
             sb.from('products').select('id,name,code,unit,wholesale_price,retail_price,purchase_price').eq('is_active', true).order('name'),
             sb.from('warehouses').select('id,name,is_main').order('name'),
             sb.from('inventory_stock').select('warehouse_id, product_id, qty'),
@@ -352,42 +352,50 @@ function retHeaderHTML() {
     const counter = retType === 'sales' ? (RET_DB.rsCounter || 1) : (RET_DB.rpCounter || 1);
     const prefix = retType === 'sales' ? 'RS' : 'RP';
     return `
-    <div class="inv-header">
-        <div class="inv-header-brand">
-            <div class="ic">↩️</div>
-            <div class="ttl">مرتجع ${retType === 'sales' ? 'مبيعات' : 'مشتريات'}<small> Sultan ERP</small></div>
-        </div>
-        <span class="inv-no-badge">${prefix}-${String(counter).padStart(4, '0')}</span>
+    <div class="inv-header inv-header-2row">
+        <div class="inv-header-row1">
+            <div class="inv-header-brand">
+                <div class="ic">↩️</div>
+                <div class="ttl">مرتجع ${retType === 'sales' ? 'مبيعات' : 'مشتريات'}<small> Sultan ERP</small></div>
+            </div>
+            <span class="inv-no-badge">${prefix}-${String(counter).padStart(4, '0')}</span>
 
-        <div class="inv-density-btns" title="نوع المرتجع">
-            <button onclick="retSwitchType('sales')" class="${retType === 'sales' ? 'active' : ''}">↩️ مبيعات</button>
-            <button onclick="retSwitchType('purchase')" class="${retType === 'purchase' ? 'active' : ''}">↩️ مشتريات</button>
-        </div>
-        <div class="inv-density-btns" title="طريقة الإدخال">
-            <button onclick="retSwitchMode('linked')" class="${retMode === 'linked' ? 'active' : ''}">🔗 مرتبط بفاتورة</button>
-            <button onclick="retSwitchMode('manual')" class="${retMode === 'manual' ? 'active' : ''}">✍️ مستقل</button>
-        </div>
+            <div class="inv-density-btns" title="نوع المرتجع">
+                <button onclick="retSwitchType('sales')" class="${retType === 'sales' ? 'active' : ''}">↩️ مبيعات</button>
+                <button onclick="retSwitchType('purchase')" class="${retType === 'purchase' ? 'active' : ''}">↩️ مشتريات</button>
+            </div>
+            <div class="inv-density-btns" title="طريقة الإدخال">
+                <button onclick="retSwitchMode('linked')" class="${retMode === 'linked' ? 'active' : ''}">🔗 مرتبط بفاتورة</button>
+                <button onclick="retSwitchMode('manual')" class="${retMode === 'manual' ? 'active' : ''}">✍️ مستقل</button>
+            </div>
 
-        <select class="inv-date-input" id="retWarehouse" title="المخزن" onchange="retOnWarehouseChange()" style="cursor:pointer">
-            ${(RET_DB.warehouses || []).map(w => `<option value="${w.id}" ${w.id === retWarehouseId ? 'selected' : ''}>🏭 ${w.name}${w.is_main ? ' (رئيسي)' : ''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
-        </select>
+            <select class="inv-date-input" id="retWarehouse" title="المخزن" onchange="retOnWarehouseChange()" style="cursor:pointer">
+                ${(RET_DB.warehouses || []).map(w => `<option value="${w.id}" ${w.id === retWarehouseId ? 'selected' : ''}>🏭 ${w.name}${w.is_main ? ' (رئيسي)' : ''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
+            </select>
 
-        ${retMode === 'manual' ? `
-        <div class="inv-cust-pick">
-            <span class="inv-cust-input-icon">👤</span>
-            <input class="inv-cust-input" id="retEntitySearch" placeholder="بحث ${entityLabel}: اسم / هاتف..." autocomplete="off">
-            <div class="inv-ac" id="retEntityAC"></div>
-        </div>` : ''}
-        <div class="inv-cust-chip" id="retEntityChip">
-            <span class="nm" id="retEntityName"></span>
-            <span class="bal" id="retEntityBal"></span>
-            ${retMode === 'manual' ? `<button class="x" onclick="retClearEntity()">✕</button>` : ''}
+            <div class="inv-header-spacer"></div>
+            <button class="inv-top-btn inv-top-new" onclick="renderReturns(document.getElementById('app-content'))">➕ جديد</button>
+            <button class="inv-top-btn inv-top-save inv-top-save-strong" onclick="retSave()">💾 حفظ <kbd>F4</kbd></button>
+            <button class="inv-top-btn inv-top-print" onclick="retPrint()">🖨️ طباعة</button>
         </div>
-
-        <div class="inv-header-spacer"></div>
-        <button class="inv-top-btn inv-top-save" onclick="retSave()">💾 حفظ <kbd>F4</kbd></button>
-        <button class="inv-top-btn inv-top-print" onclick="retPrint()">🖨️ طباعة</button>
-        <button class="inv-top-btn inv-top-new" onclick="renderReturns(document.getElementById('app-content'))">➕ جديد</button>
+        <div class="inv-header-row2">
+            <div class="inv-cust-avatar">${retType === 'sales' ? '👤' : '🏭'}</div>
+            <div class="inv-cust-body">
+                ${retMode === 'manual' ? `
+                <div class="inv-cust-pick" id="retEntityPickWrap">
+                    <input class="inv-cust-search-lg" id="retEntitySearch" placeholder="بحث عن ${entityLabel}: الاسم أو رقم الهاتف..." autocomplete="off">
+                    <div class="inv-ac" id="retEntityAC"></div>
+                </div>` : `<div class="inv-cust-addr" id="retEntityHint">${entityLabel} هيتحدد تلقائي من الفاتورة المرتبطة</div>`}
+                <div class="inv-cust-display" id="retEntityDisplay">
+                    <div class="inv-cust-name-big" id="retEntityName"></div>
+                    <div class="inv-cust-addr" id="retEntityAddr"></div>
+                </div>
+            </div>
+            <div class="inv-cust-bal-card" id="retEntityChip">
+                <span class="bal" id="retEntityBal"></span>
+                ${retMode === 'manual' ? `<button class="x" onclick="retClearEntity()" title="تغيير ${entityLabel}">✕</button>` : ''}
+            </div>
+        </div>
     </div>`;
 }
 
@@ -744,16 +752,33 @@ function retClearEntity() {
 function retUpdateEntityChip() {
     const chip = document.getElementById('retEntityChip');
     if (!chip) return;
+    const pickWrap = document.getElementById('retEntityPickWrap');
+    const hint = document.getElementById('retEntityHint');
+    const display = document.getElementById('retEntityDisplay');
     const list = retType === 'sales' ? RET_DB.customers : RET_DB.suppliers;
     const x = retEntityId ? list.find(v => v.id === retEntityId) : null;
     if (x) {
         chip.classList.add('show');
+        if (pickWrap) pickWrap.style.display = 'none';
+        if (hint) hint.style.display = 'none';
+        display.classList.add('show');
         document.getElementById('retEntityName').textContent = x.name;
+        document.getElementById('retEntityAddr').textContent = x.address || x.phone || '';
         const balEl = document.getElementById('retEntityBal');
-        balEl.textContent = (x.balance >= 0 ? 'رصيد ' : 'مديونية ') + retFmt(Math.abs(x.balance));
-        balEl.style.color = x.balance < 0 ? '#FCA5A5' : '#6EE7B7';
+        // نفس اتجاه الألوان فى sales.js/purchases.js/suppliers.js: موجب = مستحق
+        // منه (أحمر) — سالب = رصيد/مقدّم له (أخضر). كانت هنا مقلوبة قبل كده.
+        const owesUs = Number(x.balance) > 0;
+        const label = retType === 'sales'
+            ? (owesUs ? 'مديونية ' : x.balance < 0 ? 'رصيد له ' : 'الرصيد ')
+            : (owesUs ? 'مستحق عليه لنا ' : x.balance < 0 ? 'لنا عنده ' : 'مسدد ');
+        balEl.textContent = label + retFmt(Math.abs(x.balance));
+        chip.classList.toggle('inv-cust-bal-due', owesUs);
     } else {
         chip.classList.remove('show');
+        chip.classList.remove('inv-cust-bal-due');
+        if (pickWrap) pickWrap.style.display = '';
+        if (hint) hint.style.display = '';
+        display.classList.remove('show');
     }
 }
 

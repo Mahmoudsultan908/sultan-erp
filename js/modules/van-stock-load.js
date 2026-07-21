@@ -28,7 +28,7 @@ async function renderVanStockLoad(container) {
             sb.from('warehouses').select('*').order('name'),
             sb.from('products').select('id,name,code,unit').eq('is_active', true).order('name'),
             sb.from('inventory_stock').select('warehouse_id,product_id,qty'),
-            sb.from('sales_reps').select('id,name').eq('is_active', true).order('name'),
+            sb.from('sales_reps').select('id,name,phone').eq('is_active', true).order('name'),
         ]);
         VL_DB.warehouses = warehouses || [];
         VL_DB.products = products || [];
@@ -116,25 +116,34 @@ function vlRenderScreen(c) {
 }
 
 function vlHeaderHTML() {
+    const selRep = VL_DB.reps.find(r => r.id === vlRepId);
     return `
-    <div class="inv-header">
-        <div class="inv-header-brand">
-            <div class="ic">🚗</div>
-            <div class="ttl">تحميل عربية مندوب<small> نقل فيزيائي من المخزن لعربية المندوب — بدون تأثير مالي</small></div>
+    <div class="inv-header inv-header-2row">
+        <div class="inv-header-row1">
+            <div class="inv-header-brand">
+                <div class="ic">🚗</div>
+                <div class="ttl">تحميل عربية مندوب<small> نقل فيزيائي من المخزن لعربية المندوب — بدون تأثير مالي</small></div>
+            </div>
+
+            <input type="date" class="inv-date-input" id="vlDate" value="${vlToday()}" title="تاريخ التحميل">
+
+            <select class="inv-date-input" id="vlWarehouse" title="من مخزن" onchange="vlOnFilterChange()" style="cursor:pointer">
+                ${VL_DB.warehouses.map(w => `<option value="${w.id}" ${w.id === vlWarehouseId ? 'selected' : ''}>📤 من: ${w.name}${w.is_main ? ' (رئيسي)' : ''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
+            </select>
+
+            <div class="inv-header-spacer"></div>
+            <button class="inv-top-btn inv-top-new" onclick="renderVanStockLoad(document.getElementById('app-content'))">➕ جديد</button>
+            <button class="inv-top-btn inv-top-save inv-top-save-strong" onclick="vlSave()">💾 حفظ التحميل</button>
         </div>
-
-        <input type="date" class="inv-date-input" id="vlDate" value="${vlToday()}" title="تاريخ التحميل">
-
-        <select class="inv-date-input" id="vlWarehouse" title="من مخزن" onchange="vlOnFilterChange()" style="cursor:pointer">
-            ${VL_DB.warehouses.map(w => `<option value="${w.id}" ${w.id === vlWarehouseId ? 'selected' : ''}>📤 من: ${w.name}${w.is_main ? ' (رئيسي)' : ''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
-        </select>
-        <select class="inv-date-input" id="vlRep" title="عربية المندوب" onchange="vlOnFilterChange()" style="cursor:pointer">
-            ${VL_DB.reps.map(r => `<option value="${r.id}" ${r.id === vlRepId ? 'selected' : ''}>🚗 عربية: ${r.name}</option>`).join('')}
-        </select>
-
-        <div class="inv-header-spacer"></div>
-        <button class="inv-top-btn inv-top-save" onclick="vlSave()">💾 حفظ التحميل</button>
-        <button class="inv-top-btn inv-top-new" onclick="renderVanStockLoad(document.getElementById('app-content'))">➕ جديد</button>
+        <div class="inv-header-row2">
+            <div class="inv-cust-avatar">🚗</div>
+            <div class="inv-cust-body">
+                <select class="inv-cust-search-lg" id="vlRep" title="عربية المندوب" onchange="vlOnFilterChange()" style="cursor:pointer">
+                    ${VL_DB.reps.map(r => `<option value="${r.id}" ${r.id === vlRepId ? 'selected' : ''}>${r.name}</option>`).join('')}
+                </select>
+                <div class="inv-cust-addr">${selRep?.phone || 'عربية المندوب اللي هيتحمّل عليها الصنف'}</div>
+            </div>
+        </div>
     </div>`;
 }
 
@@ -309,6 +318,9 @@ async function vlOnFilterChange() {
     const repSel = document.getElementById('vlRep');
     if (whSel) vlWarehouseId = whSel.value;
     if (repSel) vlRepId = repSel.value;
+    const selRep = VL_DB.reps.find(r => r.id === vlRepId);
+    const subEl = repSel?.parentElement.querySelector('.inv-cust-addr');
+    if (subEl) subEl.textContent = selRep?.phone || 'عربية المندوب اللي هيتحمّل عليها الصنف';
     vlRenderItems();
     await vlComputeLoadSequence();
     const seqInput = document.getElementById('vlLoadSeq');
