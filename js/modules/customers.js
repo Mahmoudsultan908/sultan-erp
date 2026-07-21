@@ -17,7 +17,7 @@ async function renderCustomers(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء...</div>';
     try {
         const [{ data: customers }, { data: regions }, interactionsResult] = await Promise.all([
-            sb.from('customers').select('*').order('name'),
+            sb.from('customers').select('*').order('balance', { ascending: false }),
             sb.from('customer_regions').select('id,name'),
             // اختياري — لو جدول customer_interactions لسه ما اتعملش، نتجاهل الخطأ بهدوء
             sb.from('customer_interactions').select('customer_id, interaction_date').then(r => r, () => ({ data: [] })),

@@ -44,8 +44,9 @@ async function renderTreasury(c) {
                 <div class="mod-card-icon" style="background:${t.is_default?'#FFFBEB':'#F1F5F9'};color:${t.is_default?'#D97706':'#475569'}">🏦</div>
                 <div class="mod-card-val">${tsyFmt(t.balance)}</div>
                 <div class="mod-card-lbl">${t.treasury_name} ${t.is_default ? '<span style="background:#FFFBEB;color:#D97706;font-size:10px;padding:2px 6px;border-radius:5px;margin-right:4px">افتراضية</span>' : ''}</div>
-                <div style="display:flex;gap:6px;margin-top:8px">
+                <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
                     <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="tsyShowStatement('${t.treasury_id}')">📄 كشف حساب</button>
+                    <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="tsyOpenEditModal('${t.treasury_id}','${(t.treasury_name||'').replace(/'/g,"\\'")}')">✏️ تعديل الاسم</button>
                     ${!t.is_default ? `<button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="tsyToggleActive('${t.treasury_id}', true)">تعطيل الخزنة</button>` : ''}
                 </div>
             </div>`).join('')}
@@ -133,6 +134,44 @@ window.tsySaveNew = async function() {
         const { error } = await sb.from('treasuries').insert({ name, is_active: true, is_default: false });
         if (error) throw error;
         tsyCloseModal();
+        renderTreasury(document.getElementById('app-content'));
+    } catch (err) { alert('خطأ أثناء الحفظ: ' + err.message); }
+    finally { btn.innerText = '💾 حفظ'; btn.disabled = false; }
+};
+
+window.tsyOpenEditModal = function(treasuryId, currentName) {
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'tsyEditModal';
+    modal.innerHTML = `
+        <div class="mod-modal">
+            <div class="mod-modal-header"><h3>✏️ تعديل اسم الخزنة</h3>
+                <button class="mod-modal-close" onclick="tsyCloseEditModal()">&times;</button></div>
+            <div class="mod-modal-body">
+                <div class="mod-form-group"><label>اسم الخزنة *</label>
+                    <input type="text" id="tsyEditName" class="mod-form-input" value="${currentName}">
+                </div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="tsyCloseEditModal()">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" onclick="tsySaveEdit('${treasuryId}')">💾 حفظ</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+};
+
+window.tsyCloseEditModal = function() { const m = document.getElementById('tsyEditModal'); if (m) m.remove(); };
+
+window.tsySaveEdit = async function(treasuryId) {
+    const name = document.getElementById('tsyEditName').value.trim();
+    if (!name) return alert('أدخل اسم الخزنة');
+
+    const btn = document.querySelector('#tsyEditModal .mod-btn-primary');
+    btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
+    try {
+        const { error } = await sb.from('treasuries').update({ name }).eq('id', treasuryId);
+        if (error) throw error;
+        tsyCloseEditModal();
         renderTreasury(document.getElementById('app-content'));
     } catch (err) { alert('خطأ أثناء الحفظ: ' + err.message); }
     finally { btn.innerText = '💾 حفظ'; btn.disabled = false; }

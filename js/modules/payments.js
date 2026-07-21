@@ -93,7 +93,7 @@ async function renderPayments(c) {
                     <td>${p._queue
                         ? (p.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
                         : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:#94A3B8;font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
-                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button>` : ''}`}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="payReverseSupplierPayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
@@ -365,6 +365,26 @@ async function payUniqueRef(base) {
         n++;
     }
 }
+// استرجاع دفعة مورد — إلغاء مباشر من غير تسجيل سند بديل (بعكس paySaveEdit
+// اللي بيلغي القديم ويسجّل جديد). نفس الـ trigger بيرجّع الخزنة ورصيد
+// المورد تلقائياً، والسند الأصلي فضل ظاهر في السجل بعلامة "🚫 ملغى" —
+// التعديل 13 من تقرير 2026-07-21.
+window.payReverseSupplierPayment = async function(id) {
+    const p = _payList.find(x => x.id === id);
+    if (!p) return alert('تعذّر العثور على سند الدفع');
+    if (p.status !== 'confirmed') return alert('هذا السند غير مؤكد بالفعل ولا يمكن استرجاعه');
+    if (!confirm(`استرجاع سند الدفع ${p.ref||''} بمبلغ ${payFmt(p.amount)}؟\nالمبلغ هيرجع لرصيد المورد والخزنة، والسند هيفضل ظاهر في السجل بعلامة "ملغى".`)) return;
+    if (typeof isOnline === 'function' && !isOnline()) {
+        alert('📴 استرجاع سند دفع محتاج اتصال بالإنترنت — حاول تاني لما الاتصال يرجع');
+        return;
+    }
+    try {
+        const { error } = await sb.from('supplier_payments').update({ status: 'cancelled' }).eq('id', id);
+        if (error) throw error;
+        renderPayments(document.getElementById('app-content'));
+    } catch (err) { alert('خطأ أثناء الاسترجاع: ' + err.message); }
+};
+
 window.payOpenEditModal = function(id) {
     const p = _payList.find(x => x.id === id);
     if (!p) return alert('تعذّر العثور على سند الصرف');

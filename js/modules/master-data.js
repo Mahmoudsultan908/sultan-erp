@@ -22,7 +22,7 @@ async function renderCustomersManage(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء...</div>';
     try {
         const [{ data: customers }, { data: regions }, { data: classifications }, { data: groups }, repsResult] = await Promise.all([
-            sb.from('customers').select('*').order('name'),
+            sb.from('customers').select('*').order('balance', { ascending: false }),
             sb.from('customer_regions').select('*').order('name'),
             sb.from('customer_classifications').select('*').order('name'),
             sb.from('customer_groups').select('*, price_levels(name)').order('name'),
@@ -267,7 +267,7 @@ let _mgSuppEditingId = null;
 async function renderSuppliersManage(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل الموردين...</div>';
     try {
-        const { data: suppliers } = await sb.from('suppliers').select('*').order('name');
+        const { data: suppliers } = await sb.from('suppliers').select('*').order('balance', { ascending: false });
         _mgSuppList = suppliers || [];
         suppRenderPage(c);
 

@@ -110,7 +110,7 @@ async function renderCollections(c) {
                     <td>${p._queue
                         ? (p.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
                         : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:#94A3B8;font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
-                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="colOpenEditModal('${p.id}')">✏️ تعديل</button>` : ''}`}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="colOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="colReversePayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
@@ -394,6 +394,26 @@ async function colUniqueRef(base) {
         n++;
     }
 }
+// استرجاع دفعة — إلغاء مباشر من غير تسجيل سند بديل (بعكس colSaveEdit اللي
+// بيلغي القديم ويسجّل جديد). نفس الـ trigger (fn_customer_payment_status_
+// change) بيرجّع الخزنة ورصيد العميل تلقائياً، والسند الأصلي فضل ظاهر في
+// السجل بعلامة "🚫 ملغى" — التعديل 13 من تقرير 2026-07-21.
+window.colReversePayment = async function(id) {
+    const p = _colList.find(x => x.id === id);
+    if (!p) return alert('تعذّر العثور على سند التحصيل');
+    if (p.status !== 'confirmed') return alert('هذا السند غير مؤكد بالفعل ولا يمكن استرجاعه');
+    if (!confirm(`استرجاع سند التحصيل ${p.ref||''} بمبلغ ${colFmt(p.amount)}؟\nالمبلغ هيرجع لرصيد العميل والخزنة، والسند هيفضل ظاهر في السجل بعلامة "ملغى".`)) return;
+    if (typeof isOnline === 'function' && !isOnline()) {
+        alert('📴 استرجاع سند تحصيل محتاج اتصال بالإنترنت — حاول تاني لما الاتصال يرجع');
+        return;
+    }
+    try {
+        const { error } = await sb.from('customer_payments').update({ status: 'cancelled' }).eq('id', id);
+        if (error) throw error;
+        renderCollections(document.getElementById('app-content'));
+    } catch (err) { alert('خطأ أثناء الاسترجاع: ' + err.message); }
+};
+
 window.colOpenEditModal = function(id) {
     const p = _colList.find(x => x.id === id);
     if (!p) return alert('تعذّر العثور على سند التحصيل');
