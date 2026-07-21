@@ -65,10 +65,7 @@ function buildLayout() {
         <div class="nav-item active" data-mod="dashboard" onclick="loadMod(this, 'dashboard')">🏠 الرئيسية</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🏷️</span><span class="ng-label">الأصناف</span></span><span class="nav-group-arrow">▾</span></div>
-        <div class="nav-group-items">
-        <div class="nav-item" data-mod="products" onclick="loadMod(this, 'products')">🏷️ الأصناف</div>
-        </div>
+        <div class="nav-item" data-mod="products" onclick="loadMod(this, 'products')"><span class="nav-icon">🏷️</span><span class="nav-label">الأصناف</span></div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">👤</span><span class="ng-label">العملاء</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
@@ -108,11 +105,6 @@ function buildLayout() {
         <div class="nav-item" data-mod="expenses" onclick="loadMod(this, 'expenses')">💸 المصروفات</div>
         <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="balance-transfer" onclick="loadMod(this, 'balance-transfer')">🔀 تحويل أرصدة</div>
-        </div>
-
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📦</span><span class="ng-label">المخزون</span></span><span class="nav-group-arrow">▾</span></div>
-        <div class="nav-group-items">
-        <div class="nav-item" data-mod="inventory-hub" onclick="loadMod(this, 'inventory-hub')">📦 المخزون</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">👥</span><span class="ng-label">الموظفين</span></span><span class="nav-group-arrow">▾</span></div>
