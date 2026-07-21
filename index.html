@@ -37,6 +37,9 @@ body { font-family: 'Cairo', sans-serif; background: #F7F4EF; color: #0F172A; ov
 .sidebar.collapsed .nav-group-items { display: none; }
 .sidebar.collapsed .nav-group:has(+ .nav-group-items .nav-item.active) { background: rgba(255,255,255,0.08); color: #fff; }
 .sidebar.collapsed .sidebar-footer { display: none; }
+/* بند مستقل بلا مجموعة (زي الإعدادات) — نفس معاملة رأس المجموعة فى وضع الطي */
+.sidebar.collapsed > .nav-item { justify-content: center; padding: 13px 0; margin: 2px 8px; gap: 0; }
+.sidebar.collapsed > .nav-item .nav-label { display: none; }
 .sidebar-logo { flex-shrink: 0; }
 .sidebar-footer { flex-shrink: 0; }
 /* شريط تمرير رفيع ومتناسق مع الثيم الغامق */

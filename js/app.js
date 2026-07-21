@@ -141,10 +141,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="reports-hub" onclick="loadMod(this, 'reports-hub')">📈 التقارير</div>
         </div>
 
-        <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">⚙️</span><span class="ng-label">الإعدادات</span></span><span class="nav-group-arrow">▾</span></div>
-        <div class="nav-group-items">
-        <div class="nav-item" data-mod="settings-hub" onclick="loadMod(this, 'settings-hub')">⚙️ الإعدادات</div>
-        </div>
+        <div class="nav-item" data-mod="settings-hub" onclick="loadMod(this, 'settings-hub')"><span class="nav-icon">⚙️</span><span class="nav-label">الإعدادات</span></div>
 
         <div class="sidebar-footer"><span>© 2026 Sultan Food</span><span style="color:var(--inv-gold-light)">v2.0</span></div>
       </aside>
