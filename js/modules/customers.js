@@ -313,11 +313,12 @@ function custListRowsHtml(list) {
         const bal = Number(c.balance)||0;
         const balColor = bal > 0 ? '#DC2626' : bal < 0 ? '#059669' : '#64748B';
         const lastInt = _custLastIntMap[c.id];
+        const srcBadge = custSourceBadge(c.source);
         return `<tr>
             <td>
                 <div style="display:flex;align-items:center;gap:8px">
                     <div style="width:32px;height:32px;border-radius:50%;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#475569">${(c.name||'?').charAt(0)}</div>
-                    <div><div style="font-weight:600">${c.name}</div>${c.code?`<div style="font-size:11px;color:#94A3B8">${c.code}</div>`:''}</div>
+                    <div><div style="font-weight:600">${c.name}</div><div style="display:flex;align-items:center;gap:6px;margin-top:2px">${c.code?`<span style="font-size:11px;color:#94A3B8">${c.code}</span>`:''}${srcBadge}</div></div>
                 </div>
             </td>
             <td dir="ltr" style="text-align:right;color:#64748B">${c.phone||'—'}</td>
@@ -455,3 +456,11 @@ window.custRefreshInteractions = async function (customerId) {
 // 4) أدوات مساعدة
 // ════════════════════════════════════════════════════════════
 function custFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+// علامة مصدر تسجيل العميل (بند 6، تقرير 2026-07-21) — customers.source
+// null = تسجيل يدوي/قديم قبل إضافة العمود، مفيش بادچ ليه
+function custSourceBadge(source) {
+    if (source === 'sultanoo') return '<span style="font-size:9.5px;background:#EFF6FF;color:#2563EB;padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">📱 سلطانو</span>';
+    if (source === 'rep_app') return '<span style="font-size:9.5px;background:#F0FDF4;color:#059669;padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">🚗 مندوب</span>';
+    return '';
+}

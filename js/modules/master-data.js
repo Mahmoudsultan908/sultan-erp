@@ -104,8 +104,9 @@ function custRenderRows() {
         const grp = _mgCustGroups.find(g=>g.id===x.group_id);
         const rep = _mgCustReps.find(r=>r.id===x.default_rep_id);
         const bal = Number(x.balance)||0;
+        const srcBadge = typeof custSourceBadge === 'function' ? custSourceBadge(x.source) : '';
         return `<tr>
-            <td><strong>${x.name}</strong></td>
+            <td><strong>${x.name}</strong>${srcBadge ? `<div style="margin-top:2px">${srcBadge}</div>` : ''}</td>
             <td dir="ltr" style="text-align:right">${x.phone||'—'}</td>
             <td>${region?.name||'—'}</td>
             <td>${cls?.name||'—'}</td>
