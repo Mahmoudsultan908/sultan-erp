@@ -159,6 +159,7 @@ function vlSearchBarHTML() {
 // ════════════════════════════════════════════════════════════
 // اختيار أصناف متعددة (بحث + تحديد) — نفس نمط invOpenMultiPick فى sales.js
 // ════════════════════════════════════════════════════════════
+let _vlMultiHideZero = true;
 function vlOpenMultiPick() {
     if (!vlWarehouseId) { alert('اختر المخزن أولاً'); return; }
     document.getElementById('vlMultiModal')?.remove();
@@ -171,6 +172,10 @@ function vlOpenMultiPick() {
             <button class="mod-modal-close" onclick="vlCloseMultiPick()">✕</button></div>
         <div class="mod-modal-body">
             <input type="text" class="mod-form-input" id="vlMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="vlRenderMultiPickList(this.value)">
+            <label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:#475569;cursor:pointer">
+                <input type="checkbox" id="vlMultiHideZero" ${_vlMultiHideZero ? 'checked' : ''} onchange="vlMultiToggleHideZero(this.checked)">
+                إخفاء الأصناف بدون رصيد بالمخزن
+            </label>
             <div id="vlMultiPickList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
         </div>
         <div class="mod-modal-footer">
@@ -187,11 +192,16 @@ function vlCloseMultiPick() {
     document.getElementById('vlMultiModal')?.remove();
     _vlMultiSelected = {};
 }
+function vlMultiToggleHideZero(checked) {
+    _vlMultiHideZero = checked;
+    vlRenderMultiPickList(document.getElementById('vlMultiSearch')?.value || '');
+}
 function vlRenderMultiPickList(val) {
     const box = document.getElementById('vlMultiPickList');
     if (!box) return;
     const v = (val || '').trim();
-    const list = v ? VL_DB.products.filter(p => (p.name || '').includes(v) || (p.code || '').includes(v)) : VL_DB.products;
+    let list = v ? VL_DB.products.filter(p => (p.name || '').includes(v) || (p.code || '').includes(v)) : VL_DB.products;
+    if (_vlMultiHideZero) list = list.filter(p => vlGetStock(p.id) > 0);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _vlMultiSelected[p.id];

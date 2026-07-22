@@ -979,6 +979,7 @@ function invOnCode(idx, val) {
 //   في ملفات تانية (زي returns.js)، بنفس منطق invGetSellPrice/invPriceLevelCode
 //   المستخدم في باقي الفاتورة.
 let _invMultiSelected = {}; // { productId: qty }
+let _invMultiHideZero = true;
 function invOpenMultiPick() {
     document.getElementById('invMultiModal')?.remove();
     const m = document.createElement('div');
@@ -990,6 +991,10 @@ function invOpenMultiPick() {
             <button class="mod-modal-close" onclick="invCloseMultiPick()">✕</button></div>
         <div class="mod-modal-body">
             <input type="text" class="mod-form-input" id="invMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="invRenderMultiPickList(this.value)">
+            <label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:#475569;cursor:pointer">
+                <input type="checkbox" id="invMultiHideZero" ${_invMultiHideZero ? 'checked' : ''} onchange="invMultiToggleHideZero(this.checked)">
+                إخفاء الأصناف بدون رصيد
+            </label>
             <div id="invMultiPickList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
         </div>
         <div class="mod-modal-footer">
@@ -1006,12 +1011,17 @@ function invCloseMultiPick() {
     document.getElementById('invMultiModal')?.remove();
     _invMultiSelected = {};
 }
+function invMultiToggleHideZero(checked) {
+    _invMultiHideZero = checked;
+    invRenderMultiPickList(document.getElementById('invMultiSearch')?.value || '');
+}
 function invRenderMultiPickList(val) {
     const box = document.getElementById('invMultiPickList');
     if (!box) return;
     const v = (val||'').trim();
     const terms = v.split(/\s+/).filter(Boolean);
-    const list = v ? INV_DB.products.filter(p => terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(v)) : INV_DB.products;
+    let list = v ? INV_DB.products.filter(p => terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(v)) : INV_DB.products;
+    if (_invMultiHideZero) list = list.filter(p => invGetStock(p.id) > 0);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _invMultiSelected[p.id];
