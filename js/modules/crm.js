@@ -20,6 +20,7 @@ let _crmList = [];
 let _crmCustomers = [];
 let _crmReps = [];
 let _crmFilter = 'due'; // 'due' | 'all'
+let _crmInteractionsView = 'mine'; // 'mine' | 'all'
 let _crmTableMissing = false;
 
 const CRM_TYPE_LABELS = { call: '📞 مكالمة', visit: '🚶 زيارة', complaint: '⚠️ شكوى', note: '📝 ملاحظة' };
@@ -111,6 +112,28 @@ function crmWaLink(l) {
     return `https://wa.me/${intl}?text=${encodeURIComponent(crmWaMsg(l))}`;
 }
 
+// ---- رسالة واتساب عامة لمتابعة عميل حالي (مش Lead، ملوش مرحلة) ----
+const CRM_CUSTOMER_TPL_KEY = 'متابعة_عميل_حالي';
+const CRM_DEFAULT_CUSTOMER_TPL =
+`السلام عليكم أستاذ {name} 👋
+معاك {agent} من شركة سلطان للمواد الغذائية 🌟
+
+حابين نطمن عليك ونعرف احتياجاتك الحالية، وهل محتاج أي أصناف تانية.
+
+في خدمتك 🙏`;
+
+function crmCustomerWaMsg(x) {
+    const tmpl = _crmTemplates[CRM_CUSTOMER_TPL_KEY] || CRM_DEFAULT_CUSTOMER_TPL;
+    const agent = _crmProfiles.find(p => p.id === x.assigned_to)?.name || currentUser?.name || 'سلطان';
+    return tmpl.replace(/{name}/g, x.customers?.name || 'العميل').replace(/{agent}/g, agent);
+}
+function crmCustomerWaLink(x) {
+    const phone = (x.customers?.phone || '').replace(/\D/g, '');
+    if (!phone) return null;
+    const intl = phone.startsWith('0') ? '2' + phone : phone;
+    return `https://wa.me/${intl}?text=${encodeURIComponent(crmCustomerWaMsg(x))}`;
+}
+
 // ════════════════════════════════════════════════════════════
 // 0) الدخول الرئيسي + تبديل الوضع
 // ════════════════════════════════════════════════════════════
@@ -128,7 +151,7 @@ async function crmLoadInteractionsData() {
     _crmTableMissing = false;
     try {
         const { data, error } = await sb.from('customer_interactions')
-            .select('*, customers(name), sales_reps(name), archive_documents(title,file_url)').order('interaction_date', { ascending: false });
+            .select('*, customers(name,phone), sales_reps(name), archive_documents(title,file_url)').order('interaction_date', { ascending: false });
         if (error) throw error;
         _crmList = data || [];
     } catch (e) {
@@ -186,24 +209,36 @@ window.crmSwitchMode = function (m) {
 // ════════════════════════════════════════════════════════════
 // 1) متابعات العملاء الحاليين (الموجودة من قبل، بدون تعديل جوهري)
 // ════════════════════════════════════════════════════════════
+function crmScopedInteractions() {
+    return _crmInteractionsView === 'mine' && currentUser?.id
+        ? _crmList.filter(x => x.assigned_to === currentUser.id)
+        : _crmList;
+}
+
 function crmFilteredList() {
     const today = crmToday();
+    let list = crmScopedInteractions();
     if (_crmFilter === 'due') {
-        return _crmList.filter(x => !x.is_done && x.next_follow_up_date && x.next_follow_up_date <= today);
+        list = list.filter(x => !x.is_done && x.next_follow_up_date && x.next_follow_up_date <= today);
     }
-    return _crmList;
+    return list;
 }
 
 function crmRenderPage(c) {
     const today = crmToday();
-    const overdue = _crmList.filter(x => !x.is_done && x.next_follow_up_date && x.next_follow_up_date < today).length;
-    const dueToday = _crmList.filter(x => !x.is_done && x.next_follow_up_date === today).length;
-    const upcoming = _crmList.filter(x => !x.is_done && x.next_follow_up_date && x.next_follow_up_date > today).length;
+    const scope = crmScopedInteractions();
+    const overdue = scope.filter(x => !x.is_done && x.next_follow_up_date && x.next_follow_up_date < today).length;
+    const dueToday = scope.filter(x => !x.is_done && x.next_follow_up_date === today).length;
+    const upcoming = scope.filter(x => !x.is_done && x.next_follow_up_date && x.next_follow_up_date > today).length;
     const list = crmFilteredList();
 
     c.innerHTML = `
-        <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-            <button class="mod-btn mod-btn-primary" onclick="crmOpenAdd()">+ تسجيل تفاعل</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div class="ob-tabs">
+                <button class="ob-tab ${_crmInteractionsView==='mine'?'active':''}" onclick="crmInteractionsSetView('mine')">👤 عملائي</button>
+                <button class="ob-tab ${_crmInteractionsView==='all'?'active':''}" onclick="crmInteractionsSetView('all')">👥 الكل</button>
+            </div>
+            <button class="mod-btn mod-btn-primary" onclick="crmOpenAdd()">+ تسجيل تفاعل / تحديد مهمة</button>
         </div>
 
         ${_crmTableMissing ? `<div style="background:#FEF3C7;color:#92400E;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول التفاعلات لسه مش موجود — شغّل <code>crm_migration.sql</code> في Supabase.</div>` : ''}
@@ -221,20 +256,23 @@ function crmRenderPage(c) {
 
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>العميل</th><th>النوع</th><th>المندوب</th><th>تاريخ التفاعل</th><th>ملاحظات</th><th>المتابعة القادمة</th><th style="text-align:center">إجراءات</th>
+                <th>العميل</th><th>النوع</th><th>المسؤول عن المتابعة</th><th>تاريخ التفاعل</th><th>ملاحظات</th><th>المتابعة القادمة</th><th style="text-align:center">إجراءات</th>
             </tr></thead>
             <tbody>
                 ${list.length === 0 ? `<tr><td colspan="7" class="empty-state"><span>🤝</span>لا توجد تفاعلات مطابقة.</td></tr>` :
                 list.map(x => {
                     const overdueRow = !x.is_done && x.next_follow_up_date && x.next_follow_up_date < today;
+                    const waLink = crmCustomerWaLink(x);
+                    const assignedName = _crmProfiles.find(p => p.id === x.assigned_to)?.name || x.sales_reps?.name || '—';
                     return `<tr style="${overdueRow ? 'background:#FEF2F2' : ''}">
                         <td style="font-weight:600">${x.customers?.name || '—'}</td>
                         <td>${CRM_TYPE_LABELS[x.type] || x.type}</td>
-                        <td style="color:#64748B">${x.sales_reps?.name || '—'}</td>
+                        <td style="color:#64748B">${assignedName}</td>
                         <td style="font-size:12px">${new Date(x.interaction_date).toLocaleDateString('ar-EG')}</td>
                         <td style="color:#64748B;max-width:220px">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:#D97706">📎 ${x.archive_documents.title}</a>` : ''}</td>
                         <td style="font-size:12px;${overdueRow ? 'color:#DC2626;font-weight:700' : ''}">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') : '—'}</td>
                         <td style="text-align:center;white-space:nowrap">
+                            ${waLink ? `<a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${waLink}" target="_blank">📲</a>` : ''}
                             ${x.is_done ? '<span style="color:#059669;font-weight:600;font-size:12px">✅ تمّت</span>' :
                               x.next_follow_up_date ? `<button class="cc-edit" style="background:#F0FDF4;color:#059669" onclick="crmMarkDone('${x.id}')">✅ تمّت المتابعة</button>` : ''}
                             <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="crmDelete('${x.id}')">🗑️</button>
@@ -246,6 +284,7 @@ function crmRenderPage(c) {
 }
 
 window.crmSwitchFilter = function (f) { _crmFilter = f; crmRenderPage(document.getElementById('crmModeBody') || document.getElementById('app-content')); };
+window.crmInteractionsSetView = function (v) { _crmInteractionsView = v; crmRenderPage(document.getElementById('crmModeBody') || document.getElementById('app-content')); };
 
 window.crmMarkDone = async function (id) {
     try {
@@ -284,6 +323,12 @@ window.crmOpenAdd = async function (presetCustomerId = null, presetCustomerName 
             _crmReps = data || [];
         } catch { _crmReps = []; }
     }
+    if (!_crmProfiles.length) {
+        try {
+            const { data } = await sb.from('profiles').select('id,name,role').eq('is_active', true).order('name');
+            _crmProfiles = data || [];
+        } catch { _crmProfiles = []; }
+    }
 
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
@@ -308,17 +353,22 @@ window.crmOpenAdd = async function (presetCustomerId = null, presetCustomerName 
                         <select id="crmType" class="mod-form-input">
                             ${Object.entries(CRM_TYPE_LABELS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
                         </select></div>
-                    ${_crmReps.length ? `
-                    <div class="mod-form-group"><label>المندوب</label>
-                        <select id="crmRep" class="mod-form-input">
-                            <option value="">بدون مندوب</option>
-                            ${_crmReps.map(r => `<option value="${r.id}">🚗 ${r.name}</option>`).join('')}
-                        </select></div>` : ''}
+                    <div class="mod-form-group"><label>المسؤول عن المتابعة</label>
+                        <select id="crmAssigned" class="mod-form-input">
+                            <option value="">بدون تحديد</option>
+                            ${_crmProfiles.map(p => `<option value="${p.id}" ${p.id===currentUser?.id?'selected':''}>${p.name}</option>`).join('')}
+                        </select></div>
                 </div>
+                ${_crmReps.length ? `
+                <div class="mod-form-group"><label>مندوب الزيارة (اختياري)</label>
+                    <select id="crmRep" class="mod-form-input">
+                        <option value="">بدون مندوب</option>
+                        ${_crmReps.map(r => `<option value="${r.id}">🚗 ${r.name}</option>`).join('')}
+                    </select></div>` : ''}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>تاريخ التفاعل</label>
                         <input type="date" id="crmDate" class="mod-form-input" value="${crmToday()}"></div>
-                    <div class="mod-form-group"><label>تاريخ المتابعة القادمة</label>
+                    <div class="mod-form-group"><label>تاريخ المتابعة القادمة (هتظهر كمهمة له)</label>
                         <input type="date" id="crmFollowUp" class="mod-form-input" placeholder="اختياري"></div>
                 </div>
                 <div class="mod-form-group"><label>ملاحظات</label>
@@ -362,6 +412,7 @@ window.crmSave = async function () {
     const customer_id = document.getElementById('crmCustId').value;
     const type = document.getElementById('crmType').value;
     const rep_id = document.getElementById('crmRep')?.value || null;
+    const assigned_to = document.getElementById('crmAssigned')?.value || null;
     const interaction_date = document.getElementById('crmDate').value;
     const next_follow_up_date = document.getElementById('crmFollowUp').value || null;
     const notes = document.getElementById('crmNotes').value.trim() || null;
@@ -391,7 +442,7 @@ window.crmSave = async function () {
         }
 
         const { error } = await sb.from('customer_interactions').insert({
-            customer_id, type, rep_id, interaction_date, next_follow_up_date, notes, document_id,
+            customer_id, type, rep_id, assigned_to, interaction_date, next_follow_up_date, notes, document_id,
             created_by: currentUser?.id || null,
         });
         if (error) throw error;
@@ -709,11 +760,17 @@ window.crmOpenTemplatesModal = function () {
                     <code>{shop}</code> = اسم المحل &nbsp;|&nbsp;
                     <code>{agent}</code> = اسم المسؤول
                 </div>
+                <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;margin:6px 0">رسائل العملاء المحتملين (Leads)</div>
                 ${CRM_LEAD_STAGE_KEYS.filter(s => s !== 'خسرناه').map(s => `
                     <div class="mod-form-group">
                         <label style="color:${CRM_LEAD_STAGES[s].color}">${CRM_LEAD_STAGES[s].icon} رسالة "${s}"</label>
                         <textarea class="mod-form-input" id="tpl-${s}" rows="5" style="font-size:12px">${_crmTemplates[s] || CRM_DEFAULT_TEMPLATES[s] || ''}</textarea>
                     </div>`).join('')}
+                <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;margin:14px 0 6px">رسالة متابعة عميل حالي (مش Lead)</div>
+                <div class="mod-form-group">
+                    <label style="color:#0891B2">🤝 رسالة متابعة عميل موجود بالفعل</label>
+                    <textarea class="mod-form-input" id="tpl-${CRM_CUSTOMER_TPL_KEY}" rows="5" style="font-size:12px">${_crmTemplates[CRM_CUSTOMER_TPL_KEY] || CRM_DEFAULT_CUSTOMER_TPL}</textarea>
+                </div>
             </div>
             <div class="mod-modal-footer">
                 <button class="mod-btn" style="background:#FEE2E2;color:#DC2626" onclick="crmResetTemplates()">↩️ استعادة الافتراضي</button>
@@ -728,6 +785,8 @@ window.crmResetTemplates = function () {
         const el = document.getElementById('tpl-' + s);
         if (el) el.value = CRM_DEFAULT_TEMPLATES[s] || '';
     });
+    const custEl = document.getElementById('tpl-' + CRM_CUSTOMER_TPL_KEY);
+    if (custEl) custEl.value = CRM_DEFAULT_CUSTOMER_TPL;
 };
 
 window.crmSaveTemplates = async function () {
@@ -736,6 +795,8 @@ window.crmSaveTemplates = async function () {
         const el = document.getElementById('tpl-' + s);
         if (el && el.value.trim()) templates[s] = el.value.trim();
     });
+    const custEl = document.getElementById('tpl-' + CRM_CUSTOMER_TPL_KEY);
+    if (custEl && custEl.value.trim()) templates[CRM_CUSTOMER_TPL_KEY] = custEl.value.trim();
     try {
         const { error } = await sb.from('app_settings').upsert({
             key: 'crm_whatsapp_templates', value: templates, updated_at: new Date().toISOString(),
@@ -749,7 +810,7 @@ window.crmSaveTemplates = async function () {
 
 Object.assign(window, {
     renderCRM, crmSwitchMode,
-    crmSwitchFilter, crmMarkDone, crmDelete, crmOpenAdd,
+    crmSwitchFilter, crmInteractionsSetView, crmMarkDone, crmDelete, crmOpenAdd,
     crmCustSearchInput, crmPickCust, crmSave,
     crmLeadsSetView, crmLeadsSetFilter, crmLeadsSearchInput,
     crmDeleteLead, crmConvertLead, crmOpenAddLead, crmOpenEditLead,
