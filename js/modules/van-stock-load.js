@@ -104,6 +104,7 @@ function vlRenderScreen(c) {
             </div>
             <div class="inv-side">
                 ${vlInfoCardHTML()}
+                ${vlExcelCardHTML()}
                 ${vlActionsCardHTML()}
                 ${vlNotesCardHTML()}
             </div>
@@ -274,6 +275,18 @@ function vlInfoCardHTML() {
     </div>`;
 }
 
+function vlExcelCardHTML() {
+    return `
+    <div class="inv-card">
+        <div class="inv-card-title">📊 استيراد Excel</div>
+        <label class="inv-btn inv-btn-print" style="cursor:pointer;justify-content:center;margin:0">
+            📥 استيراد قائمة تحميل من Excel
+            <input type="file" accept=".csv,.xlsx,.xls" style="display:none" onchange="vlImportXls(this)">
+        </label>
+        <div style="font-size:11px;color:var(--inv-muted);margin-top:6px">أعمدة الملف: "الصنف" أو "الكود" + "الكمية" — نفس فكرة استيراد فاتورة المبيعات.</div>
+    </div>`;
+}
+
 function vlActionsCardHTML() {
     return `
     <div class="inv-actions">
@@ -316,6 +329,51 @@ function vlRecentListHTML() {
             }).join('') : `<tr><td colspan="9" class="empty-state"><span>🚗</span>لا توجد تحميلات حتى الآن.</td></tr>`}
         </tbody></table>
     </div>`;
+}
+
+// استيراد قائمة تحميل من Excel — نفس فكرة invImportXls فى sales.js بالحرف
+// (بحث بالكود الأول ثم الاسم، وتجميع الكمية على السطر الموجود لو الصنف
+// مكرر بدل تكرار السطر) بس هنا مفيش سعر/خصم، مجرد صنف + كمية.
+function vlImportXls(input) {
+    if (!input.files.length) return;
+    if (!vlWarehouseId) { alert('اختر المخزن أولاً'); input.value = ''; return; }
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            let added = 0, skipped = 0;
+            json.forEach(row => {
+                const name = row['الصنف'] || row['صنف'] || row['اسم الصنف'] || row['اسم'] || '';
+                const code = String(row['الكود'] || row['كود'] || '').trim();
+                const qty = parseFloat(row['الكمية'] || row['كمية'] || 0);
+                if (!qty || qty <= 0) { skipped++; return; }
+                let matched = null;
+                if (code) matched = VL_DB.products.find(p => p.code === code);
+                if (!matched && name) matched = VL_DB.products.find(p => (p.name || '').includes(name) || name.includes(p.name || ''));
+                if (!matched) { skipped++; return; }
+                const ex = vlItems.findIndex(i => i.productId === matched.id);
+                if (ex >= 0) {
+                    vlItems[ex].qty = (vlItems[ex].qty || 0) + qty;
+                } else {
+                    const empty = vlItems.find(i => !i.productId);
+                    if (empty) { empty.productId = matched.id; empty.qty = qty; }
+                    else vlItems.push({ id: Date.now() + added, productId: matched.id, qty });
+                }
+                added++;
+            });
+            vlRenderItems();
+            vlUpdateSummary();
+            alert(added ? `📥 تم استيراد ${added} صنف من Excel${skipped ? ` (اتجاهل ${skipped} سطر مش متطابق أو من غير كمية)` : ''}` : '⚠️ مفيش أي صنف اتطابق من الملف');
+        } catch (err) {
+            alert('❌ خطأ في قراءة الملف: ' + err.message);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+    input.value = '';
 }
 
 function vlGetStock(pid) {
