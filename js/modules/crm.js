@@ -310,9 +310,11 @@ window.crmDelete = async function (id) {
 //    العميل (customers.js) بتمرير customerId جاهز
 // ════════════════════════════════════════════════════════════
 let _crmAddCustId = null;
+let _crmMultiCustIds = []; // [{id,name}] — عميل واحد أو أكتر لنفس المهمة/التفاعل
 
 window.crmOpenAdd = async function (presetCustomerId = null, presetCustomerName = '') {
     _crmAddCustId = presetCustomerId;
+    _crmMultiCustIds = presetCustomerId ? [{ id: presetCustomerId, name: presetCustomerName }] : [];
     if (!_crmCustomers.length) {
         const { data } = await sb.from('customers').select('id,name').order('name');
         _crmCustomers = data || [];
@@ -338,15 +340,13 @@ window.crmOpenAdd = async function (presetCustomerId = null, presetCustomerName 
             <div class="mod-modal-header"><h3>📞 تسجيل تفاعل جديد</h3>
                 <button class="mod-modal-close" onclick="document.getElementById('crmModal').remove()">&times;</button></div>
             <div class="mod-modal-body">
-                <div class="mod-form-group"><label>العميل *</label>
-                    <div style="position:relative">
-                        <input type="text" id="crmCustSearch" class="mod-form-input" placeholder="🔍 اكتب اسم العميل..." autocomplete="off"
-                            value="${presetCustomerName}"
-                            oninput="crmCustSearchInput()" onfocus="crmCustSearchInput()"
-                            onblur="setTimeout(()=>{const ac=document.getElementById('crmCustAC'); if(ac) ac.classList.remove('show');},150)">
-                        <input type="hidden" id="crmCustId" value="${presetCustomerId || ''}">
-                        <div class="inv-ac" id="crmCustAC"></div>
-                    </div>
+                <div class="mod-form-group"><label>العميل / العملاء *</label>
+                    ${presetCustomerId ? `
+                        <div class="mod-form-input" style="background:#F8FAFC;color:#475569">${presetCustomerName}</div>
+                    ` : `
+                        <button type="button" class="mod-btn" style="width:100%;background:#EFF6FF;color:#2563EB;justify-content:center" onclick="crmOpenCustPicker()">☑️ اختيار عملاء (<span id="crmMultiCount">0</span> محدد)</button>
+                        <div id="crmMultiChips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px"></div>
+                    `}
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>نوع التفاعل</label>
@@ -383,33 +383,74 @@ window.crmOpenAdd = async function (presetCustomerId = null, presetCustomerName 
             </div>
         </div>`;
     document.body.appendChild(modal);
-    setTimeout(() => document.getElementById(presetCustomerId ? 'crmType' : 'crmCustSearch')?.focus(), 50);
+    crmRenderMultiChips();
+    setTimeout(() => document.getElementById('crmType')?.focus(), 50);
 };
 
-window.crmCustSearchInput = function () {
-    const ac = document.getElementById('crmCustAC');
-    if (!ac) return;
-    const term = (document.getElementById('crmCustSearch')?.value || '').trim().toLowerCase();
-    const list = (term ? _crmCustomers.filter(c => (c.name||'').toLowerCase().includes(term)) : _crmCustomers).slice(0, 20);
-    if (!list.length) {
-        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
-        ac.classList.add('show');
-        return;
-    }
-    ac.innerHTML = list.map(c => `<div class="inv-ac-item" onmousedown="event.preventDefault();crmPickCust('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')">
-        <div><div class="an">${c.name}</div></div>
-    </div>`).join('');
-    ac.classList.add('show');
+// ════════════════════════════════════════════════════════════
+// اختيار عملاء متعددين — نفس نمط "اختيار أصناف متعددة" فى
+// van-stock-load.js/sales.js (بحث + قائمة checkbox)
+// ════════════════════════════════════════════════════════════
+function crmRenderMultiChips() {
+    const box = document.getElementById('crmMultiChips');
+    const cnt = document.getElementById('crmMultiCount');
+    if (cnt) cnt.textContent = _crmMultiCustIds.length;
+    if (!box) return;
+    box.innerHTML = _crmMultiCustIds.map(c => `<span style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;border-radius:20px;padding:4px 10px;font-size:11.5px;display:inline-flex;align-items:center;gap:6px">
+        ${c.name} <span style="cursor:pointer;font-weight:800" onclick="crmRemoveCustChip('${c.id}')">✕</span>
+    </span>`).join('');
+}
+window.crmRemoveCustChip = function (id) {
+    _crmMultiCustIds = _crmMultiCustIds.filter(c => c.id !== id);
+    crmRenderMultiChips();
 };
-window.crmPickCust = function (id, name) {
-    document.getElementById('crmCustId').value = id;
-    document.getElementById('crmCustSearch').value = name;
-    const ac = document.getElementById('crmCustAC');
-    if (ac) { ac.innerHTML = ''; ac.classList.remove('show'); }
+
+window.crmOpenCustPicker = function () {
+    document.getElementById('crmPickModal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'crmPickModal';
+    m.className = 'mod-modal-bg active';
+    m.innerHTML = `
+    <div class="mod-modal" style="max-width:520px">
+        <div class="mod-modal-header"><h3>☑️ اختيار عملاء متعددين</h3>
+            <button class="mod-modal-close" onclick="document.getElementById('crmPickModal').remove()">✕</button></div>
+        <div class="mod-modal-body">
+            <input type="text" class="mod-form-input" id="crmPickSearch" placeholder="🔍 بحث بالاسم..." autocomplete="off" oninput="crmRenderPickList(this.value)">
+            <div id="crmPickList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto"></div>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('crmPickModal').remove()">تم</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+    crmRenderPickList('');
+    setTimeout(() => document.getElementById('crmPickSearch')?.focus(), 50);
+};
+
+function crmRenderPickList(val) {
+    const box = document.getElementById('crmPickList');
+    if (!box) return;
+    const v = (val || '').trim().toLowerCase();
+    const list = (v ? _crmCustomers.filter(c => (c.name || '').toLowerCase().includes(v)) : _crmCustomers).slice(0, 200);
+    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
+    box.innerHTML = list.map(c => {
+        const checked = _crmMultiCustIds.some(x => x.id === c.id);
+        return `<label style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="crmTogglePick('${c.id}','${(c.name||'').replace(/'/g,"\\'")}',this.checked)">
+            <span style="flex:1">${c.name}</span>
+        </label>`;
+    }).join('');
+}
+window.crmTogglePick = function (id, name, checked) {
+    if (checked) {
+        if (!_crmMultiCustIds.some(c => c.id === id)) _crmMultiCustIds.push({ id, name });
+    } else {
+        _crmMultiCustIds = _crmMultiCustIds.filter(c => c.id !== id);
+    }
+    crmRenderMultiChips();
 };
 
 window.crmSave = async function () {
-    const customer_id = document.getElementById('crmCustId').value;
     const type = document.getElementById('crmType').value;
     const rep_id = document.getElementById('crmRep')?.value || null;
     const assigned_to = document.getElementById('crmAssigned')?.value || null;
@@ -417,12 +458,14 @@ window.crmSave = async function () {
     const next_follow_up_date = document.getElementById('crmFollowUp').value || null;
     const notes = document.getElementById('crmNotes').value.trim() || null;
     const file = document.getElementById('crmFile')?.files[0] || null;
-    if (!customer_id) return alert('اختر العميل');
+    if (!_crmMultiCustIds.length) return alert('اختر عميل واحد على الأقل');
     if (!interaction_date) return alert('أدخل تاريخ التفاعل');
 
     const btn = document.querySelector('#crmModal .mod-btn-primary');
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
     try {
+        // مرفق واحد (لو موجود) بيتحفظ مرة واحدة في الأرشيف ويترتبط بكل
+        // التفاعلات اللي هتتسجل دفعة واحدة للعملاء المحددين
         let document_id = null;
         if (file) {
             const safeName = file.name.replace(/[^\w.\-]+/g, '_');
@@ -430,21 +473,22 @@ window.crmSave = async function () {
             const { error: upErr } = await sb.storage.from('archive-documents').upload(path, file);
             if (upErr) throw upErr;
             const { data: pub } = sb.storage.from('archive-documents').getPublicUrl(path);
-            const custName = _crmCustomers.find(c => c.id === customer_id)?.name || '';
+            const label = _crmMultiCustIds.length === 1 ? _crmMultiCustIds[0].name : `${_crmMultiCustIds.length} عملاء`;
             const { data: docRow, error: docErr } = await sb.from('archive_documents').insert({
-                title: `مرفق تفاعل — ${custName} — ${new Date(interaction_date).toLocaleDateString('ar-EG')}`,
+                title: `مرفق تفاعل — ${label} — ${new Date(interaction_date).toLocaleDateString('ar-EG')}`,
                 file_path: path, file_url: pub.publicUrl, file_type: file.type || '',
-                category: 'CRM', linked_type: 'customer', linked_id: customer_id,
+                category: 'CRM', linked_type: 'customer', linked_id: _crmMultiCustIds[0].id,
                 uploaded_by: currentUser?.id || null,
             }).select().single();
             if (docErr) throw docErr;
             document_id = docRow.id;
         }
 
-        const { error } = await sb.from('customer_interactions').insert({
-            customer_id, type, rep_id, assigned_to, interaction_date, next_follow_up_date, notes, document_id,
+        const rows = _crmMultiCustIds.map(c => ({
+            customer_id: c.id, type, rep_id, assigned_to, interaction_date, next_follow_up_date, notes, document_id,
             created_by: currentUser?.id || null,
-        });
+        }));
+        const { error } = await sb.from('customer_interactions').insert(rows);
         if (error) throw error;
         document.getElementById('crmModal').remove();
         if (_crmAddCustId && typeof custRefreshInteractions === 'function') {
@@ -811,7 +855,7 @@ window.crmSaveTemplates = async function () {
 Object.assign(window, {
     renderCRM, crmSwitchMode,
     crmSwitchFilter, crmInteractionsSetView, crmMarkDone, crmDelete, crmOpenAdd,
-    crmCustSearchInput, crmPickCust, crmSave,
+    crmOpenCustPicker, crmTogglePick, crmRemoveCustChip, crmSave,
     crmLeadsSetView, crmLeadsSetFilter, crmLeadsSearchInput,
     crmDeleteLead, crmConvertLead, crmOpenAddLead, crmOpenEditLead,
     crmSelectLeadStage, crmSaveLead,
