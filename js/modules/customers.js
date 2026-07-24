@@ -8,6 +8,10 @@ let _custList = [];
 let _custRegionMap = {};
 let _custLastIntMap = {};
 let _custStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
+let _custStmtItems = []; // تبويب الأصناف — إجمالي مشتريات العميل من كل صنف
+let _custStmtProfit = []; // تبويب المكسب الشهري — آخر 12 شهر
+let _custStmtTab = 'moves'; // 'moves' | 'items' | 'profit'
+let _custStmtLegacyDiff = 0;
 let _custListSearch = ''; // بحث بالاسم/الهاتف في تبويب "كشف حساب" — بيتطبق مع فلتر الرصيد مع بعض (AND)
 
 // ════════════════════════════════════════════════════════════
@@ -133,11 +137,11 @@ window.custShowStatement = async function(customerId) {
             docsResult,
             interactionsResult,
         ] = await Promise.all([
-            sb.from('sales').select('invoice_no, total, payment_type, status, created_at')
+            sb.from('sales').select('id, invoice_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }),
             sb.from('customer_payments').select('id, ref, amount, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
-            sb.from('sales_returns').select('return_no, total, payment_type, status, created_at')
+            sb.from('sales_returns').select('id, return_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
             sb.from('balance_transfers').select('id, to_c:to_customer_id(name), amount, notes, created_at')
                 .eq('from_customer_id', customerId).eq('transfer_type', 'customer_to_customer')
@@ -201,6 +205,57 @@ window.custShowStatement = async function(customerId) {
         });
         moves.sort((a,b) => new Date(a.date) - new Date(b.date));
 
+        // ═══ تبويبات "الأصناف" و"المكسب الشهري" — بند 5 (كشف حساب احترافي)،
+        // 2026-07-25. بنستخدم أرقام الفواتير/المرتجعات المؤكدة اللي جبناها
+        // فوق عشان نجيب بنود كل واحدة فيها (سطر بسطر)، بدل استعلام تاني
+        // على sales/sales_returns.
+        const confirmedSaleIds = (sales||[]).filter(s=>s.status==='confirmed').map(s=>s.id);
+        const confirmedReturnIds = (returns||[]).filter(r=>r.status==='confirmed').map(r=>r.id);
+        const saleDateOf = {}; (sales||[]).forEach(s=>{ saleDateOf[s.id] = s.created_at; });
+        const returnDateOf = {}; (returns||[]).forEach(r=>{ returnDateOf[r.id] = r.created_at; });
+
+        const [{ data: saleItemRows }, { data: returnItemRows }] = await Promise.all([
+            confirmedSaleIds.length
+                ? sb.from('sale_items').select('sale_id, product_id, qty, line_total, cost_price_snapshot, products(name,unit)').in('sale_id', confirmedSaleIds)
+                : Promise.resolve({ data: [] }),
+            confirmedReturnIds.length
+                ? sb.from('sale_return_items').select('return_id, product_id, qty, line_total, cost_price_snapshot, products(name,unit)').in('return_id', confirmedReturnIds)
+                : Promise.resolve({ data: [] }),
+        ]);
+
+        // تبويب الأصناف — إجمالي مشتريات العميل من كل صنف (إجمالي، بدون خصم مرتجعات — المرتجعات ظاهرة بالتفصيل فى تبويب الحركات)
+        const itemsMap = {};
+        (saleItemRows||[]).forEach(it => {
+            const key = it.product_id;
+            if (!itemsMap[key]) itemsMap[key] = { name: it.products?.name || '—', unit: it.products?.unit || '', qty: 0, total: 0 };
+            itemsMap[key].qty += Number(it.qty)||0;
+            itemsMap[key].total += Number(it.line_total)||0;
+        });
+        const itemsList = Object.values(itemsMap).sort((a,b)=>b.total-a.total);
+
+        // تبويب المكسب الشهري — آخر 12 شهر (شامل الشهر الحالي)، صافي بعد خصم المرتجعات
+        const monthBuckets = [];
+        const now0 = new Date();
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now0.getFullYear(), now0.getMonth() - i, 1);
+            monthBuckets.push({ key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: d.toLocaleDateString('ar-EG', { year:'numeric', month:'long' }), revenue: 0, cogs: 0 });
+        }
+        const bucketByKey = {}; monthBuckets.forEach(b=>{ bucketByKey[b.key]=b; });
+        const monthKeyOf = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+        (saleItemRows||[]).forEach(it => {
+            const b = bucketByKey[monthKeyOf(saleDateOf[it.sale_id])];
+            if (!b) return;
+            b.revenue += Number(it.line_total)||0;
+            b.cogs += (Number(it.qty)||0) * (Number(it.cost_price_snapshot)||0);
+        });
+        (returnItemRows||[]).forEach(it => {
+            const b = bucketByKey[monthKeyOf(returnDateOf[it.return_id])];
+            if (!b) return;
+            b.revenue -= Number(it.line_total)||0;
+            b.cogs -= (Number(it.qty)||0) * (Number(it.cost_price_snapshot)||0);
+        });
+        monthBuckets.forEach(b => { b.profit = b.revenue - b.cogs; });
+
         // ★ إجماليات "المبيعات/التحصيلات" فى الكروت لازم تفضل حقيقية 100%
         //   (مبنية بس على حركات فعلية)، فبنحسبها هنا قبل أي إضافة صناعية تحت.
         const balNow = Number(cust.balance)||0;
@@ -240,6 +295,11 @@ window.custShowStatement = async function(customerId) {
         const tableCredit = displayMoves.reduce((s,m)=>s+m.credit,0);
 
         _custStmtMoves = displayMoves;
+        _custStmtItems = itemsList;
+        _custStmtProfit = monthBuckets;
+        _custStmtLegacyDiff = legacyDiff;
+        _custStmtTab = 'moves';
+        window._custStmtTotals = { balNow, totalDebit, totalCredit, tableDebit, tableCredit };
 
         document.getElementById('custStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
@@ -258,30 +318,12 @@ window.custShowStatement = async function(customerId) {
                 </div>
             </div>
 
-            <input type="text" id="custStmtSearch" class="mod-form-input" style="margin-bottom:10px" placeholder="🔍 بحث في الحركات (اسم الفاتورة/المرتجع/البيان)..." oninput="custStmtFilterRows(this.value)">
-            <div class="mod-table-wrap">
-                <table class="mod-table"><thead><tr>
-                    <th>التاريخ</th><th>البيان</th>
-                    <th style="text-align:left">مدين</th>
-                    <th style="text-align:left">دائن</th>
-                    <th style="text-align:left">الرصيد</th>
-                    <th></th>
-                </tr></thead>
-                <tbody id="custStmtTbody">${custStmtRowsHtml(displayMoves)}</tbody>
-                ${displayMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
-                    <td colspan="2">الإجمالي</td>
-                    <td style="text-align:left;color:#DC2626">${custFmt(tableDebit)}</td>
-                    <td style="text-align:left;color:#059669">${custFmt(tableCredit)}</td>
-                    <td style="text-align:left">${custFmt(balNow)}</td>
-                    <td></td>
-                </tr></tfoot>` : ''}
-                </table>
+            <div class="ob-tabs" style="margin-bottom:12px">
+                <button class="ob-tab ${_custStmtTab==='moves'?'active':''}" onclick="custStmtSwitchTab('moves')">📋 الحركات</button>
+                <button class="ob-tab ${_custStmtTab==='items'?'active':''}" onclick="custStmtSwitchTab('items')">📦 الأصناف</button>
+                <button class="ob-tab ${_custStmtTab==='profit'?'active':''}" onclick="custStmtSwitchTab('profit')">📈 المكسب الشهري</button>
             </div>
-            ${Math.abs(legacyDiff) > 0.01 ? `
-            <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:#475569;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
-                🗄️ سطر "رصيد مرحّل من النظام القديم" (${custFmt(legacyDiff)}) هو الفرق بين رصيد العميل الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
-                غالبًا عميل منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد العميل نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.
-            </div>` : ''}
+            <div id="custStmtTabBody">${custStmtMovesTabHtml()}</div>
 
             <div style="margin-top:16px">
                 <div style="font-size:13px;font-weight:800;color:#1E293B;margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
@@ -393,6 +435,90 @@ window.custStmtFilterRows = function(query) {
     const tbody = document.getElementById('custStmtTbody');
     if (tbody) tbody.innerHTML = custStmtRowsHtml(filtered);
 };
+
+// ════════════════════════════════════════════════════════════
+// 2ب) تبويبات كشف الحساب الفرعية — بند 5، 2026-07-25
+// ════════════════════════════════════════════════════════════
+window.custStmtSwitchTab = function (tab) {
+    _custStmtTab = tab;
+    document.querySelectorAll('#custStmtBody .ob-tabs .ob-tab').forEach((b,i) => {
+        b.classList.toggle('active', ['moves','items','profit'][i] === tab);
+    });
+    const body = document.getElementById('custStmtTabBody');
+    if (!body) return;
+    if (tab === 'moves') body.innerHTML = custStmtMovesTabHtml();
+    else if (tab === 'items') body.innerHTML = custStmtItemsTabHtml();
+    else body.innerHTML = custStmtProfitTabHtml();
+};
+
+function custStmtMovesTabHtml() {
+    const t = window._custStmtTotals || {};
+    return `
+        <input type="text" id="custStmtSearch" class="mod-form-input" style="margin-bottom:10px" placeholder="🔍 بحث في الحركات (اسم الفاتورة/المرتجع/البيان)..." oninput="custStmtFilterRows(this.value)">
+        <div class="mod-table-wrap">
+            <table class="mod-table"><thead><tr>
+                <th>التاريخ</th><th>البيان</th>
+                <th style="text-align:left">مدين</th>
+                <th style="text-align:left">دائن</th>
+                <th style="text-align:left">الرصيد</th>
+                <th></th>
+            </tr></thead>
+            <tbody id="custStmtTbody">${custStmtRowsHtml(_custStmtMoves)}</tbody>
+            ${_custStmtMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
+                <td colspan="2">الإجمالي</td>
+                <td style="text-align:left;color:#DC2626">${custFmt(t.tableDebit)}</td>
+                <td style="text-align:left;color:#059669">${custFmt(t.tableCredit)}</td>
+                <td style="text-align:left">${custFmt(t.balNow)}</td>
+                <td></td>
+            </tr></tfoot>` : ''}
+            </table>
+        </div>
+        ${Math.abs(_custStmtLegacyDiff) > 0.01 ? `
+        <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:#475569;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
+            🗄️ سطر "رصيد مرحّل من النظام القديم" (${custFmt(_custStmtLegacyDiff)}) هو الفرق بين رصيد العميل الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
+            غالبًا عميل منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد العميل نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.
+        </div>` : ''}`;
+}
+
+function custStmtItemsTabHtml() {
+    if (!_custStmtItems.length) return `<div class="empty-state"><span>📦</span>مفيش أي أصناف مسجّلة لهذا العميل.</div>`;
+    const totalQty = _custStmtItems.reduce((s,i)=>s+i.qty,0);
+    const totalVal = _custStmtItems.reduce((s,i)=>s+i.total,0);
+    return `<div class="mod-table-wrap"><table class="mod-table"><thead><tr>
+        <th>الصنف</th><th>الوحدة</th><th style="text-align:left">الكمية</th><th style="text-align:left">متوسط السعر</th><th style="text-align:left">إجمالي القيمة</th>
+    </tr></thead><tbody>
+        ${_custStmtItems.map(i => `<tr>
+            <td style="font-weight:600">${i.name}</td>
+            <td style="color:#64748B">${i.unit||'—'}</td>
+            <td style="text-align:left">${custFmt(i.qty)}</td>
+            <td style="text-align:left;color:#64748B">${custFmt(i.qty ? i.total/i.qty : 0)}</td>
+            <td style="text-align:left;font-weight:700">${custFmt(i.total)}</td>
+        </tr>`).join('')}
+    </tbody><tfoot><tr style="background:#F8FAFC;font-weight:800">
+        <td colspan="2">الإجمالي</td><td style="text-align:left">${custFmt(totalQty)}</td><td></td><td style="text-align:left">${custFmt(totalVal)}</td>
+    </tr></tfoot></table></div>
+    <div style="font-size:11.5px;color:#94A3B8;margin-top:8px">إجمالي المشتريات (إجمالي، قبل خصم المرتجعات — تفاصيل المرتجعات فى تبويب "الحركات").</div>`;
+}
+
+function custStmtProfitTabHtml() {
+    const totalRevenue = _custStmtProfit.reduce((s,m)=>s+m.revenue,0);
+    const totalCogs = _custStmtProfit.reduce((s,m)=>s+m.cogs,0);
+    const totalProfit = _custStmtProfit.reduce((s,m)=>s+m.profit,0);
+    return `<div class="mod-table-wrap"><table class="mod-table"><thead><tr>
+        <th>الشهر</th><th style="text-align:left">صافي المبيعات</th><th style="text-align:left">تكلفة البضاعة المباعة</th><th style="text-align:left">صافي المكسب</th>
+    </tr></thead><tbody>
+        ${_custStmtProfit.map(m => `<tr>
+            <td>${m.label}</td>
+            <td style="text-align:left">${custFmt(m.revenue)}</td>
+            <td style="text-align:left;color:#64748B">${custFmt(m.cogs)}</td>
+            <td style="text-align:left;font-weight:700;color:${m.profit>=0?'#059669':'#DC2626'}">${custFmt(m.profit)}</td>
+        </tr>`).join('')}
+    </tbody><tfoot><tr style="background:#F8FAFC;font-weight:800">
+        <td>الإجمالي (12 شهر)</td><td style="text-align:left">${custFmt(totalRevenue)}</td><td style="text-align:left">${custFmt(totalCogs)}</td>
+        <td style="text-align:left;color:${totalProfit>=0?'#059669':'#DC2626'}">${custFmt(totalProfit)}</td>
+    </tr></tfoot></table></div>
+    <div style="font-size:11.5px;color:#94A3B8;margin-top:8px">المكسب = صافي المبيعات (بعد خصم مرتجعات نفس الشهر) − تكلفة البضاعة المباعة، حسب سعر التكلفة المسجّل وقت كل عملية.</div>`;
+}
 
 // ينقل لصفحة "إدارة العملاء" (master-data.js) ويفتح نافذة تعديل بيانات
 // نفس العميل تلقائياً — قبل كده كانت الصفحتين منفصلتين تماماً من غير أي

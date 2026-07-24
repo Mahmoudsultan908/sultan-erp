@@ -6,6 +6,9 @@
 
 let _supList = [];
 let _supStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
+let _supStmtItems = []; // تبويب الأصناف — إجمالي مشتريات من كل صنف
+let _supStmtTab = 'moves'; // 'moves' | 'items'
+let _supStmtLegacyDiff = 0;
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي — قائمة الموردين
@@ -110,11 +113,11 @@ window.supShowStatement = async function(supplierId) {
             { data: openingBalances },
             docsResult,
         ] = await Promise.all([
-            sb.from('purchases').select('invoice_no, total, payment_type, status, created_at')
+            sb.from('purchases').select('id, invoice_no, total, payment_type, status, created_at')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
             sb.from('supplier_payments').select('ref, amount, status, created_at')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
-            sb.from('purchase_returns').select('return_no, total, status, created_at, purchases(payment_type)')
+            sb.from('purchase_returns').select('id, return_no, total, status, created_at, purchases(payment_type)')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }).limit(100),
             // تحويلات رصيد بين موردين + استرداد نقدي من رصيد مورد لخزنة — كانوا
             // ناقصين تمامًا من الكشف (راجع fn_balance_transfer_apply للاتجاهات)
@@ -182,6 +185,21 @@ window.supShowStatement = async function(supplierId) {
         });
         moves.sort((a,b) => new Date(a.date) - new Date(b.date));
 
+        // تبويب "الأصناف" — بند 5، 2026-07-25. إجمالي المشتريات من كل صنف
+        // من نفس المورد (إجمالي، بدون خصم مرتجعات — تفاصيلها فى تبويب الحركات).
+        const confirmedPurchaseIds = (purchases||[]).filter(p=>p.status==='confirmed').map(p=>p.id);
+        const { data: purchaseItemRows } = confirmedPurchaseIds.length
+            ? await sb.from('purchase_items').select('product_id, qty, line_total, products(name,unit)').in('purchase_id', confirmedPurchaseIds)
+            : { data: [] };
+        const itemsMap = {};
+        (purchaseItemRows||[]).forEach(it => {
+            const key = it.product_id;
+            if (!itemsMap[key]) itemsMap[key] = { name: it.products?.name || '—', unit: it.products?.unit || '', qty: 0, total: 0 };
+            itemsMap[key].qty += Number(it.qty)||0;
+            itemsMap[key].total += Number(it.line_total)||0;
+        });
+        const itemsList = Object.values(itemsMap).sort((a,b)=>b.total-a.total);
+
         const balNow = Number(sup.balance)||0;
         const totalDebit = moves.reduce((s,m)=>s+m.debit,0);   // المدفوع للمورد
         const totalCredit = moves.reduce((s,m)=>s+m.credit,0); // المشتريات الآجلة
@@ -212,6 +230,10 @@ window.supShowStatement = async function(supplierId) {
         const tableCredit = displayMoves.reduce((s,m)=>s+m.credit,0);
 
         _supStmtMoves = displayMoves;
+        _supStmtItems = itemsList;
+        _supStmtLegacyDiff = legacyDiff;
+        _supStmtTab = 'moves';
+        window._supStmtTotals = { balNow, totalDebit, totalCredit, tableDebit, tableCredit };
 
         document.getElementById('supStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
@@ -230,28 +252,11 @@ window.supShowStatement = async function(supplierId) {
                 </div>
             </div>
 
-            <input type="text" id="supStmtSearch" class="mod-form-input" style="margin-bottom:10px" placeholder="🔍 بحث في الحركات (اسم الفاتورة/المرتجع/البيان)..." oninput="supStmtFilterRows(this.value)">
-            <div class="mod-table-wrap">
-                <table class="mod-table"><thead><tr>
-                    <th>التاريخ</th><th>البيان</th>
-                    <th style="text-align:left">مدين (مدفوع)</th>
-                    <th style="text-align:left">دائن (شراء)</th>
-                    <th style="text-align:left">الرصيد</th>
-                </tr></thead>
-                <tbody id="supStmtTbody">${supStmtRowsHtml(displayMoves)}</tbody>
-                ${displayMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
-                    <td colspan="2">الإجمالي</td>
-                    <td style="text-align:left;color:#059669">${supFmt(tableDebit)}</td>
-                    <td style="text-align:left;color:#D97706">${supFmt(tableCredit)}</td>
-                    <td style="text-align:left">${supFmt(Math.abs(balNow))}</td>
-                </tr></tfoot>` : ''}
-                </table>
+            <div class="ob-tabs" style="margin-bottom:12px">
+                <button class="ob-tab ${_supStmtTab==='moves'?'active':''}" onclick="supStmtSwitchTab('moves')">📋 الحركات</button>
+                <button class="ob-tab ${_supStmtTab==='items'?'active':''}" onclick="supStmtSwitchTab('items')">📦 الأصناف</button>
             </div>
-            ${Math.abs(legacyDiff) > 0.01 ? `
-            <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:#475569;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
-                🗄️ سطر "رصيد مرحّل من النظام القديم" (${supFmt(Math.abs(legacyDiff))}) هو الفرق بين رصيد المورد الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
-                غالبًا مورد منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد المورد نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.
-            </div>` : ''}
+            <div id="supStmtTabBody">${supStmtMovesTabHtml()}</div>
 
             <div style="margin-top:16px">
                 <div style="font-size:13px;font-weight:800;color:#1E293B;margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
@@ -305,6 +310,66 @@ window.supStmtFilterRows = function(query) {
     const tbody = document.getElementById('supStmtTbody');
     if (tbody) tbody.innerHTML = supStmtRowsHtml(filtered);
 };
+
+// ════════════════════════════════════════════════════════════
+// 2ب) تبويبات كشف الحساب الفرعية — بند 5، 2026-07-25
+// ════════════════════════════════════════════════════════════
+window.supStmtSwitchTab = function (tab) {
+    _supStmtTab = tab;
+    document.querySelectorAll('#supStmtBody .ob-tabs .ob-tab').forEach((b,i) => {
+        b.classList.toggle('active', ['moves','items'][i] === tab);
+    });
+    const body = document.getElementById('supStmtTabBody');
+    if (!body) return;
+    body.innerHTML = tab === 'moves' ? supStmtMovesTabHtml() : supStmtItemsTabHtml();
+};
+
+function supStmtMovesTabHtml() {
+    const t = window._supStmtTotals || {};
+    return `
+        <input type="text" id="supStmtSearch" class="mod-form-input" style="margin-bottom:10px" placeholder="🔍 بحث في الحركات (اسم الفاتورة/المرتجع/البيان)..." oninput="supStmtFilterRows(this.value)">
+        <div class="mod-table-wrap">
+            <table class="mod-table"><thead><tr>
+                <th>التاريخ</th><th>البيان</th>
+                <th style="text-align:left">مدين (مدفوع)</th>
+                <th style="text-align:left">دائن (شراء)</th>
+                <th style="text-align:left">الرصيد</th>
+            </tr></thead>
+            <tbody id="supStmtTbody">${supStmtRowsHtml(_supStmtMoves)}</tbody>
+            ${_supStmtMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
+                <td colspan="2">الإجمالي</td>
+                <td style="text-align:left;color:#059669">${supFmt(t.tableDebit)}</td>
+                <td style="text-align:left;color:#D97706">${supFmt(t.tableCredit)}</td>
+                <td style="text-align:left">${supFmt(Math.abs(t.balNow||0))}</td>
+            </tr></tfoot>` : ''}
+            </table>
+        </div>
+        ${Math.abs(_supStmtLegacyDiff) > 0.01 ? `
+        <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:#475569;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
+            🗄️ سطر "رصيد مرحّل من النظام القديم" (${supFmt(Math.abs(_supStmtLegacyDiff))}) هو الفرق بين رصيد المورد الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
+            غالبًا مورد منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد المورد نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.
+        </div>` : ''}`;
+}
+
+function supStmtItemsTabHtml() {
+    if (!_supStmtItems.length) return `<div class="empty-state"><span>📦</span>مفيش أي أصناف مسجّلة لهذا المورد.</div>`;
+    const totalQty = _supStmtItems.reduce((s,i)=>s+i.qty,0);
+    const totalVal = _supStmtItems.reduce((s,i)=>s+i.total,0);
+    return `<div class="mod-table-wrap"><table class="mod-table"><thead><tr>
+        <th>الصنف</th><th>الوحدة</th><th style="text-align:left">الكمية</th><th style="text-align:left">متوسط السعر</th><th style="text-align:left">إجمالي القيمة</th>
+    </tr></thead><tbody>
+        ${_supStmtItems.map(i => `<tr>
+            <td style="font-weight:600">${i.name}</td>
+            <td style="color:#64748B">${i.unit||'—'}</td>
+            <td style="text-align:left">${supFmt(i.qty)}</td>
+            <td style="text-align:left;color:#64748B">${supFmt(i.qty ? i.total/i.qty : 0)}</td>
+            <td style="text-align:left;font-weight:700">${supFmt(i.total)}</td>
+        </tr>`).join('')}
+    </tbody><tfoot><tr style="background:#F8FAFC;font-weight:800">
+        <td colspan="2">الإجمالي</td><td style="text-align:left">${supFmt(totalQty)}</td><td></td><td style="text-align:left">${supFmt(totalVal)}</td>
+    </tr></tfoot></table></div>
+    <div style="font-size:11.5px;color:#94A3B8;margin-top:8px">إجمالي المشتريات منه (إجمالي، قبل خصم المرتجعات — تفاصيل المرتجعات فى تبويب "الحركات").</div>`;
+}
 
 // ينقل لصفحة "إدارة الموردين" (master-data.js) ويفتح نافذة تعديل بيانات
 // نفس المورد تلقائياً — نفس فكرة custGoEditProfile في customers.js.
