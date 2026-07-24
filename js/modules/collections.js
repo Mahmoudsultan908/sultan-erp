@@ -127,9 +127,9 @@ async function renderCollections(c) {
 
 // فلترة سجل التحصيلات المعروض حسب اسم العميل (بحث فوري داخل الصفوف المعروضة فعلاً)
 window.colFilterHistory = function() {
-    const term = (document.getElementById('colHistSearch')?.value || '').trim().toLowerCase();
+    const term = document.getElementById('colHistSearch')?.value || '';
     document.querySelectorAll('#colHistTable tbody tr[data-name]').forEach(tr => {
-        tr.style.display = (!term || tr.dataset.name.includes(term)) ? '' : 'none';
+        tr.style.display = flexMatch([tr.dataset.name], term) ? '' : 'none';
     });
 };
 
@@ -239,12 +239,10 @@ window.colCustSearchInput = function(mode) {
     const ac = document.getElementById(acId);
     if (!ac) return;
     _colCustACIdx = -1;
-    const term = (document.getElementById(searchId)?.value || '').trim().toLowerCase();
+    const term = document.getElementById(searchId)?.value || '';
     // من غير كتابة: تعرض أول 20 عميل زي ما هم، عشان القائمة تظهر على طول
     // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
-    const list = (term ? _colCustomers.filter(c =>
-        (c.name||'').toLowerCase().includes(term) || (c.phone||'').includes(term) || (c.code||'').toLowerCase().includes(term)
-    ) : _colCustomers).slice(0, 20);
+    const list = flexSearch(_colCustomers, term, ['name','phone','code'], 20);
     if (!list.length) {
         ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');

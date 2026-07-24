@@ -711,7 +711,7 @@ function retSearchEntity(val) {
     const ac = document.getElementById('retEntityAC');
     if (!ac) return;
     const list = retType === 'sales' ? RET_DB.customers : RET_DB.suppliers;
-    const m = val.length ? list.filter(x => (x.name || '').includes(val) || (x.phone || '').includes(val)).slice(0, 8) : [];
+    const m = val.length ? flexSearch(list, val, ['name','phone'], 8) : [];
     if (m.length) {
         ac.innerHTML = m.map((x, i) => `<div class="inv-ac-item" data-i="${i}" onclick="retSelectEntity('${x.id}')" onmouseenter="retEntACHover(${i})">
             <div><div class="an">${x.name}</div><div class="as">${x.phone || ''}</div></div>
@@ -789,7 +789,7 @@ let _retFastIdx = -1;
 function retFastSearch(val) {
     const ac = document.getElementById('retFastAC');
     if (!ac) return;
-    const m = val.length ? RET_DB.products.filter(p => (p.name || '').includes(val) || (p.code || '').includes(val)).slice(0, 8) : [];
+    const m = val.length ? flexSearch(RET_DB.products, val, ['name','code'], 8) : [];
     if (m.length) {
         ac.innerHTML = m.map((p, i) => `<div class="inv-ac-item" data-i="${i}" onclick="retPickProduct('${p.id}')" onmouseenter="retFastHover(${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code || ''} · ${p.unit || ''}</div></div>
@@ -852,10 +852,10 @@ window.retOpenMultiSelect = function () {
     retMultiFilter();
 };
 window.retMultiFilter = function () {
-    const term = (document.getElementById('retMultiSearch')?.value || '').trim().toLowerCase();
+    const term = document.getElementById('retMultiSearch')?.value || '';
     const list = document.getElementById('retMultiList');
     if (!list) return;
-    const items = !term ? RET_DB.products : RET_DB.products.filter(p => (p.name || '').toLowerCase().includes(term) || (p.code || '').toLowerCase().includes(term));
+    const items = flexSearch(RET_DB.products, term, ['name','code']);
     list.innerHTML = items.map(p => `
         <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #F1F5F9">
             <input type="checkbox" class="ret-multi-chk" value="${p.id}" id="retMultiChk-${p.id}">
@@ -900,7 +900,7 @@ function retOnName(idx, val) {
     _retRowACIdx[idx] = -1;
     const ac = document.getElementById('retAC-' + idx);
     if (!ac) return;
-    const m = val.length ? RET_DB.products.filter(p => (p.name || '').includes(val) || (p.code || '').includes(val)).slice(0, 6) : [];
+    const m = val.length ? flexSearch(RET_DB.products, val, ['name','code'], 6) : [];
     if (m.length) {
         ac.innerHTML = m.map((p, i) => `<div class="inv-ac-item" data-i="${i}" onclick="retPickInline(${idx},'${p.id}')" onmouseenter="retRowACHover(${idx},${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code || ''} · ${p.unit || ''}</div></div>

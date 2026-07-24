@@ -128,8 +128,7 @@ window.revSearch = async function () {
 
         let rows = data || [];
         if (name) {
-            const n = name.toLowerCase();
-            rows = rows.filter(r => (r.customers?.name || r.suppliers?.name || '').toLowerCase().includes(n));
+            rows = rows.filter(r => flexMatch([r.customers?.name, r.suppliers?.name], name));
         }
         revList = rows;
         revRenderTable(rows);

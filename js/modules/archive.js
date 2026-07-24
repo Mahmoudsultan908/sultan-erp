@@ -191,9 +191,9 @@ window.arcOnLinkTypeChange = function (val) {
 window.arcLinkSearchInput = function () {
     const ac = document.getElementById('arcLinkAC');
     if (!ac) return;
-    const term = (document.getElementById('arcLinkSearch')?.value || '').trim().toLowerCase();
+    const term = document.getElementById('arcLinkSearch')?.value || '';
     const source = _arcUploadLinkType === 'customer' ? _arcCustomers : _arcUploadLinkType === 'supplier' ? _arcSuppliers : [];
-    const list = (term ? source.filter(x => (x.name || '').toLowerCase().includes(term)) : source).slice(0, 20);
+    const list = flexSearch(source, term, ['name'], 20);
     if (!list.length) {
         ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');

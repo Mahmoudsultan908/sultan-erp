@@ -430,8 +430,7 @@ window.crmOpenCustPicker = function () {
 function crmRenderPickList(val) {
     const box = document.getElementById('crmPickList');
     if (!box) return;
-    const v = (val || '').trim().toLowerCase();
-    const list = (v ? _crmCustomers.filter(c => (c.name || '').toLowerCase().includes(v)) : _crmCustomers).slice(0, 200);
+    const list = flexSearch(_crmCustomers, val, ['name'], 200);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.map(c => {
         const checked = _crmMultiCustIds.some(x => x.id === c.id);
@@ -514,14 +513,7 @@ function crmLeadsFilteredList() {
         list = list.filter(l => l.assigned_to === currentUser.id);
     }
     if (_crmLeadsFilter !== 'الكل') list = list.filter(l => l.status === _crmLeadsFilter);
-    if (_crmLeadsSearch) {
-        const q = _crmLeadsSearch.toLowerCase();
-        list = list.filter(l =>
-            (l.name||'').toLowerCase().includes(q) ||
-            (l.shop||'').toLowerCase().includes(q) ||
-            (l.area||'').toLowerCase().includes(q) ||
-            (l.phone||'').includes(q));
-    }
+    list = flexSearch(list, _crmLeadsSearch, ['name','shop','area','phone']);
     return list;
 }
 

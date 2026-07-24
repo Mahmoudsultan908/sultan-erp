@@ -81,11 +81,7 @@ function custRenderPage(c) {
 function custRenderRows() {
     const tbody = document.getElementById('custMgTbody');
     if (!tbody) return;
-    let rows = _mgCustList;
-    if (_mgCustSearch) {
-        const q = _mgCustSearch.toLowerCase();
-        rows = rows.filter(x => (x.name||'').toLowerCase().includes(q) || (x.phone||'').includes(q));
-    }
+    let rows = flexSearch(_mgCustList, _mgCustSearch, ['name','phone']);
     const balOp = document.getElementById('custMgBalOp')?.value;
     const balVal = parseFloat(document.getElementById('custMgBalVal')?.value);
     if (balOp && !isNaN(balVal)) {
@@ -303,11 +299,7 @@ function suppRenderPage(c) {
 function suppRenderRows() {
     const tbody = document.getElementById('suppMgTbody');
     if (!tbody) return;
-    let rows = _mgSuppList;
-    if (_mgSuppSearch) {
-        const q = _mgSuppSearch.toLowerCase();
-        rows = rows.filter(x => (x.name||'').toLowerCase().includes(q) || (x.phone||'').includes(q));
-    }
+    let rows = flexSearch(_mgSuppList, _mgSuppSearch, ['name','phone']);
     if (!rows.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><span>🏭</span>لا يوجد موردون بعد — ابدأ بإضافة أول مورد</td></tr>`; return; }
 
     tbody.innerHTML = rows.map(x => `<tr>

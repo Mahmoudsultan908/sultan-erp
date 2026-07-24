@@ -200,8 +200,7 @@ function vlMultiToggleHideZero(checked) {
 function vlRenderMultiPickList(val) {
     const box = document.getElementById('vlMultiPickList');
     if (!box) return;
-    const v = (val || '').trim();
-    let list = v ? VL_DB.products.filter(p => (p.name || '').includes(v) || (p.code || '').includes(v)) : VL_DB.products;
+    let list = flexSearch(VL_DB.products, val, ['name','code']);
     if (_vlMultiHideZero) list = list.filter(p => vlGetStock(p.id) > 0);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {

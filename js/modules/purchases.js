@@ -479,9 +479,7 @@ function purSearchSupplier(val) {
     if (!ac) return;
     // من غير كتابة: تعرض أول 8 موردين زي ما هم، عشان القائمة تظهر على طول
     // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
-    const m = (val.length ? PUR_DB.suppliers.filter(s =>
-        (s.name||'').includes(val) || (s.phone||'').includes(val) || (s.code||'').includes(val)
-    ) : PUR_DB.suppliers).slice(0,8);
+    const m = flexSearch(PUR_DB.suppliers, val, ['name','phone','code'], 8);
     if (m.length) {
         ac.innerHTML = m.map((s,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="purSelectSupplier('${s.id}')" onmouseenter="purSuppACHover(${i})">
             <div><div class="an">${s.name}</div><div class="as">${s.phone||''} ${s.code?'· '+s.code:''}</div></div>
@@ -553,10 +551,7 @@ function purFastSearch(val) {
     // بحث مرن: بيقسم النص المكتوب لأجزاء بالمسافة، وأي صنف اسمه فيه كل
     // الأجزاء دي (مش لازم بالترتيب ولا كلمة كاملة) بيتوافق — نفس منطق
     // invFastSearch فى sales.js بالحرف
-    const terms = val.trim().split(/\s+/).filter(Boolean);
-    const m = (val.length ? PUR_DB.products.filter(p =>
-        terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(val) || (p.barcode||'').includes(val)
-    ) : PUR_DB.products).slice(0,8);
+    const m = flexSearch(PUR_DB.products, val, ['name','code','barcode'], 8);
     if (m.length) {
         ac.innerHTML = m.map((p,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="purPickProduct('${p.id}')" onmouseenter="purFastHover(${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code||''} · ${p.unit||''}</div></div>
@@ -643,9 +638,7 @@ function purOnName(idx, val) {
     _purRowACIdx[idx] = -1;
     const ac = document.getElementById('purAC-'+idx);
     if (!ac) return;
-    const m = val.length ? PUR_DB.products.filter(p =>
-        (p.name||'').includes(val) || (p.code||'').includes(val)
-    ).slice(0,6) : [];
+    const m = val.length ? flexSearch(PUR_DB.products, val, ['name','code'], 6) : [];
     if (m.length) {
         ac.innerHTML = m.map((p,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="purPickInline(${idx},'${p.id}')" onmouseenter="purRowACHover(${idx},${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code||''} · ${p.unit||''}</div></div>
@@ -719,9 +712,7 @@ function purCloseMultiPick() {
 function purRenderMultiPickList(val) {
     const box = document.getElementById('purMultiPickList');
     if (!box) return;
-    const v = (val||'').trim();
-    const terms = v.split(/\s+/).filter(Boolean);
-    const list = v ? PUR_DB.products.filter(p => terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(v)) : PUR_DB.products;
+    const list = flexSearch(PUR_DB.products, val, ['name','code']);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _purMultiSelected[p.id];

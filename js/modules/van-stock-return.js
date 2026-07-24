@@ -185,9 +185,8 @@ function vrCloseMultiPick() {
 function vrRenderMultiPickList(val) {
     const box = document.getElementById('vrMultiPickList');
     if (!box) return;
-    const v = (val || '').trim();
     const base = vrRepProducts();
-    const list = v ? base.filter(p => (p.name || '').includes(v) || (p.code || '').includes(v)) : base;
+    const list = flexSearch(base, val, ['name','code']);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد أصناف بعربية هذا المندوب</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _vrMultiSelected[p.id];

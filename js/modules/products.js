@@ -151,10 +151,7 @@ function prodGetFilteredRows() {
     let rows = _prodList;
     if (_prodFilterCat) rows = rows.filter(p => p.category_id === _prodFilterCat);
     if (_prodFilterCompany) rows = rows.filter(p => p.company_id === _prodFilterCompany);
-    if (_prodSearch) {
-        const q = _prodSearch.toLowerCase();
-        rows = rows.filter(p => (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q) || (p.barcode||'').toLowerCase().includes(q));
-    }
+    rows = flexSearch(rows, _prodSearch, ['name','code','barcode']);
     return rows;
 }
 

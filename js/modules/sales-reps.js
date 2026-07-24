@@ -149,11 +149,7 @@ function repRenderPage(c) {
 function repRenderRows() {
     const tbody = document.getElementById('repTbody');
     if (!tbody) return;
-    let rows = _repList;
-    if (_repSearch) {
-        const q = _repSearch.toLowerCase();
-        rows = rows.filter(r => (r.name || '').toLowerCase().includes(q) || (r.phone || '').includes(q));
-    }
+    let rows = flexSearch(_repList, _repSearch, ['name','phone']);
     if (!rows.length) {
         tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><span>🚗</span>لا يوجد مندوبون بعد — ابدأ بإضافة أول مندوب</td></tr>`;
         return;

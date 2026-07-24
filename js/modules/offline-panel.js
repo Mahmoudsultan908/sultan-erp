@@ -107,11 +107,10 @@ window.opRunLookup = async function (q) {
     const [products, customers, suppliers] = await Promise.all([
         dbGetCache('products'), dbGetCache('customers'), dbGetCache('suppliers'),
     ]);
-    const query = (q || '').trim().toLowerCase();
     const rows = [];
-    (products?.data || []).forEach(p => { if (!query || (p.name || '').toLowerCase().includes(query) || (p.code || '').toLowerCase().includes(query)) rows.push({ type: '📦 صنف', name: p.name, sub: p.code || '', val: opFmt(p.wholesale_price || p.retail_price || 0) }); });
-    (customers?.data || []).forEach(c => { if (!query || (c.name || '').toLowerCase().includes(query)) rows.push({ type: '👤 عميل', name: c.name, sub: c.phone || '', val: opFmt(c.balance || 0) }); });
-    (suppliers?.data || []).forEach(s => { if (!query || (s.name || '').toLowerCase().includes(query)) rows.push({ type: '🏭 مورد', name: s.name, sub: s.phone || '', val: opFmt(s.balance || 0) }); });
+    (products?.data || []).forEach(p => { if (flexMatch([p.name, p.code], q)) rows.push({ type: '📦 صنف', name: p.name, sub: p.code || '', val: opFmt(p.wholesale_price || p.retail_price || 0) }); });
+    (customers?.data || []).forEach(c => { if (flexMatch([c.name], q)) rows.push({ type: '👤 عميل', name: c.name, sub: c.phone || '', val: opFmt(c.balance || 0) }); });
+    (suppliers?.data || []).forEach(s => { if (flexMatch([s.name], q)) rows.push({ type: '🏭 مورد', name: s.name, sub: s.phone || '', val: opFmt(s.balance || 0) }); });
 
     const oldestCache = [products, customers, suppliers].filter(Boolean).map(c => c.updatedAt).sort((a, b) => a - b)[0];
     resultsEl.innerHTML = `

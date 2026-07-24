@@ -378,11 +378,7 @@ function custListRowsHtml(list) {
 window.custApplyBalanceFilter = function() {
     const op = document.getElementById('custBalFilterOp')?.value;
     const val = parseFloat(document.getElementById('custBalFilterVal')?.value);
-    let filtered = _custList;
-    if (_custListSearch) {
-        const q = _custListSearch.toLowerCase();
-        filtered = filtered.filter(c => (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q));
-    }
+    let filtered = flexSearch(_custList, _custListSearch, ['name','phone']);
     if (op && !isNaN(val)) {
         filtered = filtered.filter(c => op === 'gt' ? (Number(c.balance)||0) > val : (Number(c.balance)||0) < val);
     }

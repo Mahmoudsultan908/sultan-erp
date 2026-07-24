@@ -102,9 +102,9 @@ async function renderPayments(c) {
 
 // فلترة سجل المدفوعات المعروض حسب اسم المورد (بحث فوري داخل الصفوف المعروضة فعلاً)
 window.payFilterHistory = function() {
-    const term = (document.getElementById('payHistSearch')?.value || '').trim().toLowerCase();
+    const term = document.getElementById('payHistSearch')?.value || '';
     document.querySelectorAll('#payHistTable tbody tr[data-name]').forEach(tr => {
-        tr.style.display = (!term || tr.dataset.name.includes(term)) ? '' : 'none';
+        tr.style.display = flexMatch([tr.dataset.name], term) ? '' : 'none';
     });
 };
 
@@ -213,12 +213,10 @@ window.paySuppSearchInput = function(mode) {
     const ac = document.getElementById(acId);
     if (!ac) return;
     _paySuppACIdx = -1;
-    const term = (document.getElementById(searchId)?.value || '').trim().toLowerCase();
+    const term = document.getElementById(searchId)?.value || '';
     // من غير كتابة: تعرض أول 20 مورد زي ما هم، عشان القائمة تظهر على طول
     // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
-    const list = (term ? _paySuppliers.filter(s =>
-        (s.name||'').toLowerCase().includes(term) || (s.phone||'').includes(term) || (s.code||'').toLowerCase().includes(term)
-    ) : _paySuppliers).slice(0, 20);
+    const list = flexSearch(_paySuppliers, term, ['name','phone','code'], 20);
     if (!list.length) {
         ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');

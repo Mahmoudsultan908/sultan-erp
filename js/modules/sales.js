@@ -764,9 +764,7 @@ function invSearchCustomer(val) {
     if (!ac) return;
     // من غير كتابة: تعرض أول 8 عملاء زي ما هم، عشان القائمة تظهر على طول
     // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
-    const m = (val.length ? INV_DB.customers.filter(c =>
-        (c.name||'').includes(val) || (c.phone||'').includes(val) || (c.code||'').includes(val)
-    ) : INV_DB.customers).slice(0,8);
+    const m = flexSearch(INV_DB.customers, val, ['name','phone','code'], 8);
     if (m.length) {
         ac.innerHTML = m.map((c,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="invSelectCustomer('${c.id}')" onmouseenter="invCustACHover(${i})">
             <div><div class="an">${c.name}</div><div class="as">${c.phone||''}</div></div>
@@ -872,10 +870,7 @@ function invFastSearch(val) {
     // بحث مرن: بيقسم النص المكتوب لأجزاء بالمسافة، وأي صنف اسمه فيه كل
     // الأجزاء دي (مش لازم بالترتيب ولا كلمة كاملة) بيتوافق — يعني تكتب
     // "او جب" وتلاقي "اولكر ... جبنة" من غير ما تكتب الاسم كامل.
-    const terms = val.trim().split(/\s+/).filter(Boolean);
-    const m = (val.length ? INV_DB.products.filter(p =>
-        terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(val) || (p.barcode||'').includes(val)
-    ) : INV_DB.products).slice(0,8);
+    const m = flexSearch(INV_DB.products, val, ['name','code','barcode'], 8);
     if (m.length) {
         ac.innerHTML = m.map((p,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="invPickProduct('${p.id}')" onmouseenter="invFastHover(${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code||''} · ${p.unit||''}</div></div>
@@ -938,9 +933,7 @@ function invOnName(idx, val) {
     _rowACIdx[idx] = -1;
     const ac = document.getElementById('invAC-'+idx);
     if (!ac) return;
-    const m = val.length ? INV_DB.products.filter(p =>
-        (p.name||'').includes(val) || (p.code||'').includes(val)
-    ).slice(0,6) : [];
+    const m = val.length ? flexSearch(INV_DB.products, val, ['name','code'], 6) : [];
     if (m.length) {
         ac.innerHTML = m.map((p,i)=>`<div class="inv-ac-item" data-i="${i}" onclick="invPickInline(${idx},'${p.id}')" onmouseenter="invRowACHover(${idx},${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code||''} · ${p.unit||''}</div></div>
@@ -1018,9 +1011,7 @@ function invMultiToggleHideZero(checked) {
 function invRenderMultiPickList(val) {
     const box = document.getElementById('invMultiPickList');
     if (!box) return;
-    const v = (val||'').trim();
-    const terms = v.split(/\s+/).filter(Boolean);
-    let list = v ? INV_DB.products.filter(p => terms.every(t => (p.name||'').includes(t)) || (p.code||'').includes(v)) : INV_DB.products;
+    let list = flexSearch(INV_DB.products, val, ['name','code']);
     if (_invMultiHideZero) list = list.filter(p => invGetStock(p.id) > 0);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
