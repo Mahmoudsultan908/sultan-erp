@@ -205,10 +205,12 @@ async function accLoadTrialBalance(c, from, to) {
         });
 
         let totalDr = 0, totalCr = 0;
+        const tbExportRows = [];
         const rows = (accounts||[]).map(a => {
             const t = totals[a.code] || { dr: 0, cr: 0 };
             if (t.dr === 0 && t.cr === 0) return '';
             totalDr += t.dr; totalCr += t.cr;
+            tbExportRows.push({ الكود: a.code, الحساب: a.name, النوع: ACC_TYPE_LABELS[a.type], مدين: t.dr, دائن: t.cr });
             return `<tr>
                 <td><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace;direction:ltr;display:inline-block">${a.code}</span></td>
                 <td><strong>${a.name}</strong></td>
@@ -239,7 +241,7 @@ async function accLoadTrialBalance(c, from, to) {
             <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'#D1FAE5':'#FEF3C7'};color:${balanced?'#059669':'#D97706'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازن':'غير متوازن'}</div><div class="mod-card-lbl">حالة الميزان</div></div>
         </div>
 
-        <div class="mod-table-wrap">
+        <div class="mod-table-wrap" id="tb-table-wrap">
             <table class="mod-table"><thead><tr>
                 <th>الكود</th><th>الحساب</th><th>النوع</th><th style="text-align:left">مدين</th><th style="text-align:left">دائن</th>
             </tr></thead>
@@ -250,6 +252,10 @@ async function accLoadTrialBalance(c, from, to) {
                 <td style="text-align:left;color:#DC2626;padding:12px">${accFmt(totalCr)}</td>
             </tr></tfoot>
             </table>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px">
+            <button class="mod-btn" onclick="window._tbExport()">📊 تصدير Excel</button>
+            <button class="mod-btn" onclick="window._tbPrint()">🖨️ طباعة</button>
         </div>`;
 
         window.accApplyTbFilter = () => {
@@ -257,6 +263,8 @@ async function accLoadTrialBalance(c, from, to) {
             const t = document.getElementById('tbTo').value;
             accLoadTrialBalance(c, f, t);
         };
+        window._tbExport = () => repExportExcel('ميزان_المراجعة', tbExportRows);
+        window._tbPrint = () => repPrintReport(`ميزان المراجعة (${from || 'البداية'} إلى ${to || 'اليوم'})`, document.getElementById('tb-table-wrap').outerHTML);
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
@@ -265,11 +273,17 @@ async function accLoadTrialBalance(c, from, to) {
 // ════════════════════════════════════════════════════════════
 // ██ 4) الميزانية العمومية ██
 // ════════════════════════════════════════════════════════════
-async function renderBalanceSheet(c) {
+async function renderBalanceSheet(c, asOfDate) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري إعداد الميزانية العمومية...</div>';
+    const today = new Date().toISOString().slice(0, 10);
+    asOfDate = asOfDate || today;
     try {
         const { data: accounts } = await sb.from('accounts').select('*');
-        const { data: lines } = await accFetchAllRows('journal_entry_lines', 'account_code, debit, credit');
+        const { data: lines } = await accFetchAllRows(
+            'journal_entry_lines',
+            'account_code, debit, credit, journal_entries!inner(entry_date)',
+            (q) => q.lte('journal_entries.entry_date', asOfDate)
+        );
 
         const totals = {};
         (lines||[]).forEach(l => {
@@ -310,9 +324,17 @@ async function renderBalanceSheet(c) {
             </div>`;
 
         c.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">🏦 الميزانية العمومية</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">حتى تاريخ اليوم — الأصول = الخصوم + حقوق الملكية</p></div>
+            <p style="font-size:13px;color:#64748B;margin-top:4px">حتى ${new Date(asOfDate).toLocaleDateString('ar-EG')} — الأصول = الخصوم + حقوق الملكية</p></div>
+        </div>
+
+        <div class="dash-card" style="padding:16px;margin-bottom:16px">
+            <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+                <div><label class="ob-label">حتى تاريخ</label><input type="date" id="bsAsOf" class="ob-input" style="margin:0" value="${asOfDate}"></div>
+                <button class="ob-add-btn" onclick="accApplyBsFilter()">🔍 تطبيق</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="renderBalanceSheet(document.getElementById('app-content'))">اليوم</button>
+            </div>
         </div>
 
         <div class="mod-grid" style="margin-bottom:16px">
@@ -321,7 +343,7 @@ async function renderBalanceSheet(c) {
             <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'#D1FAE5':'#FEF3C7'};color:${balanced?'#059669':'#D97706'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازنة':'غير متوازنة'}</div><div class="mod-card-lbl">حالة الميزانية</div></div>
         </div>
 
-        <div class="dash-row">
+        <div class="dash-row" id="bs-rows">
             <div class="dash-card" style="flex:1">
                 ${section('🏦 الأصول', byType.asset, '#2563EB')}
                 <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:2px solid #E2E8F0;font-weight:800;font-size:14px">
@@ -335,7 +357,23 @@ async function renderBalanceSheet(c) {
                     <span>إجمالي الخصوم وحقوق الملكية</span><span style="color:#DC2626">${accFmt(totalLiabilities + totalEquity)}</span>
                 </div>
             </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px">
+            <button class="mod-btn" onclick="window._bsExport()">📊 تصدير Excel</button>
+            <button class="mod-btn" onclick="window._bsPrint()">🖨️ طباعة</button>
         </div>`;
+
+        window.accApplyBsFilter = () => {
+            const d = document.getElementById('bsAsOf').value;
+            renderBalanceSheet(c, d);
+        };
+        window._bsExport = () => repExportExcel('الميزانية_العمومية', [
+            ...byType.asset.map(a => ({ القسم: 'أصول', الحساب: a.name, الرصيد: a.balance })),
+            ...byType.liability.map(a => ({ القسم: 'خصوم', الحساب: a.name, الرصيد: a.balance })),
+            ...byType.equity.map(a => ({ القسم: 'حقوق ملكية', الحساب: a.name, الرصيد: a.balance })),
+            { القسم: 'حقوق ملكية', الحساب: netProfit>=0?'صافي الربح':'صافي الخسارة', الرصيد: netProfit },
+        ]);
+        window._bsPrint = () => repPrintReport(`الميزانية العمومية — حتى ${asOfDate}`, document.getElementById('bs-rows').outerHTML);
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }

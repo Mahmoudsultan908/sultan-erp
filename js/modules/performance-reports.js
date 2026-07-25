@@ -111,6 +111,17 @@ function prfRenderPage(c) {
     else prfRenderCompareForm();
 }
 
+// تصدير/طباعة (بند 12) — زوج أزرار مشترك لكل التبويبات الـ6، بيشتغل على
+// آخر نتيجة اتحسبت لأي تبويب مفتوح حاليًا (rows/title بيتسجّلوا وقت
+// الرندر بتاع كل تبويب قبل ما يستخدم الزرارين دول)
+const PRF_ACTIONS_HTML = `
+    <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="mod-btn" onclick="prfExportCurrent()">📊 تصدير Excel</button>
+        <button class="mod-btn" onclick="prfPrintCurrent()">🖨️ طباعة</button>
+    </div>`;
+window.prfExportCurrent = () => repExportExcel(window._prfExportName || 'تقرير_أداء', window._prfExportRows || []);
+window.prfPrintCurrent = () => repPrintReport(window._prfPrintTitle || 'تقرير أداء', document.getElementById('prf-result')?.innerHTML || '');
+
 function prfDateRangeBarHTML(ids, onApply) {
     return `
     <div class="dash-card" style="padding:16px;margin-bottom:16px">
@@ -208,7 +219,10 @@ window.prfLoadByProduct = async function () {
                     <td style="text-align:center;color:#94A3B8;font-size:12px">${r.deferredRate > 0 ? perfFmt(r.deferredRate) + '/وحدة' : '—'}</td>
                 </tr>`).join('') : `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد مبيعات في هذه الفترة</td></tr>`}
             </tbody></table>
-        </div>`;
+        </div>${PRF_ACTIONS_HTML}`;
+        window._prfExportName = 'مبيعات_حسب_الصنف';
+        window._prfPrintTitle = `مبيعات حسب الصنف (${from} إلى ${to})`;
+        window._prfExportRows = rows.map(r => ({ الصنف: r.name, الكود: r.code, الكمية: r.qty, الإيراد: r.revenue, الربح: r.profit, 'هامش %': r.marginPct.toFixed(1) }));
     } catch (err) {
         resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
@@ -270,7 +284,10 @@ window.prfLoadByCustomer = async function () {
                     <td style="text-align:left">${perfFmt(r.avg)}</td>
                 </tr>`).join('') : `<tr><td colspan="4" class="empty-state"><span>📭</span>لا توجد مبيعات في هذه الفترة</td></tr>`}
             </tbody></table>
-        </div>`;
+        </div>${PRF_ACTIONS_HTML}`;
+        window._prfExportName = 'مبيعات_حسب_العميل';
+        window._prfPrintTitle = `مبيعات حسب العميل (${from} إلى ${to})`;
+        window._prfExportRows = rows.map(r => ({ العميل: r.name, 'عدد الفواتير': r.count, الإجمالي: r.total, 'متوسط الفاتورة': r.avg }));
     } catch (err) {
         resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
@@ -356,7 +373,10 @@ window.prfLoadByRep = async function () {
                     <td style="text-align:left;font-weight:700;color:#059669">${perfFmt(r.commission)}</td>
                 </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مبيعات مرتبطة بمندوب في هذه الفترة</td></tr>`}
             </tbody></table>
-        </div>`;
+        </div>${PRF_ACTIONS_HTML}`;
+        window._prfExportName = 'مبيعات_حسب_المندوب';
+        window._prfPrintTitle = `مبيعات حسب المندوب (${from} إلى ${to})`;
+        window._prfExportRows = rows.map(r => ({ المندوب: r.name, 'عدد الفواتير': r.count, مرتجعات: r.returns, 'صافي المبيعات': r.total, العمولة: r.commission }));
     } catch (err) {
         resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
@@ -471,7 +491,15 @@ window.prfLoadCompare = async function () {
                     <td style="text-align:center">${perfPctBadge(pct(m.revB, m.revA))}</td>
                 </tr>`).join('') : `<tr><td colspan="4" class="empty-state"><span>📭</span>لا توجد بيانات كافية للمقارنة</td></tr>`}
             </tbody></table>
-        </div>`;
+        </div>${PRF_ACTIONS_HTML}`;
+        window._prfExportName = 'مقارنة_فترات';
+        window._prfPrintTitle = `مقارنة فترات — أ: ${fromA} إلى ${toA} | ب: ${fromB} إلى ${toB}`;
+        window._prfExportRows = [
+            { البند: 'إجمالي المبيعات', 'الفترة أ': A.total, 'الفترة ب': B.total },
+            { البند: 'عدد الفواتير', 'الفترة أ': A.count, 'الفترة ب': B.count },
+            { البند: 'الكمية المباعة', 'الفترة أ': A.qty, 'الفترة ب': B.qty },
+            ...movers.map(m => ({ البند: 'صنف: ' + m.name, 'الفترة أ': m.revA, 'الفترة ب': m.revB })),
+        ];
     } catch (err) {
         resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
@@ -579,7 +607,10 @@ function prfRenderPaymentsResult(rows) {
                 <td style="font-size:12px;color:#94A3B8">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
             </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات مطابقة</td></tr>`}
         </tbody></table>
-    </div>`;
+    </div>${PRF_ACTIONS_HTML}`;
+    window._prfExportName = 'المدفوعات';
+    window._prfPrintTitle = 'تقرير المدفوعات';
+    window._prfExportRows = rows.map(r => ({ النوع: r.kind === 'collect' ? 'تحصيل من عميل' : 'دفع لمورد', الاسم: r.name, الخزنة: _perfTreasuries.find(t => t.id === r.treasury_id)?.name || '—', المبلغ: r.amount, التاريخ: new Date(r.created_at).toLocaleDateString('ar-EG') }));
 }
 
 // ════════════════════════════════════════════════════════════
@@ -684,7 +715,10 @@ function prfRenderReturnsResult(rows) {
                 <td style="font-size:12px;color:#94A3B8">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
             </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مرتجعات مطابقة</td></tr>`}
         </tbody></table>
-    </div>`;
+    </div>${PRF_ACTIONS_HTML}`;
+    window._prfExportName = 'المرتجعات';
+    window._prfPrintTitle = 'تقرير المرتجعات';
+    window._prfExportRows = rows.map(r => ({ النوع: r.kind === 'sale' ? 'مرتجع بيع' : 'مرتجع شراء', 'رقم المرتجع': r.no || '—', الاسم: r.name, المبلغ: r.amount, التاريخ: new Date(r.created_at).toLocaleDateString('ar-EG') }));
 }
 
 Object.assign(window, {
