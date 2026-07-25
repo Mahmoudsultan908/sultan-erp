@@ -346,6 +346,12 @@ window.expOpenAdd = async function() {
         treasuries = data || [];
     } catch {}
 
+    let employees = [];
+    try {
+        const { data } = await sb.from('employees').select('id,name').eq('is_active', true).order('name');
+        employees = data || [];
+    } catch {}
+
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'expModal';
@@ -377,6 +383,13 @@ window.expOpenAdd = async function() {
                         ${treasuries.map(t => `<option value="${t.id}" ${t.is_default?'selected':''}>${t.name}</option>`).join('')}
                     </select>
                 </div>
+                ${employees.length ? `
+                <div class="mod-form-group"><label>ربط بموظف <small style="color:#94A3B8;font-weight:400">(اختياري — بيخصم من كشف حساب الموظف فى صفحة الرواتب)</small></label>
+                    <select id="expEmployeeId" class="mod-form-input">
+                        <option value="">بدون ربط بموظف</option>
+                        ${employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+                    </select>
+                </div>` : ''}
 
                 <!-- منطقة فحص الحد -->
                 <div id="expLimitArea"></div>
@@ -515,6 +528,7 @@ async function saveExpense() {
     const desc = document.getElementById('expDesc').value.trim();
     const date = document.getElementById('expDate').value;
     const treasuryId = document.getElementById('expTreasuryId').value || null;
+    const employeeId = document.getElementById('expEmployeeId')?.value || null;
 
     if (!catId || !amount || !desc) return alert('يرجى ملء جميع الحقول المطلوبة');
 
@@ -548,7 +562,8 @@ async function saveExpense() {
                 payload: {
                     ref: 'EXP-' + Date.now(),
                     category_id: catId, amount, description: desc,
-                    expense_date: date, status: 'confirmed', treasury_id: treasuryId, created_by: currentUser?.id || null,
+                    expense_date: date, status: 'confirmed', treasury_id: treasuryId, employee_id: employeeId,
+                    created_by: currentUser?.id || null,
                 },
             });
             expCloseModal('expModal');
@@ -571,6 +586,7 @@ async function saveExpense() {
             expense_date: date,
             status: 'confirmed',
             treasury_id: treasuryId,
+            employee_id: employeeId,
             created_by: currentUser?.id || null,
         }).select();
         if (error) throw error;

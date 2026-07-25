@@ -45,6 +45,9 @@ async function renderDashboard(container) {
         const rawMonthStart = today.slice(0, 7) + '-01';
         const monthStart = rawMonthStart < SULTAN_LIVE_CUTOVER ? SULTAN_LIVE_CUTOVER : rawMonthStart;
         const trendStart = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+        // نافذة متحركة آخر 90 يوم — لحساب متوسط هامش الربح الحقيقي من بيانات
+        // البيع الفعلية (مش رقم مُدخَل يدويًا)، يُستخدم فى معادلة هدف المبيعات تحت
+        const marginWindowStart = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
 
         const [
             { data: cashData },
@@ -69,6 +72,8 @@ async function renderDashboard(container) {
             { data: activeEmployees },
             { data: expenseCatsForTarget },
             { data: monthlyMarginRow },
+            { data: marginSaleItems },
+            { data: marginReturnItems },
         ] = await Promise.all([
             sb.rpc('get_cash_balance'),
             sb.from('sales').select('total').eq('status','confirmed').gte('created_at', today),
@@ -111,6 +116,10 @@ async function renderDashboard(container) {
             sb.from('employees').select('base_salary').eq('is_active', true),
             sb.from('expense_categories').select('monthly_limit').eq('is_active', true),
             sb.from('app_settings').select('value').eq('key','monthly_target_profit_margin').maybeSingle(),
+            dashFetchAllRows('sale_items', 'qty, line_total, cost_price_snapshot, sales!inner(created_at, status)', (q) =>
+                q.eq('sales.status', 'confirmed').gte('sales.created_at', marginWindowStart)),
+            dashFetchAllRows('sale_return_items', 'qty, line_total, cost_price_snapshot, sales_returns!inner(created_at, status)', (q) =>
+                q.eq('sales_returns.status', 'confirmed').gte('sales_returns.created_at', marginWindowStart)),
         ]);
 
         // ── تجميع مبيعات آخر 30 يوم يوميًا (تعبئة الأيام الفاضية بصفر) ──
@@ -149,13 +158,25 @@ async function renderDashboard(container) {
             - (returnItemsCostMonth || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0);
         const monthProfit = netMonthSales - monthCOGS - monthExpenses;
 
-        // ── هدف المبيعات الشهري = (رواتب الموظفين النشطين + بنود التشغيل بحد شهري) + هامش ربح مستهدف ──
+        // ── هدف المبيعات الشهري = (رواتب الموظفين النشطين + بنود التشغيل بحد شهري + هامش ربح مستهدف) ÷ متوسط هامش الربح الحقيقي ──
+        // متوسط الهامش بيتحسب تلقائيًا من مبيعات آخر 90 يوم الفعلية (إيراد
+        // صافي بعد المرتجعات ناقص تكلفة البضاعة) — مش رقم بيتكتب يدوي، عشان
+        // يعكس هامش الأسعار الحقيقي اللي البيع بيحصل بيه فعلاً.
+        const marginRevenue = (marginSaleItems || []).reduce((s, it) => s + (Number(it.line_total) || 0), 0)
+            - (marginReturnItems || []).reduce((s, it) => s + (Number(it.line_total) || 0), 0);
+        const marginCost = (marginSaleItems || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0)
+            - (marginReturnItems || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0);
+        const avgMarginPct = marginRevenue > 0 ? (marginRevenue - marginCost) / marginRevenue : 0;
+
         const expectedSalaries = (activeEmployees || []).reduce((s, e) => s + (Number(e.base_salary) || 0), 0);
         const expectedOpEx = (expenseCatsForTarget || []).reduce((s, c) => s + (Number(c.monthly_limit) || 0), 0);
         let monthlyTargetMargin = 0;
         try { monthlyTargetMargin = Number(JSON.parse(monthlyMarginRow?.value ?? '0')) || 0; }
         catch { monthlyTargetMargin = Number(monthlyMarginRow?.value) || 0; }
-        const monthlySalesTarget = monthlyTargetMargin > 0 ? (expectedSalaries + expectedOpEx + monthlyTargetMargin) : 0;
+        const monthlySalesTarget = (monthlyTargetMargin > 0 && avgMarginPct > 0)
+            ? (expectedSalaries + expectedOpEx + monthlyTargetMargin) / avgMarginPct : 0;
+        const DASH_TARGET_WORKDAYS = 26;
+        const dailySalesTargetCalc = monthlySalesTarget > 0 ? monthlySalesTarget / DASH_TARGET_WORKDAYS : 0;
         const targetPct = monthlySalesTarget > 0 ? Math.round(netMonthSales / monthlySalesTarget * 100) : 0;
         const targetColor = targetPct >= 100 ? '#059669' : targetPct >= 60 ? '#D97706' : '#DC2626';
 
@@ -356,6 +377,14 @@ async function renderDashboard(container) {
                     <div class="dash-summary-row" style="font-size:11px;color:#94A3B8">
                         <span>${fmt(netMonthSales)} من ${fmt(monthlySalesTarget)}</span>
                         <span style="color:${targetColor};font-weight:700">${targetPct}%</span>
+                    </div>
+                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8">
+                        <span>المطلوب بيعه يوميًا (÷ ${DASH_TARGET_WORKDAYS} يوم عمل)</span>
+                        <span>${fmt(dailySalesTargetCalc)}</span>
+                    </div>
+                    <div class="dash-summary-row" style="font-size:10.5px;color:#94A3B8">
+                        <span>متوسط هامش الربح الفعلي (آخر 90 يوم)</span>
+                        <span>${Math.round(avgMarginPct * 100)}%</span>
                     </div>` : ''}
                 </div>
             </div>
