@@ -635,7 +635,7 @@ window.prodAddCompany = async function() {
 };
 
 // ════════════════════════════════════════════════════════════
-// تقرير: أصناف جديدة + أصناف نفدت واتُشترت تاني (آخر 7 أيام)
+// تقرير: أصناف جديدة + أصناف نفدت واتُشترت تاني (آخر يومين)
 // ════════════════════════════════════════════════════════════
 // ملحوظة على تعريف "نفدت واتُشترت تاني": مفيش عندنا جدول سجل حركة مخزون
 // تاريخي (stock ledger) نقدر نسأله "كان الرصيد كام قبل تاريخ معيّن"، فبنقدّرها:
@@ -655,7 +655,7 @@ window.prodOpenNewRestockedReport = async function() {
     document.body.appendChild(modal);
     const body = modal.querySelector('.mod-modal-body');
     try {
-        const days = 7;
+        const days = 2;
         const cutoff = new Date(Date.now() - days * 86400000).toISOString();
         const { data: recentPurchases, error } = await sb.from('purchase_items')
             .select('product_id, qty, units_per_carton_snapshot, purchases!inner(created_at, status)')

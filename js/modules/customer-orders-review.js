@@ -195,12 +195,13 @@ function corRenderBannersPage(c) {
     ${COR_BANNERS.length ? `
     <div class="mod-table-wrap">
         <table class="mod-table"><thead><tr>
-            <th style="width:70px">الصورة</th><th>العنوان</th><th>مرتبط بـ</th><th>الترتيب</th><th>الحالة</th><th style="width:150px"></th>
+            <th style="width:70px">الصورة</th><th>العنوان</th><th>مرتبط بـ</th><th>النوع</th><th>الترتيب</th><th>الحالة</th><th style="width:150px"></th>
         </tr></thead><tbody>
             ${COR_BANNERS.map(b => `<tr>
                 <td>${b.image_url ? `<img src="${b.image_url}" style="width:50px;height:36px;object-fit:cover;border-radius:6px">` : '—'}</td>
                 <td>${b.title}</td>
                 <td style="font-size:12px;color:#64748B">${b.link_type==='category' ? (COR_CATS.find(x=>x.id===b.link_value)?.name || 'قسم محذوف') : '—'}</td>
+                <td style="font-size:12px">${b.display_type==='popup' ? '📱 بوب أب عند الفتح' : '🔄 شريط دوّار'}</td>
                 <td>${b.display_order}</td>
                 <td>${b.is_active ? '<span style="color:#059669;font-weight:700">✅ فعّال</span>' : '<span style="color:#94A3B8">⏸️ متوقف</span>'}</td>
                 <td style="white-space:nowrap">
@@ -229,6 +230,12 @@ window.corOpenBannerModal = function(id) {
                         <img id="corBanImgPreview" src="${b?.image_url||''}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#F1F5F9;${b?.image_url?'':'display:none'}">
                         <input type="file" id="corBanImgFile" class="mod-form-input" accept="image/*" style="margin:0" onchange="corPreviewBannerImage(this)">
                     </div>
+                </div>
+                <div class="mod-form-group"><label>نوع العرض</label>
+                    <select id="corBanDisplayType" class="mod-form-input">
+                        <option value="carousel" ${b?.display_type!=='popup'?'selected':''}>🔄 شريط دوّار (فوق الصفحة الرئيسية)</option>
+                        <option value="popup" ${b?.display_type==='popup'?'selected':''}>📱 بوب أب بحجم الشاشة (مرة عند فتح التطبيق)</option>
+                    </select>
                 </div>
                 <div class="mod-form-group"><label>يفتح عند الضغط</label>
                     <select id="corBanLinkType" class="mod-form-input" onchange="document.getElementById('corBanCatWrap').style.display=this.value==='category'?'block':'none'">
@@ -278,6 +285,7 @@ window.corSaveBanner = async function(id) {
             link_value: linkType === 'category' ? document.getElementById('corBanCatId').value : null,
             display_order: parseInt(document.getElementById('corBanOrder').value) || 0,
             is_active: document.getElementById('corBanActive').checked,
+            display_type: document.getElementById('corBanDisplayType').value,
         };
         const file = document.getElementById('corBanImgFile')?.files?.[0];
         if (file) {
