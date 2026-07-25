@@ -110,7 +110,7 @@ async function renderExpenses(container) {
         <!-- تبويبات -->
         <div class="exp-tabs">
             <button class="exp-tab active" id="expTabTransactions" onclick="expSwitchTab('transactions')">📋 المصروفات</button>
-            <button class="exp-tab" id="expTabCats" onclick="expSwitchTab('cats')">🗂️ إدارة البنود والحدود</button>
+            <button class="exp-tab" id="expTabCats" onclick="expSwitchTab('cats')">🗂️ البنود وكشف حساب المصروفات</button>
         </div>
 
         <!-- ===== تبويب المصروفات ===== -->
@@ -185,8 +185,8 @@ function _expCatsPanelHTML(categories, catUsage) {
     return `
     <div class="mod-table-wrap">
         <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0">
-            <div style="font-size:14px;font-weight:800;color:#0F172A">دليل بنود المصروفات والحدود الشهرية</div>
-            <div style="font-size:12px;color:#64748B;margin-top:4px">عدّل الحد الشهري لكل بند — واختَر أي فترة عشان تشوف كشف حساب المصروفات بالبند فيها</div>
+            <div style="font-size:14px;font-weight:800;color:#0F172A">📄 كشف حساب المصروفات حسب البند + الحدود الشهرية</div>
+            <div style="font-size:12px;color:#64748B;margin-top:4px">اختَر الفترة اللي عايز تشوف مصروفات كل بند فيها (افتراضيًا الشهر الحالي) — وعدّل الحد الشهري لأي بند من هنا كمان</div>
             <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:12px 0 0">
                 <div><label class="ob-label">من تاريخ</label><input type="date" id="expCatsFrom" class="ob-input" style="margin:0" value="${_expCatsFrom}"></div>
                 <div><label class="ob-label">إلى تاريخ</label><input type="date" id="expCatsTo" class="ob-input" style="margin:0" value="${_expCatsTo}"></div>
