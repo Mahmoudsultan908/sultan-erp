@@ -9,8 +9,12 @@
 
 let _perfProducts = [];
 let _perfCustomers = [];
+let _perfSuppliers = [];
+let _perfTreasuries = [];
 let _perfReps = [];
-let _perfTab = 'product'; // 'product' | 'customer' | 'rep' | 'compare'
+let _perfTab = 'product'; // 'product' | 'customer' | 'rep' | 'compare' | 'payments' | 'returns'
+let _perfPaymentsRows = []; // آخر نتيجة تحميل تبويب المدفوعات — عشان خانة البحث تفلتر منها من غير استعلام جديد
+let _perfReturnsRows = []; // نفس الفكرة لتبويب المرتجعات
 
 // ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
 //   يضيّق النتيجة — sale_items بقى أكتر من كده بعد نقل البيانات التاريخية،
@@ -32,8 +36,13 @@ async function prfFetchAllRows(table, select, applyFilters) {
 }
 
 function perfFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function perfDefaultFrom() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10); }
-function perfToday() { return new Date().toISOString().slice(0, 10); }
+// ★ new Date(...).toISOString() بيحوّل لتوقيت UTC — لو المتصفح فى توقيت
+//   قدام UTC (زي GMT+3)، أول الشهر أو النهاردة كانوا بيترحّلوا يوم لورا
+//   بصمت (1 يوليو محلي بيبقى 30 يونيو UTC) وبيوسّعوا الفترة من غير ما حد
+//   يلاحظ. نبني السترينج من مكوّنات التاريخ المحلي مباشرة بدل توقيت UTC.
+function perfDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function perfDefaultFrom() { const d = new Date(); return perfDateStr(new Date(d.getFullYear(), d.getMonth(), 1)); }
+function perfToday() { return perfDateStr(new Date()); }
 function perfPctBadge(pct) {
     const color = pct > 0 ? '#059669' : pct < 0 ? '#DC2626' : '#64748B';
     const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '—';
@@ -46,12 +55,16 @@ function perfPctBadge(pct) {
 async function renderPerformanceReports(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل بيانات التقارير...</div>';
     try {
-        const [{ data: products }, { data: customers }] = await Promise.all([
+        const [{ data: products }, { data: customers }, { data: suppliers }, { data: treasuries }] = await Promise.all([
             sb.from('products').select('id,name,code,unit').order('name'),
             sb.from('customers').select('id,name').order('name'),
+            sb.from('suppliers').select('id,name').order('name'),
+            sb.from('treasuries').select('id,name').order('name'),
         ]);
         _perfProducts = products || [];
         _perfCustomers = customers || [];
+        _perfSuppliers = suppliers || [];
+        _perfTreasuries = treasuries || [];
         try {
             const { data: reps, error } = await sb.from('sales_reps').select('*');
             if (error) throw error;
@@ -75,6 +88,8 @@ const PRF_TABS = [
     { id: 'customer', label: '👥 حسب العميل' },
     { id: 'rep', label: '🚗 حسب المندوب' },
     { id: 'compare', label: '⚖️ مقارنة فترات' },
+    { id: 'payments', label: '💰 المدفوعات' },
+    { id: 'returns', label: '↩️ المرتجعات' },
 ];
 
 function prfRenderPage(c) {
@@ -91,6 +106,8 @@ function prfRenderPage(c) {
     if (_perfTab === 'product') prfRenderByProductForm();
     else if (_perfTab === 'customer') prfRenderByCustomerForm();
     else if (_perfTab === 'rep') prfRenderByRepForm();
+    else if (_perfTab === 'payments') prfRenderPaymentsForm();
+    else if (_perfTab === 'returns') prfRenderReturnsForm();
     else prfRenderCompareForm();
 }
 
@@ -460,7 +477,218 @@ window.prfLoadCompare = async function () {
     }
 };
 
+// ════════════════════════════════════════════════════════════
+// 6) المدفوعات — تحصيلات عملاء + دفعات موردين مع بعض (بند 11)
+// ════════════════════════════════════════════════════════════
+function prfRenderPaymentsForm() {
+    const body = document.getElementById('prf-body');
+    if (!body) return;
+    body.innerHTML = prfDateRangeBarHTML({ from: 'prfPayFrom', to: 'prfPayTo' }, 'prfLoadPayments()') + `
+        <div class="mod-form-group" style="max-width:320px;margin-bottom:14px">
+            <input type="text" id="prfPaySearch" class="mod-form-input" placeholder="🔍 بحث بالاسم..." oninput="prfFilterPayments(this.value)">
+        </div>
+        <div id="prf-result"></div>`;
+    prfLoadPayments();
+}
+
+window.prfLoadPayments = async function () {
+    const from = document.getElementById('prfPayFrom')?.value || perfDefaultFrom();
+    const to = document.getElementById('prfPayTo')?.value || perfToday();
+    const resultEl = document.getElementById('prf-result');
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
+
+    try {
+        const [{ data: collections, error: e1 }, { data: payouts, error: e2 }] = await Promise.all([
+            sb.from('customer_payments').select('id, customer_id, amount, treasury_id, ref, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            sb.from('supplier_payments').select('id, supplier_id, amount, treasury_id, ref, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+        ]);
+        if (e1) throw e1;
+        if (e2) throw e2;
+
+        const rows = [
+            ...(collections || []).map(r => ({
+                kind: 'collect', name: _perfCustomers.find(c => c.id === r.customer_id)?.name || 'عميل محذوف',
+                amount: Number(r.amount) || 0, treasury_id: r.treasury_id, ref: r.ref, created_at: r.created_at,
+            })),
+            ...(payouts || []).map(r => ({
+                kind: 'pay', name: _perfSuppliers.find(s => s.id === r.supplier_id)?.name || 'مورد محذوف',
+                amount: Number(r.amount) || 0, treasury_id: r.treasury_id, ref: r.ref, created_at: r.created_at,
+            })),
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        _perfPaymentsRows = rows;
+
+        prfRenderPaymentsResult(rows);
+    } catch (err) {
+        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+    }
+};
+
+window.prfFilterPayments = function (q) {
+    const filtered = flexSearch(_perfPaymentsRows, q, ['name']);
+    prfRenderPaymentsResult(filtered);
+};
+
+function prfRenderPaymentsResult(rows) {
+    const resultEl = document.getElementById('prf-result');
+    if (!resultEl) return;
+
+    const totalCollect = rows.filter(r => r.kind === 'collect').reduce((s, r) => s + r.amount, 0);
+    const totalPay = rows.filter(r => r.kind === 'pay').reduce((s, r) => s + r.amount, 0);
+
+    const byTreasury = {};
+    rows.forEach(r => {
+        const g = byTreasury[r.treasury_id || '__none__'] || (byTreasury[r.treasury_id || '__none__'] = { collect: 0, pay: 0 });
+        if (r.kind === 'collect') g.collect += r.amount; else g.pay += r.amount;
+    });
+    const treasuryRows = Object.entries(byTreasury).map(([tid, g]) => ({
+        name: tid === '__none__' ? 'بدون خزنة' : (_perfTreasuries.find(t => t.id === tid)?.name || 'خزنة محذوفة'),
+        collect: g.collect, pay: g.pay,
+    })).sort((a, b) => (b.collect + b.pay) - (a.collect + a.pay));
+
+    resultEl.innerHTML = `
+    <div class="mod-grid" style="margin-bottom:16px">
+        <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">📥</div><div class="mod-card-val">${perfFmt(totalCollect)}</div><div class="mod-card-lbl">إجمالي التحصيل من العملاء</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">📤</div><div class="mod-card-val">${perfFmt(totalPay)}</div><div class="mod-card-lbl">إجمالي الدفع للموردين</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">⚖️</div><div class="mod-card-val">${perfFmt(totalCollect - totalPay)}</div><div class="mod-card-lbl">صافي الحركة النقدية</div></div>
+    </div>
+    <div class="mod-table-wrap" style="margin-bottom:20px">
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">حسب الخزنة</div>
+        <table class="mod-table"><thead><tr>
+            <th>الخزنة</th><th style="text-align:left">تحصيل من عملاء</th><th style="text-align:left">دفع لموردين</th><th style="text-align:left">الصافي</th>
+        </tr></thead><tbody>
+            ${treasuryRows.length ? treasuryRows.map(t => `<tr>
+                <td><strong>${t.name}</strong></td>
+                <td style="text-align:left;color:#059669">${perfFmt(t.collect)}</td>
+                <td style="text-align:left;color:#DC2626">${perfFmt(t.pay)}</td>
+                <td style="text-align:left;font-weight:700">${perfFmt(t.collect - t.pay)}</td>
+            </tr>`).join('') : `<tr><td colspan="4" class="empty-state"><span>📭</span>لا توجد حركات فى هذه الفترة</td></tr>`}
+        </tbody></table>
+    </div>
+    <div class="mod-table-wrap">
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">كل الحركات</div>
+        <table class="mod-table"><thead><tr>
+            <th>النوع</th><th>الاسم</th><th>الخزنة</th><th style="text-align:left">المبلغ</th><th>التاريخ</th>
+        </tr></thead><tbody>
+            ${rows.length ? rows.map(r => `<tr>
+                <td>${r.kind === 'collect' ? '<span style="color:#059669">📥 تحصيل</span>' : '<span style="color:#DC2626">📤 دفع</span>'}</td>
+                <td>${r.name}</td>
+                <td style="color:#64748B">${_perfTreasuries.find(t => t.id === r.treasury_id)?.name || '—'}</td>
+                <td style="text-align:left;font-weight:700">${perfFmt(r.amount)}</td>
+                <td style="font-size:12px;color:#94A3B8">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
+            </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات مطابقة</td></tr>`}
+        </tbody></table>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// 7) المرتجعات — بيع وشراء مع بعض (بند 11)
+// ════════════════════════════════════════════════════════════
+function prfRenderReturnsForm() {
+    const body = document.getElementById('prf-body');
+    if (!body) return;
+    body.innerHTML = prfDateRangeBarHTML({ from: 'prfRetFrom', to: 'prfRetTo' }, 'prfLoadReturns()') + `
+        <div class="mod-form-group" style="max-width:320px;margin-bottom:14px">
+            <input type="text" id="prfRetSearch" class="mod-form-input" placeholder="🔍 بحث بالاسم..." oninput="prfFilterReturns(this.value)">
+        </div>
+        <div id="prf-result"></div>`;
+    prfLoadReturns();
+}
+
+window.prfLoadReturns = async function () {
+    const from = document.getElementById('prfRetFrom')?.value || perfDefaultFrom();
+    const to = document.getElementById('prfRetTo')?.value || perfToday();
+    const resultEl = document.getElementById('prf-result');
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
+
+    try {
+        const [{ data: salesRet, error: e1 }, { data: purRet, error: e2 }] = await Promise.all([
+            sb.from('sales_returns').select('id, customer_id, rep_id, total, return_no, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            sb.from('purchase_returns').select('id, supplier_id, total, return_no, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+        ]);
+        if (e1) throw e1;
+        if (e2) throw e2;
+
+        const rows = [
+            ...(salesRet || []).map(r => ({
+                kind: 'sale', name: _perfCustomers.find(c => c.id === r.customer_id)?.name || 'عميل نقدي/محذوف',
+                rep_id: r.rep_id, amount: Number(r.total) || 0, no: r.return_no, created_at: r.created_at,
+            })),
+            ...(purRet || []).map(r => ({
+                kind: 'purchase', name: _perfSuppliers.find(s => s.id === r.supplier_id)?.name || 'مورد محذوف',
+                rep_id: null, amount: Number(r.total) || 0, no: r.return_no, created_at: r.created_at,
+            })),
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        _perfReturnsRows = rows;
+
+        prfRenderReturnsResult(rows);
+    } catch (err) {
+        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+    }
+};
+
+window.prfFilterReturns = function (q) {
+    const filtered = flexSearch(_perfReturnsRows, q, ['name']);
+    prfRenderReturnsResult(filtered);
+};
+
+function prfRenderReturnsResult(rows) {
+    const resultEl = document.getElementById('prf-result');
+    if (!resultEl) return;
+
+    const salesTotal = rows.filter(r => r.kind === 'sale').reduce((s, r) => s + r.amount, 0);
+    const purchaseTotal = rows.filter(r => r.kind === 'purchase').reduce((s, r) => s + r.amount, 0);
+
+    const byRep = {};
+    rows.filter(r => r.kind === 'sale').forEach(r => {
+        const g = byRep[r.rep_id || '__none__'] || (byRep[r.rep_id || '__none__'] = { total: 0, count: 0 });
+        g.total += r.amount; g.count++;
+    });
+    const repRows = Object.entries(byRep).map(([rid, g]) => ({
+        name: rid === '__none__' ? 'بدون مندوب' : (_perfReps.find(r => r.id === rid)?.name || 'مندوب محذوف'),
+        total: g.total, count: g.count,
+    })).sort((a, b) => b.total - a.total);
+
+    resultEl.innerHTML = `
+    <div class="mod-grid" style="margin-bottom:16px">
+        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">↩️</div><div class="mod-card-val">${perfFmt(salesTotal)}</div><div class="mod-card-lbl">إجمالي مرتجعات البيع</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">↩️</div><div class="mod-card-val">${perfFmt(purchaseTotal)}</div><div class="mod-card-lbl">إجمالي مرتجعات الشراء</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#F1F5F9;color:#475569">Σ</div><div class="mod-card-val">${perfFmt(salesTotal + purchaseTotal)}</div><div class="mod-card-lbl">إجمالي المرتجعات</div></div>
+    </div>
+    ${repRows.length ? `
+    <div class="mod-table-wrap" style="margin-bottom:20px">
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">مرتجعات البيع حسب المندوب</div>
+        <table class="mod-table"><thead><tr>
+            <th>المندوب</th><th style="text-align:center">عدد المرتجعات</th><th style="text-align:left">الإجمالي</th>
+        </tr></thead><tbody>
+            ${repRows.map(r => `<tr>
+                <td><strong>${r.name}</strong></td>
+                <td style="text-align:center">${r.count}</td>
+                <td style="text-align:left;font-weight:700">${perfFmt(r.total)}</td>
+            </tr>`).join('')}
+        </tbody></table>
+    </div>` : ''}
+    <div class="mod-table-wrap">
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">كل المرتجعات</div>
+        <table class="mod-table"><thead><tr>
+            <th>النوع</th><th>رقم المرتجع</th><th>الاسم</th><th style="text-align:left">المبلغ</th><th>التاريخ</th>
+        </tr></thead><tbody>
+            ${rows.length ? rows.map(r => `<tr>
+                <td>${r.kind === 'sale' ? '<span style="color:#D97706">🛒 مرتجع بيع</span>' : '<span style="color:#2563EB">📥 مرتجع شراء</span>'}</td>
+                <td style="font-family:monospace;font-size:12px">${r.no || '—'}</td>
+                <td>${r.name}</td>
+                <td style="text-align:left;font-weight:700">${perfFmt(r.amount)}</td>
+                <td style="font-size:12px;color:#94A3B8">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
+            </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مرتجعات مطابقة</td></tr>`}
+        </tbody></table>
+    </div>`;
+}
+
 Object.assign(window, {
     renderPerformanceReports, prfSwitchTab,
     prfLoadByProduct, prfLoadByCustomer, prfLoadByRep, prfLoadCompare,
+    prfLoadPayments, prfFilterPayments, prfLoadReturns, prfFilterReturns,
 });

@@ -8,6 +8,9 @@ let _expUserRole = 'admin'; // افتراضياً admin (هيحدد من session
 let _expList = [];         // آخر قائمة مصروفات محمّلة — للطباعة (expPrintVoucher)
 let _expModalCategories = []; // بنود المصروفات المحمّلة لمودال "تسجيل مصروف جديد" — لخانة البحث
 let _expRepById = {};      // created_by => اسم المندوب، لو المصروف مسجّل من تطبيق سلطانو
+let _expCatsCategories = []; // بنود المصروفات — محفوظة عشان expCatsApplyRange تقدر تعيد التجميع لفترة تانية (بند 11)
+let _expCatsFrom = '';     // بداية الفترة المعروضة فى "دليل بنود المصروفات" — افتراضي أول الشهر الحالي
+let _expCatsTo = '';       // نهاية نفس الفترة — افتراضي النهاردة
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -70,6 +73,13 @@ async function renderExpenses(container) {
         catUsage[e.category_id] = (catUsage[e.category_id] || 0) + (e.amount || 0);
     });
     const monthTotal = monthExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+
+    // ★ بند 11 — دليل بنود المصروفات بقى بيقبل فترة تاريخ اختيارية بدل ما يفضل
+    //   مقفول على الشهر الحالي بس. الافتراضي لسه أول الشهر → النهاردة (نفس
+    //   السلوك القديم بالظبط)، والمستخدم يقدر يوسّع/يضيّق الفترة من الشاشة.
+    _expCatsCategories = categories;
+    _expCatsFrom = _expMonthStart();
+    _expCatsTo = _expToday();
 
     const total = expenses.reduce((s, e) => s + (e.amount || 0), 0);
     _expList = expenses;
@@ -171,11 +181,18 @@ function _expGlobalLimitCardHTML(monthTotal) {
 
 function _expCatsPanelHTML(categories, catUsage) {
     if (!categories.length) return `<div class="empty-state"><span>🗂️</span>لا توجد بنود مسجّلة.</div>`;
+    const isCurrentMonth = _expCatsFrom === _expMonthStart() && _expCatsTo === _expToday();
     return `
     <div class="mod-table-wrap">
         <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0">
             <div style="font-size:14px;font-weight:800;color:#0F172A">دليل بنود المصروفات والحدود الشهرية</div>
-            <div style="font-size:12px;color:#64748B;margin-top:4px">عدّل الحد الشهري لكل بند — الاستهلاك يُحتسب من مصروفات الشهر الحالي</div>
+            <div style="font-size:12px;color:#64748B;margin-top:4px">عدّل الحد الشهري لكل بند — واختَر أي فترة عشان تشوف كشف حساب المصروفات بالبند فيها</div>
+            <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:12px 0 0">
+                <div><label class="ob-label">من تاريخ</label><input type="date" id="expCatsFrom" class="ob-input" style="margin:0" value="${_expCatsFrom}"></div>
+                <div><label class="ob-label">إلى تاريخ</label><input type="date" id="expCatsTo" class="ob-input" style="margin:0" value="${_expCatsTo}"></div>
+                <button class="ob-add-btn" onclick="expCatsApplyRange()">🔍 تطبيق</button>
+                ${!isCurrentMonth ? `<span style="font-size:11px;color:#D97706;align-self:center">⚠️ الأرقام دلوقتي لفترة غير الشهر الحالي — نسبة الحد الشهري تقريبية للمقارنة بس</span>` : ''}
+            </div>
             <div class="mod-form-group" style="margin:12px 0 0;max-width:320px">
                 <input type="text" id="expCatSearch" class="mod-form-input" placeholder="🔍 بحث عن بند بالاسم..." oninput="expFilterCatItems(this.value)">
             </div>
@@ -209,6 +226,27 @@ function _expCatsPanelHTML(categories, catUsage) {
         </div>
     </div>`;
 }
+
+// إعادة تجميع "دليل بنود المصروفات" لفترة تانية غير الشهر الحالي (بند 11)
+window.expCatsApplyRange = async function () {
+    const from = document.getElementById('expCatsFrom')?.value || _expMonthStart();
+    const to = document.getElementById('expCatsTo')?.value || _expToday();
+    _expCatsFrom = from; _expCatsTo = to;
+
+    const panel = document.getElementById('expPanelCats');
+    if (!panel) return;
+    panel.innerHTML = '<div class="empty-state"><span>⏳</span>جاري التجميع...</div>';
+    try {
+        const { data, error } = await sb.from('expenses').select('category_id, amount')
+            .eq('status', 'confirmed').gte('expense_date', from).lte('expense_date', to);
+        if (error) throw error;
+        const catUsage = {};
+        (data || []).forEach(e => { catUsage[e.category_id] = (catUsage[e.category_id] || 0) + (e.amount || 0); });
+        panel.innerHTML = _expCatsPanelHTML(_expCatsCategories, catUsage);
+    } catch (err) {
+        panel.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+    }
+};
 
 // فلترة بنود المصروفات بالاسم (client-side بحت — بدون أي استعلام جديد لـ Supabase)
 window.expFilterCatItems = function (val) {
