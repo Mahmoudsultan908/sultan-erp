@@ -81,7 +81,10 @@ async function renderExpenses(container) {
     _expCatsFrom = _expMonthStart();
     _expCatsTo = _expToday();
 
-    const total = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+    // ★ إجمالي المصروفات وعدد العمليات — بيستثنوا الملغاة عشان مايفضلوش
+    //   محسوبين ضمن الإنفاق الفعلي بعد الإلغاء (نفس منطق فلترة monthTotal فوق)
+    const activeExpenses = expenses.filter(e => e.status !== 'cancelled');
+    const total = activeExpenses.reduce((s, e) => s + (e.amount || 0), 0);
     _expList = expenses;
 
     // مصروفات اتسجّلت محلياً ولسه ماتزامنتش
@@ -118,7 +121,7 @@ async function renderExpenses(container) {
             <div class="mod-grid">
                 <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">💸</div><div class="mod-card-val">${_expFmt(total)}</div><div class="mod-card-lbl">إجمالي المصروفات</div></div>
                 <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">📅</div><div class="mod-card-val">${_expFmt(monthTotal)}</div><div class="mod-card-lbl">مصروفات هذا الشهر</div></div>
-                <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">📊</div><div class="mod-card-val">${expenses.length}</div><div class="mod-card-lbl">عملية منفذة</div></div>
+                <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">📊</div><div class="mod-card-val">${activeExpenses.length}</div><div class="mod-card-lbl">عملية منفذة</div></div>
             </div>
 
             ${_expGlobalLimitCardHTML(monthTotal)}
@@ -150,8 +153,12 @@ function _expMonthExpTableHTML(expenses) {
                 <td style="text-align:left;font-weight:700;color:#DC2626">${_expFmt(e.amount)}</td>
                 <td>${e._queue
                     ? (e.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
+                    : e.status === 'cancelled' ? '<span style="color:#94A3B8;font-weight:600">🚫 ملغي</span>'
                     : '<span style="color:#059669;font-weight:600">✅ مؤكد</span>'}</td>
-                <td>${e._queue ? '' : `<button class="cc-edit" onclick="expPrintVoucher('${e.id}')">🖨️</button>`}</td>
+                <td style="white-space:nowrap">${e._queue ? '' : `
+                    <button class="cc-edit" onclick="expPrintVoucher('${e.id}')">🖨️</button>
+                    ${e.status === 'confirmed' ? `<button class="cc-edit" style="background:#FEE2E2;color:#991B1B" onclick="expCancelExpense('${e.id}')">❌ إلغاء</button>` : ''}
+                `}</td>
             </tr>`).join('')}
         </tbody></table>
     </div>`;
@@ -204,10 +211,11 @@ function _expCatsPanelHTML(categories, catUsage) {
                     const lim = parseFloat(c.monthly_limit) || 0;
                     const pct = lim > 0 ? (used / lim) * 100 : 0;
                     const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'safe';
-                    return `<div class="cat-card" data-cat-name="${(c.name || '').toLowerCase()}">
+                    const isActive = c.is_active !== false;
+                    return `<div class="cat-card" data-cat-name="${(c.name || '').toLowerCase()}" style="${isActive ? '' : 'opacity:.55'}">
                         <div class="cc-ic">📋</div>
                         <div class="cc-info">
-                            <div class="cc-name">${c.name}</div>
+                            <div class="cc-name">${c.name}${!isActive ? ' <span style="font-size:11px;color:#94A3B8;font-weight:600">(معطّل)</span>' : ''}</div>
                             <div class="cc-sub">${c.code || 'بدون كود'} · ${c.subtype || 'operating'} · حساب: ${c.account_code || '—'}</div>
                         </div>
                         <div class="cc-bar-wrap">
@@ -219,6 +227,7 @@ function _expCatsPanelHTML(categories, catUsage) {
                             <div class="lim">/ ${lim > 0 ? _expFmt(lim) : '∞'}</div>
                         </div>
                         <button class="cc-edit" onclick="expOpenLimit('${c.id}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})">✏️ الحد</button>
+                        <button class="cc-edit" style="${isActive ? 'background:#FEE2E2;color:#991B1B' : 'background:#D1FAE5;color:#059669'}" onclick="expToggleCategoryActive('${c.id}', ${isActive})">${isActive ? '⛔ تعطيل' : '✅ تفعيل'}</button>
                     </div>`;
                 }).join('')}
             </div>
@@ -424,6 +433,21 @@ window.expPrintVoucher = async function(id) {
         amount: e.amount,
         date: e.expense_date,
     });
+};
+
+// ★ إلغاء مصروف مؤكد — التعديل المباشر ممنوع تصميميًا فى قاعدة البيانات
+//   (trg_block_edit_expenses)، الإلغاء بس هو المسموح، وبيرجّع الفلوس
+//   للخزنة ويعكس القيد تلقائيًا (fn_expense_status_change). لتصحيح
+//   مصروف غلط: يتلغي القديم ويتسجّل واحد جديد صح.
+window.expCancelExpense = async function(id) {
+    const e = _expList.find(x => x.id === id);
+    if (!e) return;
+    if (!confirm(`تأكيد إلغاء مصروف "${e.description || ''}" بمبلغ ${_expFmt(e.amount)} ج.م؟\nهيترجع المبلغ ده تلقائيًا للخزنة ويتعكس فى الحسابات.`)) return;
+    try {
+        const { error } = await sb.from('expenses').update({ status: 'cancelled' }).eq('id', id);
+        if (error) throw error;
+        renderExpenses(document.getElementById('app-content'));
+    } catch (err) { alert('❌ خطأ أثناء الإلغاء: ' + err.message); }
 };
 
 // ════════════════════════════════════════════════════════════
@@ -676,6 +700,21 @@ window.expSaveLimit = async function(catId) {
         renderExpenses(document.getElementById('app-content'));
     } catch (err) { alert('خطأ: ' + err.message); }
     finally { btn.innerText = '💾 حفظ الحد'; btn.disabled = false; }
+};
+
+// ★ تفعيل/تعطيل بند — البند المعطّل بيختفي من اختيار مصروف/صرف جديد
+//   (expOpenAdd فى الملف ده + prlOpenPayout فى payroll.js، الاتنين
+//   بيفلتروا is_active=true) وبيتوقف عن دخوله فى حساب هدف المبيعات
+//   الشهري (dashboard.js بيفلتر نفس العمود) — البيانات التاريخية عليه
+//   تفضل زي ما هي.
+window.expToggleCategoryActive = async function(catId, currentlyActive) {
+    const next = !currentlyActive;
+    if (!confirm(next ? 'تفعيل البند ده تاني؟' : 'تعطيل البند ده؟ هيختفي من اختيار مصروف/صرف جديد، ومش هيدخل فى حساب هدف المبيعات الشهري.')) return;
+    try {
+        const { error } = await sb.from('expense_categories').update({ is_active: next }).eq('id', catId);
+        if (error) throw error;
+        renderExpenses(document.getElementById('app-content'));
+    } catch (err) { alert('❌ خطأ: ' + err.message); }
 };
 
 // ════════════════════════════════════════════════════════════
