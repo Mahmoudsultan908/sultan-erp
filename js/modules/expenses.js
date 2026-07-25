@@ -291,13 +291,13 @@ window.expOpenAdd = async function() {
     // جلب البنود (مع رجوع للكاش لو أوفلاين)
     let categories = [];
     try {
-        const { data, error } = await sb.from('expense_categories').select('*').order('name');
+        const { data, error } = await sb.from('expense_categories').select('*').eq('is_active', true).order('name');
         if (error || !data) throw error || new Error('no categories');
         categories = data;
     } catch {
         if (typeof dbGetCache === 'function') {
             const cached = await dbGetCache('expense_categories');
-            categories = cached?.data || [];
+            categories = (cached?.data || []).filter(c => c.is_active !== false);
         }
     }
     _expModalCategories = categories;

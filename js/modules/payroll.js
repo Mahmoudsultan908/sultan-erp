@@ -134,6 +134,9 @@ function prlOpenModal(x) {
                     <div class="mod-form-group"><label>تاريخ التعيين</label>
                         <input type="date" id="prlHireDate" class="mod-form-input" value="${x?.hire_date || ''}"></div>
                 </div>
+                <div class="mod-form-group"><label>أيام العمل بالشهر</label>
+                    <input type="number" id="prlWorkDays" class="mod-form-input" value="${x?.work_days_per_month ?? 30}" min="1" max="31" step="1">
+                    <div style="font-size:11px;color:#94A3B8;margin-top:3px">بيتحسب منها سعر يوم الغياب = الراتب الأساسي ÷ أيام العمل</div></div>
                 <div class="mod-form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                     <input type="checkbox" id="prlIsActive" ${x?.is_active !== false ? 'checked' : ''}> نشط
                 </label></div>
@@ -163,6 +166,7 @@ window.prlSave = async function () {
         hire_date: document.getElementById('prlHireDate').value || null,
         is_active: document.getElementById('prlIsActive').checked,
         notes: document.getElementById('prlNotes').value.trim() || null,
+        work_days_per_month: parseInt(document.getElementById('prlWorkDays').value, 10) || 30,
     };
 
     const btn = document.querySelector('#prlModal .mod-btn-primary');
@@ -220,15 +224,31 @@ async function prlRenderStatement() {
     const monthEnd = new Date(y, m, 0).toISOString().slice(0, 10);
 
     try {
-        const { data: rows, error } = await sb.from('expenses')
-            .select('id, amount, description, expense_date, status, expense_categories(name)')
-            .eq('employee_id', emp.id).eq('status', 'confirmed')
-            .gte('expense_date', monthStart).lte('expense_date', monthEnd)
-            .order('expense_date', { ascending: false });
-        if (error) throw error;
+        const [expRes, absRes, incRes] = await Promise.all([
+            sb.from('expenses')
+                .select('id, amount, description, expense_date, status, expense_categories(name)')
+                .eq('employee_id', emp.id).eq('status', 'confirmed')
+                .gte('expense_date', monthStart).lte('expense_date', monthEnd)
+                .order('expense_date', { ascending: false }),
+            sb.from('attendance_records').select('id, record_date, notes')
+                .eq('employee_id', emp.id).eq('status', 'absent')
+                .gte('record_date', monthStart).lte('record_date', monthEnd)
+                .order('record_date', { ascending: false }),
+            sb.from('employee_incentives').select('id, amount, reason, incentive_date')
+                .eq('employee_id', emp.id)
+                .gte('incentive_date', monthStart).lte('incentive_date', monthEnd)
+                .order('incentive_date', { ascending: false }),
+        ]);
+        if (expRes.error) throw expRes.error;
+        const rows = expRes.data || [];
+        const absentDays = absRes.data || [];
+        const incentives = incRes.data || [];
 
-        const taken = (rows || []).reduce((s, r) => s + (Number(r.amount) || 0), 0);
-        const remaining = (Number(emp.base_salary) || 0) - taken;
+        const taken = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        const dailyRate = (Number(emp.base_salary) || 0) / (Number(emp.work_days_per_month) || 30);
+        const absenceDeduction = absentDays.length * dailyRate;
+        const incentivesSum = incentives.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        const remaining = (Number(emp.base_salary) || 0) - taken - absenceDeduction + incentivesSum;
 
         body.innerHTML = `
             <div class="mod-form-group" style="max-width:200px">
@@ -245,18 +265,30 @@ async function prlRenderStatement() {
                     <div style="font-size:20px;font-weight:800;color:#DC2626">${prlFmt(taken)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">المتبقي</div>
+                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">خصم غياب (${absentDays.length} يوم × ${prlFmt(dailyRate)})</div>
+                    <div style="font-size:20px;font-weight:800;color:#DC2626">${prlFmt(absenceDeduction)}</div>
+                </div>
+                <div class="mod-card" style="padding:14px">
+                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">حوافز</div>
+                    <div style="font-size:20px;font-weight:800;color:#059669">${prlFmt(incentivesSum)}</div>
+                </div>
+                <div class="mod-card" style="padding:14px">
+                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">الباقي الصافي</div>
                     <div style="font-size:20px;font-weight:800;color:${remaining >= 0 ? '#059669' : '#DC2626'}">${prlFmt(remaining)}</div>
                 </div>
             </div>
-            <button class="mod-btn mod-btn-primary" style="width:100%;margin-bottom:16px" onclick="prlOpenPayout(${Math.round(remaining*100)/100})">💸 تسجيل صرف</button>
+            <div style="display:flex;gap:10px;margin-bottom:16px">
+                <button class="mod-btn mod-btn-primary" style="flex:1" onclick="prlOpenPayout(${Math.round(remaining*100)/100})">💸 تسجيل صرف</button>
+                <button class="mod-btn" style="flex:1;background:#F0FDF4;color:#059669" onclick="prlOpenIncentive()">➕ تسجيل حافز</button>
+            </div>
             <div id="prlPayoutForm"></div>
-            <div class="mod-table-wrap">
+            <div id="prlIncentiveForm"></div>
+            <div class="mod-table-wrap" style="margin-bottom:16px">
                 <table class="mod-table"><thead><tr>
                     <th>البند</th><th>البيان</th><th>التاريخ</th><th style="text-align:left">المبلغ</th>
                 </tr></thead>
                 <tbody>
-                    ${(rows || []).length === 0 ? `<tr><td colspan="4" class="empty-state"><span>📭</span>مفيش أي صرف مسجّل للموظف ده الشهر ده.</td></tr>` :
+                    ${rows.length === 0 ? `<tr><td colspan="4" class="empty-state"><span>📭</span>مفيش أي صرف مسجّل للموظف ده الشهر ده.</td></tr>` :
                     rows.map(r => `<tr>
                         <td>${r.expense_categories?.name || '—'}</td>
                         <td style="color:#64748B">${r.description || '—'}</td>
@@ -264,7 +296,26 @@ async function prlRenderStatement() {
                         <td style="text-align:left;font-weight:700">${prlFmt(r.amount)}</td>
                     </tr>`).join('')}
                 </tbody></table>
-            </div>`;
+            </div>
+            ${absentDays.length ? `
+            <div style="font-size:13px;font-weight:800;margin-bottom:8px">❌ أيام الغياب هذا الشهر</div>
+            <div class="mod-table-wrap" style="margin-bottom:16px">
+                <table class="mod-table"><thead><tr><th>التاريخ</th><th>ملاحظات</th></tr></thead>
+                <tbody>${absentDays.map(a => `<tr>
+                    <td style="font-size:12px">${new Date(a.record_date).toLocaleDateString('ar-EG')}</td>
+                    <td style="color:#64748B">${a.notes || '—'}</td>
+                </tr>`).join('')}</tbody></table>
+            </div>` : ''}
+            ${incentives.length ? `
+            <div style="font-size:13px;font-weight:800;margin-bottom:8px">⭐ الحوافز المسجّلة هذا الشهر</div>
+            <div class="mod-table-wrap">
+                <table class="mod-table"><thead><tr><th>السبب</th><th>التاريخ</th><th style="text-align:left">المبلغ</th></tr></thead>
+                <tbody>${incentives.map(i => `<tr>
+                    <td style="color:#64748B">${i.reason || '—'}</td>
+                    <td style="font-size:12px">${new Date(i.incentive_date).toLocaleDateString('ar-EG')}</td>
+                    <td style="text-align:left;font-weight:700;color:#059669">${prlFmt(i.amount)}</td>
+                </tr>`).join('')}</tbody></table>
+            </div>` : ''}`;
     } catch (err) {
         body.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
@@ -285,7 +336,7 @@ window.prlOpenPayout = async function (suggestedAmount) {
     if (!wrap) return;
 
     let categories = [], treasuries = [];
-    try { const { data } = await sb.from('expense_categories').select('*').order('name'); categories = data || []; } catch {}
+    try { const { data } = await sb.from('expense_categories').select('*').eq('is_active', true).order('name'); categories = data || []; } catch {}
     try { const { data } = await sb.from('treasuries').select('*').eq('is_active', true).order('is_default', { ascending: false }); treasuries = data || []; } catch {}
     _prlPayoutCategories = categories;
 
@@ -388,7 +439,50 @@ window.prlSavePayout = async function () {
     }
 };
 
+// ── إدخال حافز/بونص — سطر إيجابي مستقل عن المصروفات، بيدوي بالكامل ──
+window.prlOpenIncentive = function () {
+    const wrap = document.getElementById('prlIncentiveForm');
+    if (!wrap) return;
+    wrap.innerHTML = `
+    <div class="dash-card" style="padding:16px;margin-bottom:16px;background:#F0FDF4">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="mod-form-group"><label>المبلغ (ج.م) *</label>
+                <input type="number" id="prlIncentiveAmount" class="mod-form-input" min="0.01" step="0.01"></div>
+            <div class="mod-form-group"><label>التاريخ</label>
+                <input type="date" id="prlIncentiveDate" class="mod-form-input" value="${new Date().toISOString().slice(0,10)}"></div>
+        </div>
+        <div class="mod-form-group"><label>السبب</label>
+            <input type="text" id="prlIncentiveReason" class="mod-form-input" placeholder="مثال: تحصيل ممتاز الأسبوع ده"></div>
+        <div style="display:flex;gap:10px">
+            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('prlIncentiveForm').innerHTML=''">إلغاء</button>
+            <button class="mod-btn mod-btn-primary" style="background:#059669" onclick="prlSaveIncentive()">💾 تأكيد الحافز</button>
+        </div>
+    </div>`;
+};
+
+window.prlSaveIncentive = async function () {
+    const amount = parseFloat(document.getElementById('prlIncentiveAmount').value);
+    const reason = document.getElementById('prlIncentiveReason').value.trim() || null;
+    const incentive_date = document.getElementById('prlIncentiveDate').value || new Date().toISOString().slice(0, 10);
+    if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
+
+    const btn = document.querySelector('#prlIncentiveForm .mod-btn-primary');
+    btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
+    try {
+        const { error } = await sb.from('employee_incentives').insert({
+            employee_id: _prlStmtEmpId, amount, reason, incentive_date, created_by: currentUser?.id || null,
+        });
+        if (error) throw error;
+        document.getElementById('prlIncentiveForm').innerHTML = '';
+        await prlRenderStatement();
+    } catch (err) {
+        alert('❌ خطأ: ' + err.message);
+        btn.innerText = '💾 تأكيد الحافز'; btn.disabled = false;
+    }
+};
+
 Object.assign(window, {
     renderPayroll, prlOpenAdd, prlOpenEdit, prlSave, prlShowStatement, prlChangeMonth,
     prlOpenPayout, prlPayoutCatSearchInput, prlPickPayoutCat, prlPayoutCatACKey, prlPayoutCatACHover, prlSavePayout,
+    prlOpenIncentive, prlSaveIncentive,
 });

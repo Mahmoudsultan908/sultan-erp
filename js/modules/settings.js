@@ -52,6 +52,9 @@ async function renderSettings(container) {
                 <label class="ob-label" style="margin-top:14px">الهدف اليومي للمبيعات (ج.م)</label>
                 <input type="number" id="set-daily-sales-target" class="ob-input" style="max-width:250px" value="${get('daily_sales_target','0')}" min="0" step="100">
                 <p style="font-size:12px;color:#94A3B8;margin-top:6px">بيتعرض كخط مرجعي على رسم "اتجاه المبيعات" فى لوحة التحكم — سيبه صفر لو مش عايز تفعّله.</p>
+                <label class="ob-label" style="margin-top:14px">هامش الربح المستهدف شهريًا (ج.م)</label>
+                <input type="number" id="set-monthly-target-margin" class="ob-input" style="max-width:250px" value="${get('monthly_target_profit_margin','0')}" min="0" step="100">
+                <p style="font-size:12px;color:#94A3B8;margin-top:6px">هدف المبيعات الشهري فى لوحة التحكم = (رواتب الموظفين النشطين + بنود المصروفات التشغيلية اللي ليها حد شهري) + الرقم ده. سيبه صفر لو مش عايز تفعّله.</p>
             </div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
@@ -85,6 +88,7 @@ async function renderSettings(container) {
                 { key: 'vat_rate', value: document.getElementById('set-vat-rate').value },
                 { key: 'system_start_date', value: document.getElementById('set-system-start').value },
                 { key: 'daily_sales_target', value: document.getElementById('set-daily-sales-target').value },
+                { key: 'monthly_target_profit_margin', value: document.getElementById('set-monthly-target-margin').value },
                 { key: 'sultanoo_min_order_amount', value: document.getElementById('set-sultano-min-order').value },
             ];
             try {
@@ -128,7 +132,7 @@ const SETT_BACKUP_TABLES = [
     'deferred_rebate_settlement_items','financial_events','inventory_transfers',
     'inventory_transfer_items','stock_transfers','stock_transfer_items','sales_reps',
     'treasuries','treasury_transfers','balance_transfers','employees','employee_evaluations',
-    'archive_documents','customer_interactions','role_permissions','van_stock',
+    'archive_documents','customer_interactions','role_permissions','van_stock','employee_incentives',
     'customer_orders','customer_order_items','banners','attendance_records',
     'system_settings','app_settings',
 ];

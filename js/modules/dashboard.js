@@ -66,6 +66,9 @@ async function renderDashboard(container) {
             { data: trendSales },
             { data: lastBackupRow },
             { data: dailyTargetRow },
+            { data: activeEmployees },
+            { data: expenseCatsForTarget },
+            { data: monthlyMarginRow },
         ] = await Promise.all([
             sb.rpc('get_cash_balance'),
             sb.from('sales').select('total').eq('status','confirmed').gte('created_at', today),
@@ -105,6 +108,9 @@ async function renderDashboard(container) {
             sb.from('sales').select('total,created_at').eq('status','confirmed').gte('created_at', trendStart),
             sb.from('app_settings').select('value').eq('key','last_backup_at').maybeSingle(),
             sb.from('app_settings').select('value').eq('key','daily_sales_target').maybeSingle(),
+            sb.from('employees').select('base_salary').eq('is_active', true),
+            sb.from('expense_categories').select('monthly_limit').eq('is_active', true),
+            sb.from('app_settings').select('value').eq('key','monthly_target_profit_margin').maybeSingle(),
         ]);
 
         // ── تجميع مبيعات آخر 30 يوم يوميًا (تعبئة الأيام الفاضية بصفر) ──
@@ -142,6 +148,16 @@ async function renderDashboard(container) {
         const monthCOGS = (saleItemsCostMonth || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0)
             - (returnItemsCostMonth || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0);
         const monthProfit = netMonthSales - monthCOGS - monthExpenses;
+
+        // ── هدف المبيعات الشهري = (رواتب الموظفين النشطين + بنود التشغيل بحد شهري) + هامش ربح مستهدف ──
+        const expectedSalaries = (activeEmployees || []).reduce((s, e) => s + (Number(e.base_salary) || 0), 0);
+        const expectedOpEx = (expenseCatsForTarget || []).reduce((s, c) => s + (Number(c.monthly_limit) || 0), 0);
+        let monthlyTargetMargin = 0;
+        try { monthlyTargetMargin = Number(JSON.parse(monthlyMarginRow?.value ?? '0')) || 0; }
+        catch { monthlyTargetMargin = Number(monthlyMarginRow?.value) || 0; }
+        const monthlySalesTarget = monthlyTargetMargin > 0 ? (expectedSalaries + expectedOpEx + monthlyTargetMargin) : 0;
+        const targetPct = monthlySalesTarget > 0 ? Math.round(netMonthSales / monthlySalesTarget * 100) : 0;
+        const targetColor = targetPct >= 100 ? '#059669' : targetPct >= 60 ? '#D97706' : '#DC2626';
 
         // ── تقرير الجرد اليومي (صافي المركز المالي) ──────────────────
         // قيمة المخزون (مخازن + عربيات المندوبين) + رصيد الخزنة + مديونية العملاء - مستحقات الموردين
@@ -333,6 +349,14 @@ async function renderDashboard(container) {
                         <span>هامش الربح</span>
                         <span>${netMonthSales > 0 ? Math.round(monthProfit / netMonthSales * 100) : 0}%</span>
                     </div>
+                    ${monthlySalesTarget > 0 ? `
+                    <div class="dash-summary-divider"></div>
+                    <div class="dash-summary-row"><span>🎯 هدف المبيعات الشهري</span><span>${fmt(monthlySalesTarget)}</span></div>
+                    <div class="dash-limit-bar" style="margin:4px 0"><div class="dash-limit-fill" style="width:${Math.min(targetPct,100)}%;background:${targetColor}"></div></div>
+                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8">
+                        <span>${fmt(netMonthSales)} من ${fmt(monthlySalesTarget)}</span>
+                        <span style="color:${targetColor};font-weight:700">${targetPct}%</span>
+                    </div>` : ''}
                 </div>
             </div>
         </div>`;
