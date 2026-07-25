@@ -253,7 +253,7 @@ async function renderDashboard(container) {
                 </div>
             </div>
 
-            <!-- اتجاه المبيعات + تقرير الجرد اليومي: جنب بعض فى نفس الصف -->
+            <!-- اتجاه المبيعات + هدف المبيعات الشهري: جنب بعض فى بداية الصفحة -->
             <div class="dash-row">
                 <div class="dash-card" style="flex:1">
                     <div class="dash-card-header">
@@ -266,6 +266,49 @@ async function renderDashboard(container) {
                     <div id="dashTrendChartWrap">${dashRenderTrendSVG(30)}</div>
                 </div>
 
+                <div class="dash-card" style="flex:1">
+                    <div class="dash-card-header"><span>🎯 هدف المبيعات الشهري</span></div>
+                    ${monthlySalesTarget > 0 ? `
+                    <div class="dash-summary-row dash-summary-total">
+                        <span>المحقق حتى الآن</span>
+                        <span style="color:${targetColor}">${fmt(netMonthSales)} <span style="font-size:11px;color:#94A3B8;font-weight:400">من ${fmt(monthlySalesTarget)}</span></span>
+                    </div>
+                    <div class="dash-limit-bar" style="margin:6px 0"><div class="dash-limit-fill" style="width:${Math.min(targetPct,100)}%;background:${targetColor}"></div></div>
+                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8;margin-bottom:8px">
+                        <span>نسبة التحقيق</span>
+                        <span style="color:${targetColor};font-weight:700">${targetPct}%</span>
+                    </div>
+                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8">
+                        <span>المطلوب بيعه يوميًا (÷ ${DASH_TARGET_WORKDAYS} يوم عمل)</span>
+                        <span>${fmt(dailySalesTargetCalc)}</span>
+                    </div>
+                    <div class="dash-summary-divider"></div>
+                    <div style="font-size:11px;color:#94A3B8;margin-bottom:6px">📐 إزاي اتحسب الرقم ده؟</div>
+                    <div class="dash-summary-row" style="font-size:11px;color:#64748B">
+                        <span>المصروفات المتوقعة (رواتب + بنود تشغيل)</span>
+                        <span>${fmt(expectedSalaries + expectedOpEx)}</span>
+                    </div>
+                    <div class="dash-summary-row" style="font-size:11px;color:#64748B">
+                        <span>+ هامش الربح المستهدف (من الإعدادات)</span>
+                        <span>${fmt(monthlyTargetMargin)}</span>
+                    </div>
+                    <div class="dash-summary-row" style="font-size:11px;color:#64748B">
+                        <span>÷ متوسط هامش الربح الفعلي (آخر 90 يوم)</span>
+                        <span>${Math.round(avgMarginPct * 100)}%</span>
+                    </div>
+                    <div class="dash-summary-row" style="font-size:11px;color:#0F172A;font-weight:700;margin-top:2px">
+                        <span>= الهدف الشهري</span>
+                        <span>${fmt(monthlySalesTarget)}</span>
+                    </div>
+                    <div style="font-size:10.5px;color:#94A3B8;margin-top:6px;line-height:1.5">
+                        يعني: عشان تغطي مصروفاتك المتوقعة وتحقق الهامش اللي حددته، بهامش الربح الحقيقي اللي بتبيع بيه فعلاً، لازم تبيع بالرقم ده الشهر ده.
+                    </div>` : `
+                    <p class="dash-empty">حدّد "هامش الربح المستهدف شهريًا" من ⚙️ الإعدادات العامة عشان يظهر هدف المبيعات هنا.</p>`}
+                </div>
+            </div>
+
+            <!-- تقرير الجرد اليومي — نزل هنا تحت الصف الأول -->
+            <div class="dash-row">
                 <div class="dash-card" style="flex:1">
                     <div class="dash-card-header"><span>📋 تقرير الجرد اليومي — صافي المركز المالي</span></div>
                     <div class="dash-summary-row"><span>📦 قيمة البضاعة (المخازن)</span><span class="dash-s-green">${fmt(stockValue)}</span></div>
@@ -370,22 +413,6 @@ async function renderDashboard(container) {
                         <span>هامش الربح</span>
                         <span>${netMonthSales > 0 ? Math.round(monthProfit / netMonthSales * 100) : 0}%</span>
                     </div>
-                    ${monthlySalesTarget > 0 ? `
-                    <div class="dash-summary-divider"></div>
-                    <div class="dash-summary-row"><span>🎯 هدف المبيعات الشهري</span><span>${fmt(monthlySalesTarget)}</span></div>
-                    <div class="dash-limit-bar" style="margin:4px 0"><div class="dash-limit-fill" style="width:${Math.min(targetPct,100)}%;background:${targetColor}"></div></div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8">
-                        <span>${fmt(netMonthSales)} من ${fmt(monthlySalesTarget)}</span>
-                        <span style="color:${targetColor};font-weight:700">${targetPct}%</span>
-                    </div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8">
-                        <span>المطلوب بيعه يوميًا (÷ ${DASH_TARGET_WORKDAYS} يوم عمل)</span>
-                        <span>${fmt(dailySalesTargetCalc)}</span>
-                    </div>
-                    <div class="dash-summary-row" style="font-size:10.5px;color:#94A3B8">
-                        <span>متوسط هامش الربح الفعلي (آخر 90 يوم)</span>
-                        <span>${Math.round(avgMarginPct * 100)}%</span>
-                    </div>` : ''}
                 </div>
             </div>
         </div>`;
