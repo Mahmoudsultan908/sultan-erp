@@ -1,84 +1,21 @@
 /* ════════════════════════════════════════════════════════════
-   الموردين + كشف الحساب — suppliers
-   يعرض قائمة الموردين + كشف حساب لكل مورد
+   كشف حساب المورد — suppliers
+   قائمة الموردين نفسها اندمجت في master-data.js (بند 4، 2026-07-25) —
+   الملف ده بقى مسؤول بس عن مودال كشف الحساب وكل تبويباته، اللي
+   بيتفتح من زرار "📄 كشف حساب" فى شاشة "الموردين" الموحّدة.
    مصادر الحركة: purchases (آجل/نقدي) + supplier_payments (دفعات)
    ════════════════════════════════════════════════════════════ */
 
-let _supList = [];
 let _supStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
 let _supStmtItems = []; // تبويب الأصناف — إجمالي مشتريات من كل صنف
 let _supStmtTab = 'moves'; // 'moves' | 'items'
 let _supStmtLegacyDiff = 0;
 
 // ════════════════════════════════════════════════════════════
-// 1) التقديم الرئيسي — قائمة الموردين
-// ════════════════════════════════════════════════════════════
-async function renderSuppliers(c) {
-    c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل الموردين...</div>';
-    try {
-        const { data: suppliers } = await sb.from('suppliers').select('*').order('balance', { ascending: false });
-        _supList = suppliers || [];
-
-        const totalDebt = _supList.reduce((s,s2)=>s+(Number(s2.balance)>0?Number(s2.balance):0),0);
-        const debtors = _supList.filter(s => Number(s.balance) > 0);
-
-        c.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-                <div><h2 style="font-size:22px;font-weight:800">🏭 الموردين</h2>
-                <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة الموردين وكشوف الحسابات</p></div>
-            </div>
-
-            <div class="mod-grid">
-                <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">🏭</div><div class="mod-card-val">${_supList.length}</div><div class="mod-card-lbl">إجمالي الموردين</div></div>
-                <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${supFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين (${debtors.length})</div></div>
-                <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">✅</div><div class="mod-card-val">${_supList.filter(s=>Number(s.balance)<=0).length}</div><div class="mod-card-lbl">موردين بلا مستحقات</div></div>
-            </div>
-
-            <div class="mod-table-wrap" style="margin-top:16px">
-                <table class="mod-table"><thead><tr>
-                    <th>المورد</th><th>الهاتف</th>
-                    <th style="text-align:left">المستحق</th>
-                    <th style="text-align:center">إجراءات</th>
-                </tr></thead>
-                <tbody>
-                    ${_supList.length === 0 ? `<tr><td colspan="4" class="empty-state"><span>🏭</span>لا يوجد موردين.</td></tr>` :
-                    _supList.map(s => {
-                        const bal = Number(s.balance)||0;
-                        const balColor = bal > 0 ? '#DC2626' : '#059669';
-                        return `<tr>
-                            <td>
-                                <div style="display:flex;align-items:center;gap:8px">
-                                    <div style="width:32px;height:32px;border-radius:8px;background:#FEF3C7;display:flex;align-items:center;justify-content:center;font-size:14px">🏭</div>
-                                    <div><div style="font-weight:600">${s.name}</div>${s.code?`<div style="font-size:11px;color:#94A3B8">${s.code}</div>`:''}</div>
-                                </div>
-                            </td>
-                            <td dir="ltr" style="text-align:right;color:#64748B">${s.phone||'—'}</td>
-                            <td style="text-align:left;font-weight:700;color:${balColor}">${supFmt(Math.abs(bal))}</td>
-                            <td style="text-align:center">
-                                <button class="cc-edit" onclick="supShowStatement('${s.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
-                            </td>
-                        </tr>`;
-                    }).join('')}
-                </tbody></table>
-            </div>
-        `;
-
-        // ★ جاي من بحث Ctrl+K (app.js) — افتح كشف حساب نفس المورد تلقائياً
-        if (window._pendingSupplierStatement) {
-            const pendId = window._pendingSupplierStatement;
-            window._pendingSupplierStatement = null;
-            supShowStatement(pendId);
-        }
-    } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
-    }
-}
-
-// ════════════════════════════════════════════════════════════
-// 2) كشف حساب مورد (مودال)
+// كشف حساب مورد (مودال)
 // ════════════════════════════════════════════════════════════
 window.supShowStatement = async function(supplierId) {
-    const sup = _supList.find(s=>s.id===supplierId);
+    const { data: sup } = await sb.from('suppliers').select('*').eq('id', supplierId).single();
     if (!sup) return;
 
     const modal = document.createElement('div');

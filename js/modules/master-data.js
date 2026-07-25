@@ -2,7 +2,10 @@
    إدارة البيانات الأساسية — العملاء والموردين
    master-data.js
    يصدّر: renderCustomersManage(container), renderSuppliersManage(container)
-   (منفصل عمداً عن customers.js/suppliers.js اللي بيعرضوا كشف الحساب)
+   ★ بند 4 (2026-07-25): القائمة دي بقت الصفحة الوحيدة لكل عميل/مورد —
+   فيها التعديل وزرار "📄 كشف حساب" مع بعض (بدل تبويب منفصل كان بيفتح
+   نفس القائمة تقريباً تاني). كشف الحساب نفسه لسه مودال من customers.js/
+   suppliers.js، بس بيتفتح من هنا مباشرة.
    ════════════════════════════════════════════════════════════ */
 
 function mdFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -15,25 +18,34 @@ let _mgCustRegions = [];
 let _mgCustClassifications = [];
 let _mgCustGroups = [];
 let _mgCustReps = [];
+let _mgCustLastIntMap = {};
 let _mgCustSearch = '';
 let _mgCustEditingId = null;
 
 async function renderCustomersManage(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء...</div>';
     try {
-        const [{ data: customers }, { data: regions }, { data: classifications }, { data: groups }, repsResult] = await Promise.all([
+        const [{ data: customers }, { data: regions }, { data: classifications }, { data: groups }, repsResult, interactionsResult] = await Promise.all([
             sb.from('customers').select('*').order('balance', { ascending: false }),
             sb.from('customer_regions').select('*').order('name'),
             sb.from('customer_classifications').select('*').order('name'),
             sb.from('customer_groups').select('*, price_levels(name)').order('name'),
             // اختياري — لو جدول sales_reps لسه ما اتعملش، نتجاهل الخطأ بهدوء (زي sales.js بالظبط)
             sb.from('sales_reps').select('id,name').eq('is_active', true).order('name').then(r => r, () => ({ data: [] })),
+            // اختياري كمان — لو جدول customer_interactions لسه ما اتعملش
+            sb.from('customer_interactions').select('customer_id, interaction_date').then(r => r, () => ({ data: [] })),
         ]);
         _mgCustList = customers || [];
         _mgCustRegions = regions || [];
         _mgCustClassifications = classifications || [];
         _mgCustGroups = groups || [];
         _mgCustReps = repsResult?.data || [];
+        _mgCustLastIntMap = {};
+        (interactionsResult?.data || []).forEach(x => {
+            if (!_mgCustLastIntMap[x.customer_id] || x.interaction_date > _mgCustLastIntMap[x.customer_id]) {
+                _mgCustLastIntMap[x.customer_id] = x.interaction_date;
+            }
+        });
         custRenderPage(c);
 
         // ★ جاي من زرار "تعديل بيانات العميل" في كشف الحساب (customers.js) —
@@ -43,21 +55,38 @@ async function renderCustomersManage(c) {
             window._pendingCustomerEdit = null;
             custOpenEdit(pendId);
         }
+        // ★ جاي من بحث Ctrl+K أو من مكان تاني بيطلب فتح كشف حساب مباشرة (بند 4)
+        if (window._pendingCustomerStatement) {
+            const pendId = window._pendingCustomerStatement;
+            window._pendingCustomerStatement = null;
+            custShowStatement(pendId);
+        }
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
 function custRenderPage(c) {
+    const totalDebt = _mgCustList.reduce((s,x)=>s+(Number(x.balance)>0?Number(x.balance):0),0);
+    const totalCredit = _mgCustList.reduce((s,x)=>s+(Number(x.balance)<0?Math.abs(Number(x.balance)):0),0);
+    const debtors = _mgCustList.filter(x => Number(x.balance) > 0);
+
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
-            <div><h2 style="font-size:22px;font-weight:800">👥 إدارة العملاء</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إضافة وتعديل بيانات العملاء</p></div>
+            <div><h2 style="font-size:22px;font-weight:800">👥 العملاء</h2>
+            <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة بيانات العملاء وكشوف حساباتهم</p></div>
             <div style="display:flex;gap:8px">
                 <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="mdOpenLookupManager('customer')">⚙️ المناطق/التصنيفات/المجموعات</button>
                 <button class="mod-btn mod-btn-primary" onclick="custOpenAdd()">+ إضافة عميل</button>
             </div>
         </div>
+
+        <div class="mod-grid" style="margin-bottom:16px">
+            <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${_mgCustList.length}</div><div class="mod-card-lbl">إجمالي العملاء</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💵</div><div class="mod-card-val">${mdFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
+        </div>
+
         <div class="mod-card" style="margin-bottom:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
             <div style="flex:1;min-width:200px">
                 <input type="text" id="custMgSearch" class="mod-form-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="custMgSearch(this.value)">
@@ -71,8 +100,8 @@ function custRenderPage(c) {
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>التصنيف</th><th>المجموعة</th><th>المندوب</th>
-                <th style="text-align:left">الحد الائتماني</th><th style="text-align:left">الرصيد</th><th></th>
+                <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>التصنيف</th><th>المجموعة</th><th>المندوب</th><th>آخر تفاعل</th>
+                <th style="text-align:left">الحد الائتماني</th><th style="text-align:left">الرصيد</th><th style="text-align:center">إجراءات</th>
             </tr></thead><tbody id="custMgTbody"></tbody></table>
         </div>`;
     custRenderRows();
@@ -89,8 +118,8 @@ function custRenderRows() {
     }
     if (!rows.length) {
         tbody.innerHTML = _mgCustList.length
-            ? `<tr><td colspan="9" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين للبحث/الفلتر الحالي</td></tr>`
-            : `<tr><td colspan="9" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`;
+            ? `<tr><td colspan="10" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين للبحث/الفلتر الحالي</td></tr>`
+            : `<tr><td colspan="10" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`;
         return;
     }
 
@@ -101,6 +130,7 @@ function custRenderRows() {
         const rep = _mgCustReps.find(r=>r.id===x.default_rep_id);
         const bal = Number(x.balance)||0;
         const srcBadge = typeof custSourceBadge === 'function' ? custSourceBadge(x.source) : '';
+        const lastInt = _mgCustLastIntMap[x.id];
         return `<tr>
             <td><strong>${x.name}</strong>${srcBadge ? `<div style="margin-top:2px">${srcBadge}</div>` : ''}</td>
             <td dir="ltr" style="text-align:right">${x.phone||'—'}</td>
@@ -108,9 +138,14 @@ function custRenderRows() {
             <td>${cls?.name||'—'}</td>
             <td>${grp?.name||'—'}</td>
             <td>${rep?`🚗 ${rep.name}`:'—'}</td>
+            <td style="font-size:12px;color:#94A3B8">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
             <td style="text-align:left">${x.credit_limit>0?mdFmt(x.credit_limit):'—'}</td>
             <td style="text-align:left;font-weight:700;color:${bal>0?'#DC2626':'#059669'}">${mdFmt(bal)}</td>
-            <td><button class="cc-edit" onclick="custOpenEdit('${x.id}')">✏️</button></td>
+            <td style="text-align:center;white-space:nowrap">
+                <button class="cc-edit" onclick="custOpenEdit('${x.id}')">✏️</button>
+                <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="custShowStatement('${x.id}')">📄 كشف حساب</button>
+                ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenAdd('${x.id}','${(x.name||'').replace(/'/g,"\\'")}')" title="تسجيل تفاعل سريع">📞</button>` : ''}
+            </td>
         </tr>`;
     }).join('');
 }
@@ -273,24 +308,40 @@ async function renderSuppliersManage(c) {
             window._pendingSupplierEdit = null;
             suppOpenEdit(pendId);
         }
+        // ★ جاي من بحث Ctrl+K أو من مكان تاني بيطلب فتح كشف حساب مباشرة (بند 4)
+        if (window._pendingSupplierStatement) {
+            const pendId = window._pendingSupplierStatement;
+            window._pendingSupplierStatement = null;
+            supShowStatement(pendId);
+        }
     } catch (err) {
         c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
 function suppRenderPage(c) {
+    const totalDebt = _mgSuppList.reduce((s,x)=>s+(Number(x.balance)>0?Number(x.balance):0),0);
+    const debtFree = _mgSuppList.filter(x => Number(x.balance) <= 0).length;
+
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
-            <div><h2 style="font-size:22px;font-weight:800">🏭 إدارة الموردين</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إضافة وتعديل بيانات الموردين</p></div>
+            <div><h2 style="font-size:22px;font-weight:800">🏭 الموردين</h2>
+            <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة بيانات الموردين وكشوف حساباتهم</p></div>
             <button class="mod-btn mod-btn-primary" onclick="suppOpenAdd()">+ إضافة مورد</button>
         </div>
+
+        <div class="mod-grid" style="margin-bottom:16px">
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">🏭</div><div class="mod-card-val">${_mgSuppList.length}</div><div class="mod-card-lbl">إجمالي الموردين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">✅</div><div class="mod-card-val">${debtFree}</div><div class="mod-card-lbl">موردين بلا مستحقات</div></div>
+        </div>
+
         <div class="mod-card" style="margin-bottom:16px">
             <input type="text" id="suppMgSearch" class="mod-form-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="suppMgSearch(this.value)">
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>المورد</th><th>الهاتف</th><th>الكود</th><th style="text-align:left">المستحق عليه لنا</th><th></th>
+                <th>المورد</th><th>الهاتف</th><th>الكود</th><th style="text-align:left">المستحق عليه لنا</th><th style="text-align:center">إجراءات</th>
             </tr></thead><tbody id="suppMgTbody"></tbody></table>
         </div>`;
     suppRenderRows();
@@ -307,7 +358,10 @@ function suppRenderRows() {
         <td dir="ltr" style="text-align:right">${x.phone||'—'}</td>
         <td>${x.code||'—'}</td>
         <td style="text-align:left;font-weight:700;color:${Number(x.balance)>0?'#DC2626':'#059669'}">${mdFmt(x.balance)}</td>
-        <td><button class="cc-edit" onclick="suppOpenEdit('${x.id}')">✏️</button></td>
+        <td style="text-align:center;white-space:nowrap">
+            <button class="cc-edit" onclick="suppOpenEdit('${x.id}')">✏️</button>
+            <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="supShowStatement('${x.id}')">📄 كشف حساب</button>
+        </td>
     </tr>`).join('');
 }
 window.suppMgSearch = function(v) { _mgSuppSearch = v; suppRenderRows(); };

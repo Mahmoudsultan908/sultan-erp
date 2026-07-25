@@ -1,104 +1,22 @@
 /* ════════════════════════════════════════════════════════════
-   العملاء + كشف الحساب — customers
-   يعرض قائمة العملاء + تفاصيل/كشف حساب لكل عميل
+   كشف حساب العميل — customers
+   قائمة العملاء نفسها اندمجت في master-data.js (بند 4، 2026-07-25) —
+   الملف ده بقى مسؤول بس عن مودال كشف الحساب وكل تبويباته، اللي
+   بيتفتح من زرار "📄 كشف حساب" فى شاشة "العملاء" الموحّدة.
    مصادر الحركة: sales (آجل/نقدي) + customer_payments (تحصيلات)
    ════════════════════════════════════════════════════════════ */
 
-let _custList = [];
-let _custRegionMap = {};
-let _custLastIntMap = {};
 let _custStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
 let _custStmtItems = []; // تبويب الأصناف — إجمالي مشتريات العميل من كل صنف
 let _custStmtProfit = []; // تبويب المكسب الشهري — آخر 12 شهر
 let _custStmtTab = 'moves'; // 'moves' | 'items' | 'profit'
 let _custStmtLegacyDiff = 0;
-let _custListSearch = ''; // بحث بالاسم/الهاتف في تبويب "كشف حساب" — بيتطبق مع فلتر الرصيد مع بعض (AND)
 
 // ════════════════════════════════════════════════════════════
-// 1) التقديم الرئيسي — قائمة العملاء
-// ════════════════════════════════════════════════════════════
-async function renderCustomers(c) {
-    c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء...</div>';
-    try {
-        const [{ data: customers }, { data: regions }, interactionsResult] = await Promise.all([
-            sb.from('customers').select('*').order('balance', { ascending: false }),
-            sb.from('customer_regions').select('id,name'),
-            // اختياري — لو جدول customer_interactions لسه ما اتعملش، نتجاهل الخطأ بهدوء
-            sb.from('customer_interactions').select('customer_id, interaction_date').then(r => r, () => ({ data: [] })),
-        ]);
-        _custList = customers || [];
-        _custRegionMap = {};
-        (regions || []).forEach(r => { _custRegionMap[r.id] = r.name; });
-        // آخر تفاعل لكل عميل — أحدث interaction_date من customer_interactions
-        _custLastIntMap = {};
-        (interactionsResult?.data || []).forEach(x => {
-            if (!_custLastIntMap[x.customer_id] || x.interaction_date > _custLastIntMap[x.customer_id]) {
-                _custLastIntMap[x.customer_id] = x.interaction_date;
-            }
-        });
-
-        const totalDebt = _custList.reduce((s,c)=>s+(Number(c.balance)>0?Number(c.balance):0),0);
-        const totalCredit = _custList.reduce((s,c)=>s+(Number(c.balance)<0?Math.abs(Number(c.balance)):0),0);
-        const debtors = _custList.filter(c => Number(c.balance) > 0);
-
-        c.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-                <div><h2 style="font-size:22px;font-weight:800">👥 العملاء</h2>
-                <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة العملاء وكشوف الحسابات</p></div>
-            </div>
-
-            <div class="mod-grid">
-                <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${_custList.length}</div><div class="mod-card-lbl">إجمالي العملاء</div></div>
-                <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${custFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
-                <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💵</div><div class="mod-card-val">${custFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
-            </div>
-
-            <div class="dash-card" style="padding:14px;margin-top:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
-                <div style="flex:1;min-width:200px">
-                    <label class="ob-label">بحث</label>
-                    <input type="text" id="custListSearch" class="ob-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="custListSearchInput(this.value)">
-                </div>
-                <div style="min-width:130px">
-                    <label class="ob-label">فلتر الرصيد</label>
-                    <select id="custBalFilterOp" class="ob-input" style="margin:0">
-                        <option value="">الكل</option>
-                        <option value="gt">أكبر من</option>
-                        <option value="lt">أصغر من</option>
-                    </select>
-                </div>
-                <div style="min-width:130px">
-                    <input type="number" id="custBalFilterVal" class="ob-input" style="margin:0" placeholder="مبلغ..." dir="ltr">
-                </div>
-                <button class="ob-add-btn" onclick="custApplyBalanceFilter()">🔍 تطبيق</button>
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('custBalFilterOp').value='';document.getElementById('custBalFilterVal').value='';custApplyBalanceFilter()">الكل</button>
-            </div>
-
-            <div class="mod-table-wrap" style="margin-top:10px">
-                <table class="mod-table"><thead><tr>
-                    <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>آخر تفاعل</th>
-                    <th style="text-align:left">الرصيد</th>
-                    <th style="text-align:center">إجراءات</th>
-                </tr></thead>
-                <tbody id="custListTbody">${custListRowsHtml(_custList)}</tbody></table>
-            </div>
-        `;
-
-        // ★ جاي من بحث Ctrl+K (app.js) — افتح كشف حساب نفس العميل تلقائياً
-        if (window._pendingCustomerStatement) {
-            const pendId = window._pendingCustomerStatement;
-            window._pendingCustomerStatement = null;
-            custShowStatement(pendId);
-        }
-    } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
-    }
-}
-
-// ════════════════════════════════════════════════════════════
-// 2) كشف حساب عميل (مودال)
+// كشف حساب عميل (مودال)
 // ════════════════════════════════════════════════════════════
 window.custShowStatement = async function(customerId) {
-    const cust = _custList.find(c=>c.id===customerId);
+    const { data: cust } = await sb.from('customers').select('*').eq('id', customerId).single();
     if (!cust) return;
 
     const modal = document.createElement('div');
@@ -347,45 +265,6 @@ window.custShowStatement = async function(customerId) {
 
 window.custCloseModal = function(id) { const m = document.getElementById(id); if (m) m.remove(); };
 
-// بناء صفوف قائمة العملاء — دالة منفصلة عشان تتنادى من العرض الأول
-// ومن custApplyBalanceFilter من غير تكرار كود
-function custListRowsHtml(list) {
-    if (!list.length) return `<tr><td colspan="6" class="empty-state"><span>👥</span>لا يوجد عملاء.</td></tr>`;
-    return list.map(c => {
-        const bal = Number(c.balance)||0;
-        const balColor = bal > 0 ? '#DC2626' : bal < 0 ? '#059669' : '#64748B';
-        const lastInt = _custLastIntMap[c.id];
-        const srcBadge = custSourceBadge(c.source);
-        return `<tr>
-            <td>
-                <div style="display:flex;align-items:center;gap:8px">
-                    <div style="width:32px;height:32px;border-radius:50%;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#475569">${(c.name||'?').charAt(0)}</div>
-                    <div><div style="font-weight:600">${c.name}</div><div style="display:flex;align-items:center;gap:6px;margin-top:2px">${c.code?`<span style="font-size:11px;color:#94A3B8">${c.code}</span>`:''}${srcBadge}</div></div>
-                </div>
-            </td>
-            <td dir="ltr" style="text-align:right;color:#64748B">${c.phone||'—'}</td>
-            <td style="color:#64748B">${_custRegionMap[c.region_id] || '—'}</td>
-            <td style="font-size:12px;color:#94A3B8">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
-            <td style="text-align:left;font-weight:700;color:${balColor}">${custFmt(bal)}</td>
-            <td style="text-align:center;white-space:nowrap">
-                <button class="cc-edit" onclick="custShowStatement('${c.id}')" style="background:#FFFBEB;color:#D97706">📄 كشف حساب</button>
-                ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenAdd('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="تسجيل تفاعل سريع">📞</button>` : ''}
-            </td>
-        </tr>`;
-    }).join('');
-}
-
-window.custApplyBalanceFilter = function() {
-    const op = document.getElementById('custBalFilterOp')?.value;
-    const val = parseFloat(document.getElementById('custBalFilterVal')?.value);
-    let filtered = flexSearch(_custList, _custListSearch, ['name','phone']);
-    if (op && !isNaN(val)) {
-        filtered = filtered.filter(c => op === 'gt' ? (Number(c.balance)||0) > val : (Number(c.balance)||0) < val);
-    }
-    const tbody = document.getElementById('custListTbody');
-    if (tbody) tbody.innerHTML = custListRowsHtml(filtered);
-};
-window.custListSearchInput = function(v) { _custListSearch = v; window.custApplyBalanceFilter(); };
 
 // بناء صفوف جدول كشف الحساب — دالة منفصلة عشان تتنادى من العرض الأول
 // ومن custStmtFilterRows (البحث) من غير تكرار كود

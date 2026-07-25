@@ -646,13 +646,13 @@ async function _searchRun(term) {
 
 window.searchGoCustomer = function (id) {
     window._pendingCustomerStatement = id;
-    window._pendingCustHubTab = 'statement';
+    window._pendingCustHubTab = 'manage';
     window.searchClosePalette();
     document.querySelector('[data-mod="customers-hub"]')?.click();
 };
 window.searchGoSupplier = function (id) {
     window._pendingSupplierStatement = id;
-    window._pendingSuppHubTab = 'statement';
+    window._pendingSuppHubTab = 'manage';
     window.searchClosePalette();
     document.querySelector('[data-mod="suppliers-hub"]')?.click();
 };
