@@ -11,12 +11,26 @@
    جدول ملخص لكل المندوبين + تفاصيل مندوب واحد (RDC_SELECTED_REP).
    ════════════════════════════════════════════════════════════ */
 
-let RDC_DATE = new Date().toISOString().slice(0, 10);
+// ★ dStr/dNextDay بيبنوا السترينج من مكوّنات التاريخ المحلي مباشرة، مش
+//   عن طريق toISOString() (بيحوّل لتوقيت UTC) — نفس الباج اتصلح قبل كده
+//   فى performance-reports.js وreports.js. هنا كان أخطر: dayEnd كان بيطلع
+//   يساوي dayStart بالظبط (منتصف الليل بتوقيت القاهرة UTC+3 بعد إضافة 24
+//   ساعة وتحويلها لـUTC بيرجع لنفس تاريخ اليوم)، فالفلتر gte/lt كان بيبقى
+//   مدى فاضي دايمًا — التقرير كان بيرجّع صفر لكل مندوب فى كل يوم من غير
+//   استثناء، من أول ما اتبنى.
+function dStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function dNextDay(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return dStr(new Date(y, m - 1, d + 1));
+}
+
+let RDC_DATE = dStr(new Date());
 let RDC_SELECTED_REP = null; // null = ملخص كل المندوبين
 let RDC_REPS = [];
 let RDC_AGG = {}; // repId => { salesCash, salesCredit, salesCount, collections, expenses, returns, deposits, visitsPlanned, visitsDone, visitsSkipped, vanStockValue }
 let RDC_DETAIL = { sales: [], payments: [], expenses: [], returns: [] }; // تفاصيل خام لمندوب اليوم المختار (للعرض التفصيلي)
 let RDC_TREASURY_BAL = {}; // treasury_id => الرصيد الحالي
+let RDC_CLOSINGS = {}; // repId => صف rep_day_closings (لو المندوب قفل يومه من تليفونه) أو undefined لو لسه مقفلش
 
 function rdcFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -33,7 +47,7 @@ async function renderRepDailyClosing(c) {
 
 async function rdcLoad() {
     const dayStart = RDC_DATE;
-    const dayEnd = new Date(new Date(RDC_DATE + 'T00:00:00').getTime() + 86400000).toISOString().slice(0, 10);
+    const dayEnd = dNextDay(RDC_DATE);
 
     const [
         { data: reps },
@@ -45,6 +59,7 @@ async function rdcLoad() {
         { data: visits },
         { data: vanStock },
         { data: treasuryBalances },
+        { data: closings },
     ] = await Promise.all([
         sb.from('sales_reps').select('id,name,treasury_id').eq('is_active', true).order('name'),
         sb.from('sales').select('id,invoice_no,rep_id,total,payment_type,customer_id,customers(name),created_at')
@@ -60,6 +75,7 @@ async function rdcLoad() {
         sb.from('rep_visits').select('rep_id,status').eq('visit_date', RDC_DATE),
         sb.from('van_stock').select('rep_id,qty,products(purchase_price)'),
         sb.rpc('get_treasury_balances'),
+        sb.from('rep_day_closings').select('*').eq('close_date', RDC_DATE),
     ]);
 
     RDC_REPS = reps || [];
@@ -92,11 +108,24 @@ async function rdcLoad() {
     RDC_TREASURY_BAL = {};
     (treasuryBalances || []).forEach(t => { RDC_TREASURY_BAL[t.treasury_id] = Number(t.balance) || 0; });
 
+    RDC_CLOSINGS = {};
+    (closings || []).forEach(cl => { RDC_CLOSINGS[cl.rep_id] = cl; });
+
     // تفاصيل خام (للعرض التفصيلي لمندوب واحد بس — بيتفلتر وقت العرض)
     RDC_DETAIL = { sales: sales || [], payments: payments || [], expenses: expenses || [], returns: returns || [] };
 }
 
 function rdcCashCheck(b) { return b.salesCash + b.collections - b.expenses - b.deposits; }
+
+// حالة إغلاق اليوم بتيجي من rep_day_closings — المندوب بيقفل من تليفونه
+// (شاشة إغلاق اليوم فى تطبيق سلطانو)، والتقرير بينزل نسخة هنا لحظة الإغلاق.
+// لو الصف مش موجود يبقى المندوب لسه فاتح يومه أو لسه ما وصلتش نسخة (offline).
+function rdcClosingBadge(repId) {
+    const cl = RDC_CLOSINGS[repId];
+    if (!cl) return `<span style="font-size:11px;color:#94A3B8">⏳ مفتوح</span>`;
+    const diffOk = Math.abs(Number(cl.diff) || 0) < 0.01;
+    return `<span style="font-size:11px;font-weight:700;color:${diffOk ? '#059669' : '#DC2626'}">🌙 مقفول${diffOk ? '' : ' (فرق ' + rdcFmt(cl.diff) + ')'}</span>`;
+}
 
 function rdcDateBarHTML() {
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
@@ -125,6 +154,7 @@ function rdcRenderSummary(c) {
             <th style="text-align:left">مطابقة الكاش</th>
             <th style="text-align:center">زيارات</th>
             <th style="text-align:left">مخزون العربية</th>
+            <th style="text-align:center">الإغلاق</th>
             <th></th>
         </tr></thead>
         <tbody>
@@ -145,6 +175,7 @@ function rdcRenderSummary(c) {
                     <td style="text-align:left;font-weight:700;color:${checkColor}">${rdcFmt(check)}</td>
                     <td style="text-align:center;font-size:11.5px;white-space:nowrap">${visitsTxt}</td>
                     <td style="text-align:left">${rdcFmt(b.vanStockValue)}</td>
+                    <td style="text-align:center">${rdcClosingBadge(r.id)}</td>
                     <td><button class="cc-edit" onclick="rdcOpenDetail('${r.id}')">🔍 التفاصيل</button></td>
                 </tr>`;
             }).join('')}
@@ -178,6 +209,19 @@ function rdcRenderDetail(c) {
     const check = rdcCashCheck(b);
     const checkColor = Math.abs(check) < 0.01 ? '#059669' : Math.abs(check) < 100 ? '#D97706' : '#DC2626';
     const treasuryBal = rep.treasury_id != null ? RDC_TREASURY_BAL[rep.treasury_id] : null;
+
+    const closing = RDC_CLOSINGS[rep.id];
+    const closingCard = closing ? `
+        <div class="mod-card" style="border:1.5px solid ${Math.abs(Number(closing.diff)||0) < 0.01 ? '#A7F3D0' : '#FECACA'}">
+            <div style="font-size:12px;color:#64748B;margin-bottom:6px">🌙 إغلاق اليوم (من تليفون المندوب)</div>
+            <div style="font-size:15px;font-weight:800">الكاش المتوقع ${rdcFmt(closing.expected_cash)} — الفعلي ${rdcFmt(closing.actual_cash)}</div>
+            <div style="font-size:13px;font-weight:700;color:${Math.abs(Number(closing.diff)||0) < 0.01 ? '#059669' : '#DC2626'}">الفرق: ${rdcFmt(closing.diff)}</div>
+            <div style="font-size:11px;color:#94A3B8;margin-top:4px">اتقفل الساعة ${new Date(closing.closed_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
+        </div>` : `
+        <div class="mod-card" style="border:1.5px solid #E2E8F0">
+            <div style="font-size:12px;color:#64748B;margin-bottom:6px">🌙 إغلاق اليوم</div>
+            <div style="font-size:14px;font-weight:700;color:#94A3B8">⏳ لسه ما قفلش يومه</div>
+        </div>`;
 
     const daySales = RDC_DETAIL.sales.filter(s => s.rep_id === rep.id);
     const dayPayments = RDC_DETAIL.payments.filter(p => p.created_by === rep.id);
@@ -238,6 +282,7 @@ function rdcRenderDetail(c) {
             <div style="font-size:12px;color:#64748B;margin-bottom:6px">📦 مخزون العربية الحالي</div>
             <div style="font-size:18px;font-weight:800">${rdcFmt(b.vanStockValue)}</div>
         </div>
+        ${closingCard}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
