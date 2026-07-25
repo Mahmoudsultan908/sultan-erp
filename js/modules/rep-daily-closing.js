@@ -117,15 +117,75 @@ async function rdcLoad() {
 
 function rdcCashCheck(b) { return b.salesCash + b.collections - b.expenses - b.deposits; }
 
-// حالة إغلاق اليوم بتيجي من rep_day_closings — المندوب بيقفل من تليفونه
-// (شاشة إغلاق اليوم فى تطبيق سلطانو)، والتقرير بينزل نسخة هنا لحظة الإغلاق.
-// لو الصف مش موجود يبقى المندوب لسه فاتح يومه أو لسه ما وصلتش نسخة (offline).
+// حالة إغلاق اليوم بتيجي من rep_day_closings — إما المندوب قفلها من تليفونه
+// (شاشة إغلاق اليوم فى تطبيق سلطانو) أو الأدمن قفلها من هنا يدويًا لو
+// المندوب لسه ما قفلش (rdcOpenCloseModal تحت). لو الصف مش موجود يبقى
+// لسه محدش قفل يوم المندوب ده.
 function rdcClosingBadge(repId) {
     const cl = RDC_CLOSINGS[repId];
-    if (!cl) return `<span style="font-size:11px;color:#94A3B8">⏳ مفتوح</span>`;
+    if (!cl) return `<span style="font-size:11px;color:#94A3B8">⏳ مفتوح</span> <button class="cc-edit" style="padding:2px 8px;font-size:11px" onclick="rdcOpenCloseModal('${repId}')">🌙 إغلاق</button>`;
     const diffOk = Math.abs(Number(cl.diff) || 0) < 0.01;
     return `<span style="font-size:11px;font-weight:700;color:${diffOk ? '#059669' : '#DC2626'}">🌙 مقفول${diffOk ? '' : ' (فرق ' + rdcFmt(cl.diff) + ')'}</span>`;
 }
+
+// إغلاق اليوم يدويًا من الأدمن — نفس فكرة زرار إغلاق اليوم اللي عند
+// المندوب على تليفونه بالظبط (كاش متوقع محسوب من حركة اليوم، والأدمن
+// بيدخل الكاش الفعلي اللي استلمه)، لكن من جوه الـERP مباشرة لحالات
+// زي: المندوب نسي يقفل من تليفونه، أو تليفونه أوفلاين.
+window.rdcOpenCloseModal = function (repId) {
+    const rep = RDC_REPS.find(r => r.id === repId);
+    const b = RDC_AGG[repId];
+    if (!rep || !b) return;
+    const expected = rdcCashCheck(b);
+    document.getElementById('rdcCloseModal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'rdcCloseModal';
+    m.className = 'mod-modal-bg active';
+    m.innerHTML = `
+    <div class="mod-modal" style="max-width:420px">
+        <div class="mod-modal-header"><h3>🌙 إغلاق يوم ${rep.name} — ${RDC_DATE}</h3>
+            <button class="mod-modal-close" onclick="document.getElementById('rdcCloseModal').remove()">✕</button></div>
+        <div class="mod-modal-body">
+            <div style="font-size:13px;color:#64748B;margin-bottom:12px">الكاش المتوقع من حركة اليوم (نقدي + تحصيل − مصروفات − توريد):</div>
+            <div style="font-size:20px;font-weight:800;margin-bottom:14px">${rdcFmt(expected)}</div>
+            <label style="font-size:13px;font-weight:700;color:#334155">الكاش الفعلي اللي المندوب سلّمه</label>
+            <input type="number" id="rdcCloseActual" class="mod-form-input" value="${expected.toFixed(2)}" oninput="rdcUpdateCloseDiff(${expected})">
+            <div id="rdcCloseDiff" style="font-size:13px;font-weight:700;margin-top:8px;color:#059669">الفرق: 0.00</div>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="inv-btn inv-btn-print" onclick="document.getElementById('rdcCloseModal').remove()">إلغاء</button>
+            <button class="inv-btn inv-btn-save" onclick="rdcConfirmClose('${repId}', ${expected})">🌙 إغلاق اليوم</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+};
+
+window.rdcUpdateCloseDiff = function (expected) {
+    const actual = parseFloat(document.getElementById('rdcCloseActual')?.value) || 0;
+    const diff = actual - expected;
+    const el = document.getElementById('rdcCloseDiff');
+    if (el) { el.textContent = `الفرق: ${rdcFmt(diff)}`; el.style.color = Math.abs(diff) < 0.01 ? '#059669' : '#DC2626'; }
+};
+
+window.rdcConfirmClose = async function (repId, expected) {
+    const actual = parseFloat(document.getElementById('rdcCloseActual')?.value) || 0;
+    const b = RDC_AGG[repId];
+    try {
+        const { error } = await sb.from('rep_day_closings').upsert({
+            rep_id: repId, close_date: RDC_DATE,
+            expected_cash: expected, actual_cash: actual, diff: actual - expected,
+            total_sales: b.salesCash + b.salesCredit, total_cash: b.salesCash, total_debt: b.salesCredit,
+            total_collect: b.collections, total_returns: b.returns, total_expenses: b.expenses,
+            total_deposits: b.deposits, visits: b.visitsDone + b.visitsSkipped + b.visitsPlanned, sold_visits: b.visitsDone,
+            closed_at: new Date().toISOString(),
+        }, { onConflict: 'rep_id,close_date' });
+        if (error) throw error;
+        document.getElementById('rdcCloseModal')?.remove();
+        await renderRepDailyClosing(document.getElementById('repMgmtBody') || document.getElementById('app-content'));
+    } catch (err) {
+        alert('خطأ: ' + err.message);
+    }
+};
 
 function rdcDateBarHTML() {
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
@@ -220,7 +280,8 @@ function rdcRenderDetail(c) {
         </div>` : `
         <div class="mod-card" style="border:1.5px solid #E2E8F0">
             <div style="font-size:12px;color:#64748B;margin-bottom:6px">🌙 إغلاق اليوم</div>
-            <div style="font-size:14px;font-weight:700;color:#94A3B8">⏳ لسه ما قفلش يومه</div>
+            <div style="font-size:14px;font-weight:700;color:#94A3B8;margin-bottom:8px">⏳ لسه ما قفلش يومه</div>
+            <button class="mod-btn mod-btn-primary" style="padding:6px 14px;font-size:12.5px" onclick="rdcOpenCloseModal('${rep.id}')">🌙 إغلاق اليوم من هنا</button>
         </div>`;
 
     const daySales = RDC_DETAIL.sales.filter(s => s.rep_id === rep.id);
@@ -299,4 +360,4 @@ window.rdcOnDateChange = async function (val) {
     await renderRepDailyClosing(c);
 };
 
-Object.assign(window, { renderRepDailyClosing, rdcOpenDetail, rdcBackToSummary, rdcOnDetailRepChange, rdcOnDateChange });
+Object.assign(window, { renderRepDailyClosing, rdcOpenDetail, rdcBackToSummary, rdcOnDetailRepChange, rdcOnDateChange, rdcOpenCloseModal, rdcUpdateCloseDiff, rdcConfirmClose });
