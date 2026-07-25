@@ -22,6 +22,17 @@ const USR_ROLE_COLORS = {
 
 function usrFmtDate(d) { return d ? new Date(d).toLocaleDateString('ar-EG') : '—'; }
 
+// بند 7 (تحديد المستخدمين النشطين)، 2026-07-25. "متصل الآن" = last_seen
+// خلال آخر 3 دقايق (نفس فكرة heartbeat بسيطة، بدون realtime/presence
+// عشان ميضيفش تعقيد لسيرفر مالوش الأساس ده أصلاً)
+const USR_ONLINE_WINDOW_MS = 3 * 60 * 1000;
+function usrIsOnline(lastSeen) { return lastSeen && (Date.now() - new Date(lastSeen).getTime()) < USR_ONLINE_WINDOW_MS; }
+function usrFmtLastSeen(d) {
+    if (!d) return '—';
+    if (usrIsOnline(d)) return '<span style="color:#059669;font-weight:700">🟢 متصل الآن</span>';
+    return new Date(d).toLocaleString('ar-EG', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+
 // ════════════════════════════════════════════════════════════
 // 1) العرض الرئيسي
 // ════════════════════════════════════════════════════════════
@@ -68,16 +79,21 @@ function usrRenderPage(c) {
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">👥</div><div class="mod-card-val">${_usrList.length}</div><div class="mod-card-lbl">إجمالي المستخدمين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">✅</div><div class="mod-card-val">${_usrList.filter(u=>u.is_active!==false).length}</div><div class="mod-card-lbl">نشطون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">🟢</div><div class="mod-card-val">${_usrList.filter(u=>usrIsOnline(u.last_seen)).length}</div><div class="mod-card-lbl">متصلون الآن</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">🚫</div><div class="mod-card-val">${_usrList.filter(u=>u.is_active===false).length}</div><div class="mod-card-lbl">معطّلون</div></div>
         </div>
 
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>المستخدم</th><th>الصلاحية</th><th>الحالة</th><th>تاريخ الإضافة</th><th></th>
+                <th>المستخدم</th><th>الصلاحية</th><th>الحالة</th><th>آخر ظهور</th><th></th>
             </tr></thead><tbody id="usrTbody"></tbody></table>
         </div>`;
     usrRenderRows();
+    // تحديث "آخر ظهور" لحظيًا كل نص دقيقة، من غير ما نعيد تحميل الصفحة كلها
+    clearInterval(window._usrRefreshTimer);
+    window._usrRefreshTimer = setInterval(() => {
+        if (document.getElementById('usrTbody')) usrRenderRows(); else clearInterval(window._usrRefreshTimer);
+    }, 30000);
 }
 
 function usrRenderRows() {
@@ -96,7 +112,7 @@ function usrRenderRows() {
                 </select>
             </td>
             <td><span class="dash-badge ${active?'dash-badge-green':'dash-badge-blue'}" style="${!active?'background:#FEE2E2;color:#DC2626':''}">${active?'✅ نشط':'🚫 معطّل'}</span></td>
-            <td class="dash-muted">${usrFmtDate(u.created_at)}</td>
+            <td class="dash-muted" style="font-size:12.5px">${usrFmtLastSeen(u.last_seen)}</td>
             <td><button class="cc-edit" style="${active?'background:#FEE2E2;color:#DC2626':'background:#D1FAE5;color:#059669'}" onclick="usrToggleActive('${u.id}', ${!active})">${active?'🚫 تعطيل':'✅ تفعيل'}</button></td>
         </tr>`;
     }).join('');
@@ -276,6 +292,35 @@ window.setupApp = async function() {
     if (badge && window._currentUserRoleLabel) {
         badge.innerHTML = `${currentUser.email} <span>${window._currentUserRoleLabel}</span>`;
     }
+
+    usrStartHeartbeat();
 };
+
+// نبضة حضور بسيطة — تحدّث profiles.last_seen عند الدخول وكل دقيقتين
+// بعد كده طول ما التبويب مفتوح، عشان صفحة "إدارة المستخدمين" تقدر
+// تعرض "متصل الآن" لأي حد فاتح البرنامج فعليًا دلوقتي (بند 7، 2026-07-25)
+function usrStartHeartbeat() {
+    if (window._usrHeartbeatTimer) return; // مرة واحدة بس لكل جلسة صفحة
+    const beat = async () => {
+        try {
+            if (currentUser?.id) await sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id);
+        } catch { /* فشل النبضة مالوش أثر على استخدام البرنامج، نتجاهله بهدوء */ }
+    };
+    beat();
+    window._usrHeartbeatTimer = setInterval(beat, 120000);
+}
+
+// ★ بدء مستقل عن setupApp() — فى جلسة متصفح فيها تسجيل دخول محفوظ
+// مسبقاً (Reload لصفحة مفتوحة أصلاً)، sb.auth.getSession() بيرجع بسرعة
+// كفاية إن initApp() فى app.js ينادي setupApp() الأصلي قبل ما السكريبت
+// ده يخلص تحميله ويستبدلها — فالـ wrap فوق ميتنفذش أول مرة. الحل هنا:
+// بولينج بسيط لحد ما currentUser يبقى جاهز، من غير أي اعتماد على wrap.
+(function usrHeartbeatBootstrap() {
+    const tryStart = () => {
+        if (typeof currentUser !== 'undefined' && currentUser?.id) { usrStartHeartbeat(); return; }
+        setTimeout(tryStart, 400);
+    };
+    tryStart();
+})();
 
 Object.assign(window, { renderUsersManagement, usrOpenAdd, usrSaveNewUser, usrToggleActive, usrChangeRole });
