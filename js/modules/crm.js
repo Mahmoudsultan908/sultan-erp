@@ -169,9 +169,22 @@ async function crmLoadInteractionsData() {
 async function crmLoadLeadsData() {
     _crmLeadsTableMissing = false;
     try {
-        const { data, error } = await sb.from('crm_leads').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        _crmLeads = data || [];
+        // ★ سلطان بيرجع أقصى 1000 صف لكل طلب بشكل افتراضي، فلازم نجيب على
+        //   دفعات لحد ما نوصل لآخر صفحة، وإلا أي قائمة عملاء محتملين أكبر
+        //   من 1000 (زي استيراد جهات اتصال بالجمله) هتتقطع بصمت من غير أي
+        //   خطأ ظاهر — لا في الجدول ولا في كروت الإحصائيات فوقه.
+        const PAGE = 1000;
+        let all = [];
+        let from = 0;
+        while (true) {
+            const { data, error } = await sb.from('crm_leads').select('*')
+                .order('created_at', { ascending: false }).range(from, from + PAGE - 1);
+            if (error) throw error;
+            all = all.concat(data || []);
+            if (!data || data.length < PAGE) break;
+            from += PAGE;
+        }
+        _crmLeads = all;
     } catch (e) {
         _crmLeadsTableMissing = true;
         _crmLeads = [];
