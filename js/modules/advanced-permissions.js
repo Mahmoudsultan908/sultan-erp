@@ -37,6 +37,7 @@ const AP_PAGE_GROUPS = [
     ]},
     { title: 'المشتريات والموردين', pages: [
         ['purchases', '📥 فاتورة المشتريات'], ['purchase-orders', '📋 أوامر الشراء'],
+        ['purchase-suggestions', '💡 اقتراح أمر شراء'],
         ['payments', '💸 دفع الموردين'],
     ]},
     { title: 'المراجعة والمرتجعات', pages: [
