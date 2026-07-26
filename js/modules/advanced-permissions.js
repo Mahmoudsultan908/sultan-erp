@@ -64,6 +64,7 @@ const AP_PAGE_GROUPS = [
         ['general-import-export', '🔄 استيراد/تصدير عام'], ['print-center', '🖨️ مركز الطباعة'],
         ['opening-balances', '📋 الأرصدة الافتتاحية'],
         ['settings-hub', '⚙️ الإعدادات (+ المستخدمون + الصلاحيات)'],
+        ['private-chat', '🔒 محادثة خاصة — محمية أصلاً بكلمة سر منفصلة لكل طرف'],
     ]},
 ];
 

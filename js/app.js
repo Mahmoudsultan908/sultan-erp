@@ -112,6 +112,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي <span class="nav-soon-badge">قريباً</span></div>
         </div>
 
+        <div class="nav-item" data-mod="private-chat" onclick="loadMod(this, 'private-chat')"><span class="nav-icon">🔒</span><span class="nav-label">محادثة خاصة</span></div>
         <div class="nav-item" data-mod="settings-hub" onclick="loadMod(this, 'settings-hub')"><span class="nav-icon">⚙️</span><span class="nav-label">الإعدادات</span></div>
 
         <div class="sidebar-footer"><span>© 2026 Sultan Food</span><span style="color:var(--inv-gold-light)">v2.0</span></div>
@@ -327,6 +328,7 @@ const titles = {
         'purchases': 'فاتورة مشتريات جديدة',
         'purchase-orders': 'أوامر الشراء',
         'purchase-suggestions': 'اقتراح أمر شراء',
+        'private-chat': 'محادثة خاصة',
         'payments': 'دفع الموردين (سندات صرف)',
         'collections': 'تحصيل العملاء (سندات قبض)',
         'invoice-review': 'مراجعة الفواتير وتعديلها',
@@ -367,6 +369,7 @@ async function _dispatchRender(modName, c) {
     if (modName === 'purchases' && typeof renderPurchases === 'function') await renderPurchases(c);
     if (modName === 'purchase-orders' && typeof renderPurchaseOrders === 'function') await renderPurchaseOrders(c);
     if (modName === 'purchase-suggestions' && typeof renderPurchaseSuggestions === 'function') await renderPurchaseSuggestions(c);
+    if (modName === 'private-chat' && typeof renderPrivateChat === 'function') await renderPrivateChat(c);
     if (modName === 'payments' && typeof renderPayments === 'function') await renderPayments(c);
     if (modName === 'collections' && typeof renderCollections === 'function') await renderCollections(c);
     if (modName === 'invoice-review' && typeof renderInvoiceReview === 'function') await renderInvoiceReview(c);
