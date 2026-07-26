@@ -19,6 +19,7 @@ let _pchPendingThreadId = null;
 let _pchRecorder = null;
 let _pchRecordedChunks = [];
 let _pchIsRecording = false;
+let _pchRealtimeChannel = null;
 const PCH_MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const PCH_ROLE_LABELS = { admin: 'مدير النظام', accountant: 'محاسب', cashier: 'كاشير', rep: 'مندوب مبيعات', employee: 'موظف' };
@@ -67,6 +68,58 @@ async function pchUploadFile(file, ext) {
     return path;
 }
 
+// ════════════════════════════════════════════════════════════
+// فورية (Realtime) + إشعارات — بدون Refresh زي الواتس
+// ════════════════════════════════════════════════════════════
+// اشتراك واحد شامل كل محادثاتي (مش بس المفتوحة دلوقتي)، عشان
+// الإشعار يوصل حتى لو أنا واقف فى صفحة تانية من البرنامج، والشاشة
+// تتحدّث فوراً لو أنا فاتح المحادثة دي بالظبط. الحماية هنا نفسها
+// RLS على private_chat_messages — Supabase Realtime بيتأكد من صلاحية
+// كل مشترك على مستوى الصف قبل ما يبعتله أي تغيير.
+function pchUnsubscribeRealtime() {
+    if (_pchRealtimeChannel) { sb.removeChannel(_pchRealtimeChannel); _pchRealtimeChannel = null; }
+}
+
+function pchSubscribeRealtime() {
+    pchUnsubscribeRealtime();
+    const ids = PCH_DB.threads.map(t => t.id);
+    if (!ids.length) return;
+    _pchRealtimeChannel = sb.channel('pch-' + (currentUser?.id || 'anon'))
+        .on('postgres_changes', {
+            event: '*', schema: 'public', table: 'private_chat_messages',
+            filter: `thread_id=in.(${ids.join(',')})`,
+        }, (payload) => pchHandleRealtimeEvent(payload))
+        .subscribe();
+}
+
+async function pchHandleRealtimeEvent(payload) {
+    const row = payload.new || payload.old;
+    if (!row) return;
+    if (row.thread_id === _pchUnlockedThreadId) {
+        try { await pchLoadMessages(_pchUnlockedThreadId); pchRefreshChatBody(); } catch { /* تجاهل، هتتحدث تاني عند أي إجراء */ }
+    }
+    if (payload.eventType === 'INSERT' && row.sender_id !== currentUser?.id) {
+        pchNotify(row);
+    }
+}
+
+function pchNotify(row) {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const t = PCH_DB.threads.find(x => x.id === row.thread_id);
+    const senderName = t ? pchOtherPerson(t) : 'شخص';
+    try {
+        const n = new Notification('🔒 رسالة خاصة جديدة', {
+            body: `من ${senderName}`, icon: 'icon-192.png', tag: 'pch-' + row.thread_id,
+        });
+        n.onclick = () => { window.focus(); n.close(); };
+    } catch { /* بعض المتصفحات بترفض بصمت لو الصلاحية اتسحبت بعد الفحص */ }
+}
+
+window.pchRequestNotifyPermission = function () {
+    if (typeof Notification === 'undefined') return;
+    Notification.requestPermission().then(() => pchRenderScreen(document.getElementById('app-content')));
+};
+
 async function renderPrivateChat(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري التحميل...</div>';
     try {
@@ -80,6 +133,7 @@ async function renderPrivateChat(c) {
         PCH_DB.isAdmin = await pchCurrentIsAdmin();
         _pchUnlockedThreadId = null;
         _pchMessages = [];
+        pchSubscribeRealtime();
         pchRenderScreen(c);
     } catch (err) {
         if (/relation .* does not exist/i.test(err.message || '')) {
@@ -95,7 +149,10 @@ function pchRenderScreen(c) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">🔒 المحادثات الخاصة</h2>
         <p style="font-size:13px;color:#64748B;margin-top:4px">محادثة محمية بكلمة سر منفصلة عن كلمة سر الدخول — كل شخص بيحط كلمة السر بتاعته وبيدخلها فى كل مرة يفتحها</p></div>
-        ${PCH_DB.isAdmin && !_pchUnlockedThreadId ? `<button class="mod-btn mod-btn-primary" onclick="pchOpenNewThread()">+ محادثة جديدة</button>` : ''}
+        <div style="display:flex;gap:8px">
+            ${typeof Notification !== 'undefined' && Notification.permission !== 'granted' ? `<button class="mod-btn" style="background:#FFFBEB;color:#D97706" onclick="pchRequestNotifyPermission()">🔔 تفعيل الإشعارات</button>` : ''}
+            ${PCH_DB.isAdmin && !_pchUnlockedThreadId ? `<button class="mod-btn mod-btn-primary" onclick="pchOpenNewThread()">+ محادثة جديدة</button>` : ''}
+        </div>
     </div>
     <div id="pchBody">${_pchUnlockedThreadId ? pchChatViewHTML() : pchThreadListHTML()}</div>`;
 }
@@ -453,4 +510,5 @@ Object.assign(window, {
     renderPrivateChat,
     pchOpenNewThread, pchSaveNewThread, pchPromptUnlock, pchTryUnlock,
     pchSendMessage, pchPickImage, pchToggleRecording, pchTogglePin, pchLockAndBack, pchOpenChangePass, pchSaveChangePass,
+    pchRequestNotifyPermission,
 });
