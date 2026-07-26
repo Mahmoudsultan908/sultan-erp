@@ -16,6 +16,10 @@ let PCH_DB = { profiles: [], threads: [] };
 let _pchUnlockedThreadId = null;
 let _pchMessages = [];
 let _pchPendingThreadId = null;
+let _pchRecorder = null;
+let _pchRecordedChunks = [];
+let _pchIsRecording = false;
+const PCH_MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const PCH_ROLE_LABELS = { admin: 'مدير النظام', accountant: 'محاسب', cashier: 'كاشير', rep: 'مندوب مبيعات', employee: 'موظف' };
 
@@ -47,6 +51,18 @@ async function pchCurrentIsAdmin() {
 function pchOtherPerson(t) {
     const amManager = t.manager_id === currentUser?.id;
     return amManager ? (t.participant?.name || '—') : (t.manager?.name || '—');
+}
+
+// رفع صورة/رسالة صوتية لـ bucket "chat-media" الموجود بالفعل — نفس
+// نمط رفع المرفقات فى crm.js (sb.storage.from(...).upload) بس بمسار
+// منظّم تحت رقم المحادثة نفسها
+async function pchUploadFile(file, ext) {
+    const rand = pchRandomSalt().slice(0, 10);
+    const path = `${_pchUnlockedThreadId}/${Date.now()}_${rand}.${ext}`;
+    const { error: upErr } = await sb.storage.from('chat-media').upload(path, file);
+    if (upErr) throw upErr;
+    const { data: pub } = sb.storage.from('chat-media').getPublicUrl(path);
+    return pub.publicUrl;
 }
 
 async function renderPrivateChat(c) {
@@ -237,7 +253,10 @@ function pchChatViewHTML() {
     <div class="mod-card" style="padding:14px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:8px" id="pchMsgList">
         ${_pchMessages.length ? _pchMessages.map(m => pchMessageHTML(m)).join('') : `<div class="empty-state"><span>💬</span>ابدأ المحادثة...</div>`}
     </div>
-    <div style="display:flex;gap:8px;margin-top:10px">
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <input type="file" id="pchImageInput" accept="image/*" style="display:none" onchange="pchPickImage(this)">
+        <button class="mod-btn" style="background:#F1F5F9;color:#475569;padding:8px 10px" title="إرسال صورة" onclick="document.getElementById('pchImageInput').click()">📷</button>
+        <button class="mod-btn" id="pchMicBtn" style="background:#F1F5F9;color:#475569;padding:8px 10px" title="تسجيل رسالة صوتية" onclick="pchToggleRecording()">🎤</button>
         <input type="text" id="pchNewMsg" class="mod-form-input" placeholder="اكتب رسالة..." onkeydown="if(event.key==='Enter')pchSendMessage()">
         <button class="mod-btn mod-btn-primary" onclick="pchSendMessage()">إرسال</button>
     </div>`;
@@ -245,8 +264,15 @@ function pchChatViewHTML() {
 
 function pchMessageHTML(m) {
     const mine = m.sender_id === currentUser?.id;
+    let attachmentHTML = '';
+    if (m.attachment_type === 'image') {
+        attachmentHTML = `<img src="${m.attachment_url}" style="max-width:220px;max-height:220px;border-radius:10px;display:block;cursor:pointer" onclick="window.open('${m.attachment_url}','_blank')">`;
+    } else if (m.attachment_type === 'audio') {
+        attachmentHTML = `<audio controls src="${m.attachment_url}" style="max-width:220px;display:block"></audio>`;
+    }
+    const textHTML = m.body ? `<div style="${attachmentHTML ? 'margin-top:6px' : ''}">${m.body.replace(/</g, '&lt;')}</div>` : '';
     return `<div style="align-self:${mine ? 'flex-end' : 'flex-start'};max-width:75%">
-        <div style="background:${mine ? '#DBEAFE' : '#F1F5F9'};border-radius:12px;padding:8px 12px;font-size:13px;white-space:pre-wrap">${(m.body || '').replace(/</g, '&lt;')}</div>
+        <div style="background:${mine ? '#DBEAFE' : '#F1F5F9'};border-radius:12px;padding:8px 12px;font-size:13px;white-space:pre-wrap">${attachmentHTML}${textHTML}</div>
         <div style="font-size:10px;color:#94A3B8;margin-top:2px;display:flex;gap:6px;align-items:center">
             <span>${m.sender?.name || ''} · ${new Date(m.created_at).toLocaleString('ar-EG')}</span>
             <span style="cursor:pointer" title="${m.is_pinned ? 'إلغاء التثبيت' : 'تثبيت'}" onclick="pchTogglePin('${m.id}',${!m.is_pinned})">${m.is_pinned ? '📌' : '📍'}</span>
@@ -272,6 +298,69 @@ window.pchSendMessage = async function () {
         await pchLoadMessages(_pchUnlockedThreadId);
         pchRefreshChatBody();
     } catch (err) { alert('❌ خطأ: ' + err.message); }
+};
+
+window.pchPickImage = async function (input) {
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > PCH_MAX_IMAGE_BYTES) { alert('⚠️ حجم الصورة كبير جداً (الحد الأقصى 8 ميجا)'); return; }
+    try {
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+        const url = await pchUploadFile(file, ext);
+        const { error } = await sb.from('private_chat_messages').insert({
+            thread_id: _pchUnlockedThreadId, sender_id: currentUser.id,
+            attachment_url: url, attachment_type: 'image',
+        });
+        if (error) throw error;
+        await pchLoadMessages(_pchUnlockedThreadId);
+        pchRefreshChatBody();
+    } catch (err) { alert('❌ خطأ فى رفع الصورة: ' + err.message); }
+};
+
+function pchUpdateMicButton() {
+    const btn = document.getElementById('pchMicBtn');
+    if (!btn) return;
+    btn.textContent = _pchIsRecording ? '⏹️' : '🎤';
+    btn.style.background = _pchIsRecording ? '#FEE2E2' : '#F1F5F9';
+    btn.style.color = _pchIsRecording ? '#DC2626' : '#475569';
+}
+
+// تسجيل صوتي عبر MediaRecorder — زرار واحد يبدأ ويوقف (بدل ضغط مطوّل)،
+// وبمجرد التوقف بيترفع تلقائي كرسالة صوتية جديدة
+window.pchToggleRecording = async function () {
+    if (_pchIsRecording) {
+        _pchRecorder?.stop();
+        return;
+    }
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        _pchRecordedChunks = [];
+        _pchRecorder = new MediaRecorder(stream);
+        _pchRecorder.ondataavailable = e => { if (e.data.size > 0) _pchRecordedChunks.push(e.data); };
+        _pchRecorder.onstop = async () => {
+            stream.getTracks().forEach(tr => tr.stop());
+            _pchIsRecording = false;
+            pchUpdateMicButton();
+            const blob = new Blob(_pchRecordedChunks, { type: 'audio/webm' });
+            if (!blob.size) return;
+            try {
+                const url = await pchUploadFile(blob, 'webm');
+                const { error } = await sb.from('private_chat_messages').insert({
+                    thread_id: _pchUnlockedThreadId, sender_id: currentUser.id,
+                    attachment_url: url, attachment_type: 'audio',
+                });
+                if (error) throw error;
+                await pchLoadMessages(_pchUnlockedThreadId);
+                pchRefreshChatBody();
+            } catch (err) { alert('❌ خطأ فى رفع الرسالة الصوتية: ' + err.message); }
+        };
+        _pchRecorder.start();
+        _pchIsRecording = true;
+        pchUpdateMicButton();
+    } catch (err) {
+        alert('❌ محتاج صلاحية استخدام الميكروفون: ' + err.message);
+    }
 };
 
 window.pchTogglePin = async function (id, pin) {
@@ -345,5 +434,5 @@ window.pchSaveChangePass = async function () {
 Object.assign(window, {
     renderPrivateChat,
     pchOpenNewThread, pchSaveNewThread, pchPromptUnlock, pchTryUnlock,
-    pchSendMessage, pchTogglePin, pchLockAndBack, pchOpenChangePass, pchSaveChangePass,
+    pchSendMessage, pchPickImage, pchToggleRecording, pchTogglePin, pchLockAndBack, pchOpenChangePass, pchSaveChangePass,
 });
