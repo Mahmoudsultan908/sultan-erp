@@ -152,9 +152,157 @@ function vlSearchBarHTML() {
     return `
     <div class="inv-searchbar">
         <div style="flex:1;color:#CBD5E1;font-size:12.5px">اختار أصناف متعددة دفعة واحدة بالبحث، أو أضف صنف واحد يدوياً.</div>
+        <button class="inv-add-row-btn" onclick="vlOpenSuggestModal()">💡 اقتراح تحميل</button>
         <button class="inv-add-row-btn" onclick="vlOpenMultiPick()">☑️ اختيار أصناف متعددة</button>
         <button class="inv-add-row-btn" onclick="vlAddRow()">+ سطر يدوي</button>
     </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// اقتراح تحميل ذكي — بيرشّح أعلى الأصناف مبيعاً لهذا المندوب خلال
+// آخر فترة (وبيرجع لأعلى الأصناف مبيعاً على مستوى كل المندوبين لو
+// المندوب ده جديد ومعندوش مبيعات كفاية)، ممزوجة مع متوسط الكمية
+// اللي اتحمّلت له فعلاً فى آخر 5 تحميلات سابقة، عشان الاقتراح يعكس
+// إيه اللي بيتباع وإيه اللي المندوب ده متعوّد ياخده فى عربيته.
+// بيستخدم نفس آلية الاختيار المتعدد (_vlMultiSelected) فى الإضافة.
+// ════════════════════════════════════════════════════════════
+let _vlSuggestDays = 30;
+let _vlSuggestRows = [];
+
+function vlOpenSuggestModal() {
+    if (!vlRepId) { alert('اختر المندوب أولاً'); return; }
+    if (!vlWarehouseId) { alert('اختر المخزن أولاً'); return; }
+    document.getElementById('vlSuggestModal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'vlSuggestModal';
+    m.className = 'mod-modal-bg active';
+    m.innerHTML = `
+    <div class="mod-modal" style="max-width:680px">
+        <div class="mod-modal-header"><h3>💡 اقتراح تحميل ذكي</h3>
+            <button class="mod-modal-close" onclick="vlCloseSuggestModal()">✕</button></div>
+        <div class="mod-modal-body">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <label style="font-size:12.5px;color:#475569">آخر</label>
+                <select class="mod-form-input" id="vlSuggestDays" style="width:110px" onchange="vlRunSuggest(parseInt(this.value))">
+                    <option value="7">7 أيام</option>
+                    <option value="14">14 يوم</option>
+                    <option value="30" selected>30 يوم</option>
+                    <option value="60">60 يوم</option>
+                </select>
+                <div style="flex:1;font-size:11.5px;color:#94A3B8">الترتيب حسب الأكثر مبيعاً لهذا المندوب + الأكثر تحميلاً له فى آخر 5 تحميلات سابقة.</div>
+            </div>
+            <div id="vlSuggestList" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto">
+                <div class="empty-state"><span>⏳</span>جاري الحساب...</div>
+            </div>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="inv-btn inv-btn-print" onclick="vlCloseSuggestModal()">إلغاء</button>
+            <button class="inv-btn inv-btn-save" onclick="vlAddSuggested()">➕ إضافة المحدد</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+    _vlMultiSelected = {};
+    vlRunSuggest(_vlSuggestDays);
+}
+
+function vlCloseSuggestModal() {
+    document.getElementById('vlSuggestModal')?.remove();
+    _vlMultiSelected = {};
+}
+
+async function vlRunSuggest(days) {
+    _vlSuggestDays = days || 30;
+    const box = document.getElementById('vlSuggestList');
+    if (box) box.innerHTML = '<div class="empty-state"><span>⏳</span>جاري الحساب...</div>';
+    try {
+        const since = new Date(Date.now() - _vlSuggestDays * 86400000).toISOString();
+
+        let { data: repSales } = await sb.from('sales')
+            .select('id, sale_items(product_id, qty)')
+            .eq('rep_id', vlRepId).eq('status', 'confirmed').gte('created_at', since);
+
+        let soldMap = {};
+        (repSales || []).forEach(s => (s.sale_items || []).forEach(it => {
+            if (!it.product_id) return;
+            soldMap[it.product_id] = (soldMap[it.product_id] || 0) + (Number(it.qty) || 0);
+        }));
+
+        let usedFallback = false;
+        if (!Object.keys(soldMap).length) {
+            usedFallback = true;
+            const { data: allSales } = await sb.from('sales')
+                .select('id, sale_items(product_id, qty)')
+                .eq('status', 'confirmed').gte('created_at', since).limit(500);
+            (allSales || []).forEach(s => (s.sale_items || []).forEach(it => {
+                if (!it.product_id) return;
+                soldMap[it.product_id] = (soldMap[it.product_id] || 0) + (Number(it.qty) || 0);
+            }));
+        }
+
+        const { data: pastLoads } = await sb.from('van_stock_loads')
+            .select('id, van_stock_load_items(product_id, qty)')
+            .eq('rep_id', vlRepId).order('created_at', { ascending: false }).limit(5);
+
+        let loadMap = {};
+        const loadCount = (pastLoads || []).length || 1;
+        (pastLoads || []).forEach(l => (l.van_stock_load_items || []).forEach(it => {
+            if (!it.product_id) return;
+            loadMap[it.product_id] = (loadMap[it.product_id] || 0) + (Number(it.qty) || 0);
+        }));
+
+        const weeks = Math.max(_vlSuggestDays / 7, 1);
+        const pids = new Set([...Object.keys(soldMap), ...Object.keys(loadMap)]);
+
+        _vlSuggestRows = [...pids].map(pid => {
+            const sold = soldMap[pid] || 0;
+            const avgLoad = (loadMap[pid] || 0) / loadCount;
+            const stock = vlGetStock(pid);
+            let qty = Math.round(Math.max(avgLoad, sold / weeks));
+            if (qty < 1) qty = 1;
+            qty = Math.min(qty, stock);
+            return { pid, sold, avgLoad, stock, score: sold + avgLoad * 3, qty };
+        }).filter(r => r.stock > 0 && r.qty > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 30);
+
+        _vlSuggestRows.forEach(r => { _vlMultiSelected[r.pid] = r.qty; });
+        vlRenderSuggestList(usedFallback);
+    } catch (err) {
+        if (box) box.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:14px;border-radius:10px">خطأ: ${err.message}</div>`;
+    }
+}
+
+function vlRenderSuggestList(usedFallback) {
+    const box = document.getElementById('vlSuggestList');
+    if (!box) return;
+    if (!_vlSuggestRows.length) {
+        box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد بيانات مبيعات أو تحميلات سابقة كافية لهذا المندوب فى هذه الفترة (أو الأصناف المرشّحة رصيدها فى المخزن صفر).</div>';
+        return;
+    }
+    const note = usedFallback
+        ? `<div style="font-size:11px;color:#B45309;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:6px 10px;margin-bottom:8px">⚠️ المندوب ده لسه مالوش مبيعات كفاية فى الفترة دى، فالاقتراح مبني على الأكثر مبيعاً على مستوى كل المندوبين.</div>`
+        : '';
+    box.innerHTML = note + _vlSuggestRows.map(r => {
+        const p = VL_DB.products.find(x => x.id === r.pid);
+        if (!p) return '';
+        const sel = _vlMultiSelected[r.pid];
+        const checked = sel != null;
+        const qty = sel ?? r.qty;
+        return `<label class="inv-multi-row" data-pid="${r.pid}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="vlMultiToggle('${r.pid}',this.checked)">
+            <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code || ''} · ${p.unit || ''}</small>
+                <div style="font-size:10.5px;color:#94A3B8">مبيعات ${_vlSuggestDays} يوم: ${vlFmt(r.sold)} · متوسط تحميل سابق: ${vlFmt(r.avgLoad)}</div>
+            </span>
+            <span style="font-size:11px;color:#94A3B8">مخزون: ${vlFmt(r.stock)}</span>
+            <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="0.001" style="width:76px;padding:6px 8px"
+                onclick="event.stopPropagation()" oninput="vlMultiSetQty('${r.pid}',this.value)">
+        </label>`;
+    }).join('');
+}
+
+function vlAddSuggested() {
+    vlAddMultiPicked();
+    document.getElementById('vlSuggestModal')?.remove();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -600,4 +748,5 @@ Object.assign(window, {
     vlAddRow, vlRemoveRow, vlOnProductChange, vlOnQtyInput, vlOnFilterChange, vlSave, vlSaveAndPrint,
     vlOpenMultiPick, vlCloseMultiPick, vlRenderMultiPickList, vlMultiToggle, vlMultiSetQty, vlAddMultiPicked,
     vlOnLoadSeqInput,
+    vlOpenSuggestModal, vlCloseSuggestModal, vlRunSuggest, vlAddSuggested,
 });
