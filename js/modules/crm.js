@@ -13,7 +13,10 @@
    (ديسك توب أو موبايل) يشوفوا نفس النص.
    ════════════════════════════════════════════════════════════ */
 
-let _crmMode = 'leads'; // 'leads' | 'interactions'
+let _crmMode = 'tasks'; // 'tasks' | 'leads' | 'interactions'
+let _crmTasksView = 'mine'; // 'mine' | 'all'
+let _crmTopProductName = null; // أكتر صنف مبيعاً آخر 30 يوم — لمتغير {top_product} فى الرسائل
+let _crmEditingVariants = {}; // نسخ رسائل إضافية بيتم تعديلها فى مودال القوالب قبل الحفظ
 
 // ---- حالة التفاعلات (الموجودة من قبل) ----
 let _crmList = [];
@@ -99,18 +102,45 @@ function crmLeadUrgent(l) {
 function crmAgentName(l) {
     return _crmProfiles.find(p => p.id === l.assigned_to)?.name || currentUser?.name || 'سلطان';
 }
-function crmWaMsg(l) {
-    const tmpl = _crmTemplates[l.status] || CRM_DEFAULT_TEMPLATES[l.status] || CRM_DEFAULT_TEMPLATES['جديد'];
+function crmWaMsg(l, variant) {
+    let tmpl;
+    if (variant && _crmTemplates._variants?.[l.status]?.[variant]) tmpl = _crmTemplates._variants[l.status][variant];
+    else tmpl = _crmTemplates[l.status] || CRM_DEFAULT_TEMPLATES[l.status] || CRM_DEFAULT_TEMPLATES['جديد'];
+    const days = l.last_contact_date ? crmDaysDiff(l.last_contact_date) : 0;
     return tmpl
         .replace(/{name}/g, l.name || 'العميل')
         .replace(/{shop}/g, l.shop || 'المحل')
-        .replace(/{agent}/g, crmAgentName(l));
+        .replace(/{agent}/g, crmAgentName(l))
+        .replace(/{days}/g, String(days))
+        .replace(/{top_product}/g, _crmTopProductName || 'أصنافنا الجديدة');
 }
-function crmWaLink(l) {
+function crmWaLink(l, variant) {
     const phone = (l.phone || '').replace(/\D/g, '');
     const intl = phone.startsWith('0') ? '2' + phone : phone;
-    return `https://wa.me/${intl}?text=${encodeURIComponent(crmWaMsg(l))}`;
+    return `https://wa.me/${intl}?text=${encodeURIComponent(crmWaMsg(l, variant))}`;
 }
+
+// زرار واتساب لعميل محتمل — بيظهر قايمة اختيار نسخة الرسالة لو فيه
+// نسخ إضافية معرّفة لمرحلته (راجع crmOpenTemplatesModal)، وإلا زرار عادي
+function crmWaButtonHTML(l) {
+    const variants = Object.keys(_crmTemplates._variants?.[l.status] || {});
+    if (!variants.length) {
+        return `<a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${crmWaLink(l)}" target="_blank">📲</a>`;
+    }
+    return `<span style="display:inline-flex;gap:3px;align-items:center;vertical-align:middle">
+        <select id="crmVar-${l.id}" style="font-size:10px;padding:3px;border-radius:6px;border:1px solid #E2E8F0;max-width:90px" onclick="event.stopPropagation()">
+            <option value="">افتراضي</option>
+            ${variants.map(v => `<option value="${v.replace(/"/g, '&quot;')}">${v}</option>`).join('')}
+        </select>
+        <button class="cc-edit" style="background:#DCFCE7;color:#16A34A" onclick="crmSendLeadWa('${l.id}')">📲</button>
+    </span>`;
+}
+window.crmSendLeadWa = function (id) {
+    const lead = _crmLeads.find(l => l.id === id);
+    if (!lead) return;
+    const variant = document.getElementById('crmVar-' + id)?.value || '';
+    window.open(crmWaLink(lead, variant), '_blank');
+};
 
 // ---- رسالة واتساب عامة لمتابعة عميل حالي (مش Lead، ملوش مرحلة) ----
 const CRM_CUSTOMER_TPL_KEY = 'متابعة_عميل_حالي';
@@ -197,6 +227,30 @@ async function crmLoadLeadsData() {
         const { data } = await sb.from('app_settings').select('value').eq('key', 'crm_whatsapp_templates').maybeSingle();
         _crmTemplates = data?.value || {};
     } catch { _crmTemplates = {}; }
+    await crmLoadTopProduct();
+}
+
+// أكتر صنف بيتباع آخر 30 يوم (مبيعات مؤكدة) — لمتغير {top_product} فى رسائل الواتساب
+async function crmLoadTopProduct() {
+    try {
+        const since = new Date(Date.now() - 30 * 86400000).toISOString();
+        const { data: sales } = await sb.from('sales')
+            .select('id, sale_items(product_id, qty)')
+            .eq('status', 'confirmed').gte('created_at', since).limit(500);
+        const map = {};
+        (sales || []).forEach(s => (s.sale_items || []).forEach(it => {
+            if (!it.product_id) return;
+            map[it.product_id] = (map[it.product_id] || 0) + (Number(it.qty) || 0);
+        }));
+        let bestId = null, bestQty = 0;
+        Object.keys(map).forEach(pid => { if (map[pid] > bestQty) { bestQty = map[pid]; bestId = pid; } });
+        if (bestId) {
+            const { data: p } = await sb.from('products').select('name').eq('id', bestId).maybeSingle();
+            _crmTopProductName = p?.name || null;
+        } else {
+            _crmTopProductName = null;
+        }
+    } catch { _crmTopProductName = null; }
 }
 
 function crmRenderShell(c) {
@@ -206,18 +260,30 @@ function crmRenderShell(c) {
             <p style="font-size:13px;color:#64748B;margin-top:4px">عملاء محتملون وواتساب + متابعات العملاء الحاليين</p></div>
         </div>
         <div class="ob-tabs" style="margin-bottom:16px">
+            <button class="ob-tab ${_crmMode === 'tasks' ? 'active' : ''}" onclick="crmSwitchMode('tasks')">📋 مهام اليوم</button>
             <button class="ob-tab ${_crmMode === 'leads' ? 'active' : ''}" onclick="crmSwitchMode('leads')">🎯 العملاء المحتملون</button>
             <button class="ob-tab ${_crmMode === 'interactions' ? 'active' : ''}" onclick="crmSwitchMode('interactions')">📞 متابعات العملاء الحاليين</button>
         </div>
         <div id="crmModeBody"></div>`;
-    const body = document.getElementById('crmModeBody');
-    if (_crmMode === 'leads') crmRenderLeadsPage(body); else crmRenderPage(body);
+    crmRefreshCurrentBody();
 }
 
 window.crmSwitchMode = function (m) {
     _crmMode = m;
     crmRenderShell(document.getElementById('app-content'));
 };
+
+// بيرندر التبويب الحالي فى مكانه — بتُستخدم بعد أي إجراء (حفظ/حذف/تعديل)
+// عشان لو الإجراء اتعمل من تبويب "مهام اليوم" يفضل هو الظاهر مش يترندر
+// تبويب تاني بالغلط (كانت المشكلة قبل كده إن كل دالة كانت بترندر تبويبها
+// هي بس، فمن تبويب المهام كان ممكن يترندرلك تبويب تاني بعد الحفظ)
+function crmRefreshCurrentBody() {
+    const body = document.getElementById('crmModeBody');
+    if (!body) return;
+    if (_crmMode === 'tasks') crmRenderTasksPage(body);
+    else if (_crmMode === 'leads') crmRenderLeadsPage(body);
+    else crmRenderPage(body);
+}
 
 // ════════════════════════════════════════════════════════════
 // 1) متابعات العملاء الحاليين (الموجودة من قبل، بدون تعديل جوهري)
@@ -304,7 +370,7 @@ window.crmMarkDone = async function (id) {
         const { error } = await sb.from('customer_interactions').update({ is_done: true }).eq('id', id);
         if (error) throw error;
         await crmLoadInteractionsData();
-        crmRenderPage(document.getElementById('crmModeBody') || document.getElementById('app-content'));
+        crmRefreshCurrentBody();
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };
 
@@ -314,7 +380,7 @@ window.crmDelete = async function (id) {
         const { error } = await sb.from('customer_interactions').delete().eq('id', id);
         if (error) throw error;
         await crmLoadInteractionsData();
-        crmRenderPage(document.getElementById('crmModeBody') || document.getElementById('app-content'));
+        crmRefreshCurrentBody();
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };
 
@@ -518,6 +584,108 @@ window.crmSave = async function () {
 };
 
 // ════════════════════════════════════════════════════════════
+// 1ج) مهام اليوم — قايمة موحّدة بتجمع العملاء المحتملين المتأخرين
+//    (crmLeadUrgent) + متابعات العملاء الحاليين المستحقة، مرتبة
+//    الأكثر تأخيراً فوق، عشان تفتحها الأول كل يوم وتشتغل عليها
+//    نزول من غير ما تنقل بين تبويبين وتدوّر على اللي محتاج متابعة
+// ════════════════════════════════════════════════════════════
+function crmBuildTaskQueue() {
+    const today = crmToday();
+    const mineOnly = _crmTasksView === 'mine' && currentUser?.id;
+
+    const leadTasks = _crmLeads
+        .filter(l => crmLeadUrgent(l))
+        .filter(l => !mineOnly || l.assigned_to === currentUser.id)
+        .map(l => {
+            const cfg = CRM_LEAD_STAGES[l.status] || { color: '#64748B', icon: '?' };
+            const isDateDue = l.next_follow_up_date && l.next_follow_up_date <= today;
+            const reason = isDateDue
+                ? (l.next_follow_up_date < today ? `متابعة متأخرة من ${new Date(l.next_follow_up_date).toLocaleDateString('ar-EG')}` : 'متابعة مستحقة اليوم')
+                : `واقف على مرحلة "${l.status}" من غير رد من ${crmDaysDiff(l.last_contact_date)} يوم`;
+            const sortKey = isDateDue ? crmDaysDiff(l.next_follow_up_date) : crmDaysDiff(l.last_contact_date);
+            return {
+                kind: 'lead', id: l.id, sortKey,
+                name: l.name, sub: l.shop || l.area || '',
+                badge: `${cfg.icon} ${l.status}`, badgeColor: cfg.color, reason,
+                lastContact: l.last_contact_date ? new Date(l.last_contact_date).toLocaleDateString('ar-EG') : 'لم يتم التواصل',
+                lead: l,
+            };
+        });
+
+    const interactionTasks = _crmList
+        .filter(x => !x.is_done && x.next_follow_up_date && x.next_follow_up_date <= today)
+        .filter(x => !mineOnly || x.assigned_to === currentUser.id)
+        .map(x => {
+            const reason = x.next_follow_up_date < today ? `متابعة متأخرة من ${new Date(x.next_follow_up_date).toLocaleDateString('ar-EG')}` : 'متابعة مستحقة اليوم';
+            return {
+                kind: 'interaction', id: x.id, sortKey: crmDaysDiff(x.next_follow_up_date),
+                name: x.customers?.name || '—', sub: CRM_TYPE_LABELS[x.type] || x.type,
+                badge: null, badgeColor: null, reason,
+                lastContact: new Date(x.interaction_date).toLocaleDateString('ar-EG'),
+                waLink: crmCustomerWaLink(x),
+            };
+        });
+
+    return [...leadTasks, ...interactionTasks].sort((a, b) => b.sortKey - a.sortKey);
+}
+
+function crmRenderTasksPage(c) {
+    const queue = crmBuildTaskQueue();
+    c.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div class="ob-tabs">
+                <button class="ob-tab ${_crmTasksView === 'mine' ? 'active' : ''}" onclick="crmTasksSetView('mine')">👤 مهامي</button>
+                <button class="ob-tab ${_crmTasksView === 'all' ? 'active' : ''}" onclick="crmTasksSetView('all')">👥 الكل</button>
+            </div>
+            <div style="font-size:13px;color:#64748B">${queue.length} مهمة مستحقة</div>
+        </div>
+        <div class="mod-table-wrap">
+            <table class="mod-table"><thead><tr>
+                <th>العميل</th><th>الحالة</th><th>السبب</th><th>آخر تواصل</th><th style="text-align:center">إجراءات</th>
+            </tr></thead><tbody>
+                ${queue.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>✅</span>مفيش أي مهمة مستحقة النهارده — كله متابَع!</td></tr>` :
+                queue.map(t => `<tr style="background:#FEF2F2">
+                    <td style="font-weight:600">${t.name}<div style="font-size:11px;color:#94A3B8">${t.sub || ''}</div></td>
+                    <td>${t.badge ? `<span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid ${t.badgeColor};color:${t.badgeColor}">${t.badge}</span>` : `<span style="font-size:12px;color:#64748B">${t.sub}</span>`}</td>
+                    <td style="font-size:12px;color:#DC2626;font-weight:600">${t.reason}</td>
+                    <td style="font-size:12px">${t.lastContact}</td>
+                    <td style="text-align:center;white-space:nowrap">
+                        ${t.kind === 'lead' ? `
+                            ${crmWaButtonHTML(t.lead)}
+                            <button class="cc-edit" style="background:#F0FDF4;color:#059669" onclick="crmQuickTouchLead('${t.id}')">📞 اتصلت</button>
+                            <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenEditLead('${t.id}')">✏️</button>
+                        ` : `
+                            ${t.waLink ? `<a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${t.waLink}" target="_blank">📲</a>` : ''}
+                            <button class="cc-edit" style="background:#F0FDF4;color:#059669" onclick="crmMarkDone('${t.id}')">✅ تمّت</button>
+                        `}
+                    </td>
+                </tr>`).join('')}
+            </tbody></table>
+        </div>`;
+}
+
+window.crmTasksSetView = function (v) { _crmTasksView = v; crmRenderTasksPage(document.getElementById('crmModeBody')); };
+
+// تواصل سريع مع عميل محتمل من قايمة المهام — بيسجل إن التواصل حصل
+// النهارده وبيأجّل المتابعة القادمة بمدة مرحلته الحالية تلقائياً
+// (زي "تم التواصل" اللي مسموح لها 3 أيام)، من غير ما يفتح المودال
+// الكامل. لو محتاج يغيّر المرحلة أو يكتب ملاحظة، برضه فيه زرار ✏️ جنبه.
+window.crmQuickTouchLead = async function (id) {
+    const lead = _crmLeads.find(l => l.id === id);
+    if (!lead) return;
+    const cfg = CRM_LEAD_STAGES[lead.status];
+    const nextDate = cfg?.days ? new Date(Date.now() + cfg.days * 86400000).toISOString().slice(0, 10) : null;
+    try {
+        const { error } = await sb.from('crm_leads').update({
+            last_contact_date: crmToday(), next_follow_up_date: nextDate, updated_at: new Date().toISOString(),
+        }).eq('id', id);
+        if (error) throw error;
+        await crmLoadLeadsData();
+        crmRefreshCurrentBody();
+    } catch (err) { alert('❌ خطأ: ' + err.message); }
+};
+
+// ════════════════════════════════════════════════════════════
 // 2) قمع العملاء المحتملين (Leads) + واتساب
 // ════════════════════════════════════════════════════════════
 function crmLeadsFilteredList() {
@@ -601,7 +769,7 @@ function crmRenderLeadsPage(c) {
                         <td style="font-size:12px">${l.last_contact_date ? new Date(l.last_contact_date).toLocaleDateString('ar-EG') : 'لم يتم التواصل'}</td>
                         <td style="font-size:12px;${urg ? 'color:#DC2626;font-weight:700' : ''}">${l.next_follow_up_date ? new Date(l.next_follow_up_date).toLocaleDateString('ar-EG') : '—'}</td>
                         <td style="text-align:center;white-space:nowrap">
-                            <a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${crmWaLink(l)}" target="_blank">📲</a>
+                            ${crmWaButtonHTML(l)}
                             <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenEditLead('${l.id}')">✏️</button>
                             ${l.status === 'اشترى' && !l.converted_customer_id ? `<button class="cc-edit" style="background:#D1FAE5;color:#059669" onclick="crmConvertLead('${l.id}')">👤 تحويل لعميل</button>` : ''}
                             <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="crmDeleteLead('${l.id}')">🗑️</button>
@@ -622,7 +790,7 @@ window.crmDeleteLead = async function (id) {
         const { error } = await sb.from('crm_leads').delete().eq('id', id);
         if (error) throw error;
         await crmLoadLeadsData();
-        crmRenderLeadsPage(document.getElementById('crmModeBody'));
+        crmRefreshCurrentBody();
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };
 
@@ -654,7 +822,7 @@ window.crmConvertLead = async function (id) {
         if (updErr) throw updErr;
         alert('✅ تم إنشاء العميل بنجاح');
         await crmLoadLeadsData();
-        crmRenderLeadsPage(document.getElementById('crmModeBody'));
+        crmRefreshCurrentBody();
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };
 
@@ -783,7 +951,7 @@ window.crmSaveLead = async function (isEdit) {
         }
         document.getElementById('crmLeadModal').remove();
         await crmLoadLeadsData();
-        crmRenderLeadsPage(document.getElementById('crmModeBody'));
+        crmRefreshCurrentBody();
     } catch (err) {
         const hint = _crmLeadsTableMissing ? '\n\nتأكد من تشغيل crm_leads_migration.sql في Supabase.' : '';
         alert('❌ خطأ: ' + err.message + hint);
@@ -795,6 +963,7 @@ window.crmSaveLead = async function (isEdit) {
 // 3) قوالب رسائل الواتساب (مركزية — app_settings)
 // ════════════════════════════════════════════════════════════
 window.crmOpenTemplatesModal = function () {
+    _crmEditingVariants = JSON.parse(JSON.stringify(_crmTemplates._variants || {}));
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'crmTplModal';
@@ -807,13 +976,18 @@ window.crmOpenTemplatesModal = function () {
                     <strong>المتغيرات المتاحة:</strong>
                     <code>{name}</code> = اسم العميل &nbsp;|&nbsp;
                     <code>{shop}</code> = اسم المحل &nbsp;|&nbsp;
-                    <code>{agent}</code> = اسم المسؤول
+                    <code>{agent}</code> = اسم المسؤول &nbsp;|&nbsp;
+                    <code>{days}</code> = عدد الأيام من آخر تواصل &nbsp;|&nbsp;
+                    <code>{top_product}</code> = أكتر صنف بيتباع دلوقتي
                 </div>
                 <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;margin:6px 0">رسائل العملاء المحتملين (Leads)</div>
                 ${CRM_LEAD_STAGE_KEYS.filter(s => s !== 'خسرناه').map(s => `
                     <div class="mod-form-group">
-                        <label style="color:${CRM_LEAD_STAGES[s].color}">${CRM_LEAD_STAGES[s].icon} رسالة "${s}"</label>
+                        <label style="color:${CRM_LEAD_STAGES[s].color}">${CRM_LEAD_STAGES[s].icon} رسالة "${s}" (الافتراضية)</label>
                         <textarea class="mod-form-input" id="tpl-${s}" rows="5" style="font-size:12px">${_crmTemplates[s] || CRM_DEFAULT_TEMPLATES[s] || ''}</textarea>
+                    </div>
+                    <div id="crmVariantsBox-${s}" style="margin:0 0 16px;padding:10px;background:#F8FAFC;border-radius:8px">
+                        ${crmRenderVariantRows(s)}
                     </div>`).join('')}
                 <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;margin:14px 0 6px">رسالة متابعة عميل حالي (مش Lead)</div>
                 <div class="mod-form-group">
@@ -827,6 +1001,54 @@ window.crmOpenTemplatesModal = function () {
             </div>
         </div>`;
     document.body.appendChild(modal);
+};
+
+// نسخ إضافية اختيارية لكل مرحلة (غير الرسالة الافتراضية) — بتظهر كقايمة
+// اختيار جنب زرار 📲 فى جدول العملاء المحتملين وقايمة مهام اليوم، عشان
+// يبقى فيه أكتر من صياغة لنفس المرحلة (تذكير أول/تاني/عرض خاص...) بدل
+// ما يفضل نفس النص بيتكرر لكل عميل
+function crmRenderVariantRows(stage) {
+    const variants = _crmEditingVariants[stage] || {};
+    const names = Object.keys(variants);
+    return `
+        <div style="font-size:11px;font-weight:700;color:#94A3B8;margin-bottom:6px">نسخ إضافية لمرحلة "${stage}" (اختياري)</div>
+        ${names.map(name => `
+            <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
+                <input class="mod-form-input" style="width:110px;font-size:11px;padding:6px" value="${name}" onchange="crmRenameVariant('${stage}','${name.replace(/'/g, "\\'")}',this.value)">
+                <textarea class="mod-form-input" style="flex:1;font-size:11px" rows="3" oninput="crmEditVariantText('${stage}','${name.replace(/'/g, "\\'")}',this.value)">${variants[name] || ''}</textarea>
+                <button type="button" class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="crmRemoveVariant('${stage}','${name.replace(/'/g, "\\'")}')">✕</button>
+            </div>`).join('')}
+        <button type="button" class="mod-btn" style="background:#EFF6FF;color:#2563EB;font-size:11px;padding:6px 10px" onclick="crmAddVariant('${stage}')">➕ نسخة جديدة</button>
+    `;
+}
+
+window.crmAddVariant = function (stage) {
+    if (!_crmEditingVariants[stage]) _crmEditingVariants[stage] = {};
+    let n = 1, name = 'نسخة 1';
+    while (_crmEditingVariants[stage][name] != null) { n++; name = 'نسخة ' + n; }
+    _crmEditingVariants[stage][name] = '';
+    const box = document.getElementById('crmVariantsBox-' + stage);
+    if (box) box.innerHTML = crmRenderVariantRows(stage);
+};
+window.crmRemoveVariant = function (stage, name) {
+    if (_crmEditingVariants[stage]) delete _crmEditingVariants[stage][name];
+    const box = document.getElementById('crmVariantsBox-' + stage);
+    if (box) box.innerHTML = crmRenderVariantRows(stage);
+};
+window.crmEditVariantText = function (stage, name, val) {
+    if (!_crmEditingVariants[stage]) _crmEditingVariants[stage] = {};
+    _crmEditingVariants[stage][name] = val;
+};
+window.crmRenameVariant = function (stage, oldName, newName) {
+    newName = (newName || '').trim();
+    if (!newName || newName === oldName) return;
+    const obj = _crmEditingVariants[stage] || {};
+    if (obj[newName] != null) { alert('⚠️ فيه نسخة بنفس الاسم بالفعل'); const box = document.getElementById('crmVariantsBox-' + stage); if (box) box.innerHTML = crmRenderVariantRows(stage); return; }
+    obj[newName] = obj[oldName];
+    delete obj[oldName];
+    _crmEditingVariants[stage] = obj;
+    const box = document.getElementById('crmVariantsBox-' + stage);
+    if (box) box.innerHTML = crmRenderVariantRows(stage);
 };
 
 window.crmResetTemplates = function () {
@@ -846,6 +1068,18 @@ window.crmSaveTemplates = async function () {
     });
     const custEl = document.getElementById('tpl-' + CRM_CUSTOMER_TPL_KEY);
     if (custEl && custEl.value.trim()) templates[CRM_CUSTOMER_TPL_KEY] = custEl.value.trim();
+
+    const variants = {};
+    Object.keys(_crmEditingVariants).forEach(stage => {
+        const clean = {};
+        Object.keys(_crmEditingVariants[stage] || {}).forEach(name => {
+            const text = (_crmEditingVariants[stage][name] || '').trim();
+            if (text) clean[name] = text;
+        });
+        if (Object.keys(clean).length) variants[stage] = clean;
+    });
+    if (Object.keys(variants).length) templates._variants = variants;
+
     try {
         const { error } = await sb.from('app_settings').upsert({
             key: 'crm_whatsapp_templates', value: templates, updated_at: new Date().toISOString(),
@@ -865,4 +1099,6 @@ Object.assign(window, {
     crmDeleteLead, crmConvertLead, crmOpenAddLead, crmOpenEditLead,
     crmSelectLeadStage, crmSaveLead,
     crmOpenTemplatesModal, crmResetTemplates, crmSaveTemplates,
+    crmTasksSetView, crmQuickTouchLead, crmSendLeadWa,
+    crmAddVariant, crmRemoveVariant, crmEditVariantText, crmRenameVariant,
 });
