@@ -53,16 +53,18 @@ function pchOtherPerson(t) {
     return amManager ? (t.participant?.name || '—') : (t.manager?.name || '—');
 }
 
-// رفع صورة/رسالة صوتية لـ bucket "chat-media" الموجود بالفعل — نفس
-// نمط رفع المرفقات فى crm.js (sb.storage.from(...).upload) بس بمسار
-// منظّم تحت رقم المحادثة نفسها
+// رفع صورة/رسالة صوتية لـ bucket "chat-media" — الـ bucket ده خاص
+// (مش public)، والمسار بيبدأ برقم المحادثة نفسها (thread_id/filename)
+// عشان الـ RLS على storage.objects تقدر تتأكد إن اللي بيرفع/بيقرا هو
+// فعلاً أحد طرفي المحادثة دي بالظبط (راجع private_chat_signed_urls
+// migration). بيرجّع المسار الخام بس — مفيش رابط عام خالص، القراءة
+// الفعلية بتتم لاحقاً عبر createSignedUrl() فى pchLoadMessages
 async function pchUploadFile(file, ext) {
     const rand = pchRandomSalt().slice(0, 10);
     const path = `${_pchUnlockedThreadId}/${Date.now()}_${rand}.${ext}`;
     const { error: upErr } = await sb.storage.from('chat-media').upload(path, file);
     if (upErr) throw upErr;
-    const { data: pub } = sb.storage.from('chat-media').getPublicUrl(path);
-    return pub.publicUrl;
+    return path;
 }
 
 async function renderPrivateChat(c) {
@@ -222,11 +224,25 @@ window.pchTryUnlock = async function () {
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };
 
+// صلاحية الرابط الموقّع 24 ساعة — قصيرة كفاية إنها مش "رابط عام
+// دائم"، وطويلة كفاية إنها متتجددش كل ضغطة. بتتجدد تلقائياً فى كل
+// مرة تتفتح فيها المحادثة أو يتبعت/يتثبّت فيها حاجة، فمفيش داعي
+// لمدة أطول من كده
+const PCH_SIGNED_URL_SECONDS = 24 * 60 * 60;
+
 async function pchLoadMessages(threadId) {
     const { data, error } = await sb.from('private_chat_messages')
         .select('*, sender:sender_id(name)').eq('thread_id', threadId).order('created_at', { ascending: true });
     if (error) throw error;
     _pchMessages = data || [];
+    await Promise.all(_pchMessages.filter(m => m.attachment_path).map(async m => {
+        try {
+            const { data: signed, error: signErr } = await sb.storage.from('chat-media')
+                .createSignedUrl(m.attachment_path, PCH_SIGNED_URL_SECONDS);
+            if (signErr) throw signErr;
+            m._signedUrl = signed?.signedUrl || null;
+        } catch { m._signedUrl = null; }
+    }));
 }
 
 // ════════════════════════════════════════════════════════════
@@ -265,10 +281,12 @@ function pchChatViewHTML() {
 function pchMessageHTML(m) {
     const mine = m.sender_id === currentUser?.id;
     let attachmentHTML = '';
-    if (m.attachment_type === 'image') {
-        attachmentHTML = `<img src="${m.attachment_url}" style="max-width:220px;max-height:220px;border-radius:10px;display:block;cursor:pointer" onclick="window.open('${m.attachment_url}','_blank')">`;
-    } else if (m.attachment_type === 'audio') {
-        attachmentHTML = `<audio controls src="${m.attachment_url}" style="max-width:220px;display:block"></audio>`;
+    if (m.attachment_type === 'image' && m._signedUrl) {
+        attachmentHTML = `<img src="${m._signedUrl}" style="max-width:220px;max-height:220px;border-radius:10px;display:block;cursor:pointer" onclick="window.open('${m._signedUrl}','_blank')">`;
+    } else if (m.attachment_type === 'audio' && m._signedUrl) {
+        attachmentHTML = `<audio controls src="${m._signedUrl}" style="max-width:220px;display:block"></audio>`;
+    } else if (m.attachment_type) {
+        attachmentHTML = `<div style="color:#94A3B8;font-size:11px">⚠️ تعذّر تحميل المرفق (الرابط منتهي)</div>`;
     }
     const textHTML = m.body ? `<div style="${attachmentHTML ? 'margin-top:6px' : ''}">${m.body.replace(/</g, '&lt;')}</div>` : '';
     return `<div style="align-self:${mine ? 'flex-end' : 'flex-start'};max-width:75%">
@@ -307,10 +325,10 @@ window.pchPickImage = async function (input) {
     if (file.size > PCH_MAX_IMAGE_BYTES) { alert('⚠️ حجم الصورة كبير جداً (الحد الأقصى 8 ميجا)'); return; }
     try {
         const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-        const url = await pchUploadFile(file, ext);
+        const path = await pchUploadFile(file, ext);
         const { error } = await sb.from('private_chat_messages').insert({
             thread_id: _pchUnlockedThreadId, sender_id: currentUser.id,
-            attachment_url: url, attachment_type: 'image',
+            attachment_path: path, attachment_type: 'image',
         });
         if (error) throw error;
         await pchLoadMessages(_pchUnlockedThreadId);
@@ -345,10 +363,10 @@ window.pchToggleRecording = async function () {
             const blob = new Blob(_pchRecordedChunks, { type: 'audio/webm' });
             if (!blob.size) return;
             try {
-                const url = await pchUploadFile(blob, 'webm');
+                const path = await pchUploadFile(blob, 'webm');
                 const { error } = await sb.from('private_chat_messages').insert({
                     thread_id: _pchUnlockedThreadId, sender_id: currentUser.id,
-                    attachment_url: url, attachment_type: 'audio',
+                    attachment_path: path, attachment_type: 'audio',
                 });
                 if (error) throw error;
                 await pchLoadMessages(_pchUnlockedThreadId);
