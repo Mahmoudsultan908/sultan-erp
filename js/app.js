@@ -107,6 +107,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="reports-hub" onclick="loadMod(this, 'reports-hub')">📈 التقارير</div>
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
         <div class="nav-item" data-mod="purchase-orders" onclick="loadMod(this, 'purchase-orders')">📋 أوامر الشراء</div>
+        <div class="nav-item" data-mod="purchase-suggestions" onclick="loadMod(this, 'purchase-suggestions')">💡 اقتراح أمر شراء</div>
         <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب <span class="nav-soon-badge">قريباً</span></div>
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي <span class="nav-soon-badge">قريباً</span></div>
         </div>
@@ -325,6 +326,7 @@ const titles = {
         'quotations': 'عروض الأسعار',
         'purchases': 'فاتورة مشتريات جديدة',
         'purchase-orders': 'أوامر الشراء',
+        'purchase-suggestions': 'اقتراح أمر شراء',
         'payments': 'دفع الموردين (سندات صرف)',
         'collections': 'تحصيل العملاء (سندات قبض)',
         'invoice-review': 'مراجعة الفواتير وتعديلها',
@@ -364,6 +366,7 @@ async function _dispatchRender(modName, c) {
     if (modName === 'quotations' && typeof renderQuotations === 'function') await renderQuotations(c);
     if (modName === 'purchases' && typeof renderPurchases === 'function') await renderPurchases(c);
     if (modName === 'purchase-orders' && typeof renderPurchaseOrders === 'function') await renderPurchaseOrders(c);
+    if (modName === 'purchase-suggestions' && typeof renderPurchaseSuggestions === 'function') await renderPurchaseSuggestions(c);
     if (modName === 'payments' && typeof renderPayments === 'function') await renderPayments(c);
     if (modName === 'collections' && typeof renderCollections === 'function') await renderCollections(c);
     if (modName === 'invoice-review' && typeof renderInvoiceReview === 'function') await renderInvoiceReview(c);
