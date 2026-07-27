@@ -184,8 +184,8 @@ function pcWrapper(company, title, bodyHTML) {
 <style>
   @page { size: A4; margin: 15mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Cairo', 'Tahoma', sans-serif; color: #0F172A; font-size: 13px; }
-  .pc-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0F172A; padding-bottom: 14px; margin-bottom: 20px; }
+  body { font-family: 'Cairo', 'Tahoma', sans-serif; color: var(--inv-text); font-size: 13px; }
+  .pc-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid var(--inv-navy-deep); padding-bottom: 14px; margin-bottom: 20px; }
   .pc-company-name { font-size: 22px; font-weight: 800; }
   .pc-company-info { font-size: 11.5px; color: var(--inv-text-soft); margin-top: 4px; }
   .pc-doc-title { font-size: 20px; font-weight: 800; text-align: left; }
@@ -197,7 +197,7 @@ function pcWrapper(company, title, bodyHTML) {
   table.pc-items td { padding: 7px 10px; border-bottom: 1px solid #E2E8F0; font-size: 12px; }
   .pc-totals { width: 300px; margin-right: 0; margin-left: auto; }
   .pc-totals .row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12.5px; }
-  .pc-totals .grand { border-top: 2px solid #0F172A; margin-top: 6px; padding-top: 8px; font-size: 16px; font-weight: 800; }
+  .pc-totals .grand { border-top: 2px solid var(--inv-navy-deep); margin-top: 6px; padding-top: 8px; font-size: 16px; font-weight: 800; }
   .pc-footer { margin-top: 50px; display: flex; justify-content: space-between; }
   .pc-sign { width: 180px; border-top: 1px solid var(--inv-muted-light); text-align: center; padding-top: 6px; font-size: 11.5px; color: var(--inv-muted); }
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }

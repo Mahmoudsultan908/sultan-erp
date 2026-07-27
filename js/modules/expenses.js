@@ -192,7 +192,7 @@ function _expCatsPanelHTML(categories, catUsage) {
     return `
     <div class="mod-table-wrap">
         <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0">
-            <div style="font-size:14px;font-weight:800;color:#0F172A">📄 كشف حساب المصروفات حسب البند + الحدود الشهرية</div>
+            <div style="font-size:14px;font-weight:800;color:var(--inv-text)">📄 كشف حساب المصروفات حسب البند + الحدود الشهرية</div>
             <div style="font-size:12px;color:var(--inv-muted);margin-top:4px">اختَر الفترة اللي عايز تشوف مصروفات كل بند فيها (افتراضيًا الشهر الحالي) — وعدّل الحد الشهري لأي بند من هنا كمان</div>
             <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:12px 0 0">
                 <div><label class="ob-label">من تاريخ</label><input type="date" id="expCatsFrom" class="ob-input" style="margin:0" value="${_expCatsFrom}"></div>
@@ -505,7 +505,7 @@ window.expCheckLimit = async function() {
         catExceeded = pct >= 100;
         catHTML = `
             <div class="limit-box">
-                <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">📦 بند: <strong style="color:#0F172A">${catName}</strong> — شهر ${_expMonthLabel()}</div>
+                <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">📦 بند: <strong style="color:var(--inv-text)">${catName}</strong> — شهر ${_expMonthLabel()}</div>
                 <div class="limit-row"><span class="lr-label">المصروف السابق:</span><span class="lr-val">${_expFmt(used)} ج.م</span></div>
                 <div class="limit-row"><span class="lr-label">هذا المصروف:</span><span class="lr-val" style="color:var(--inv-red)">${_expFmt(amount)} ج.م</span></div>
                 <div class="limit-row"><span class="lr-label">الإجمالي بعد الإضافة:</span><span class="lr-val">${_expFmt(total)} ج.م</span><span style="color:var(--inv-muted-light);font-size:11px">/ ${_expFmt(catLimit)} ج.م</span></div>

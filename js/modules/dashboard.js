@@ -296,7 +296,7 @@ async function renderDashboard(container) {
                         <span>÷ متوسط هامش الربح الفعلي (آخر 90 يوم)</span>
                         <span>${Math.round(avgMarginPct * 100)}%</span>
                     </div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#0F172A;font-weight:700;margin-top:2px">
+                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-text);font-weight:700;margin-top:2px">
                         <span>= الهدف الشهري</span>
                         <span>${fmt(monthlySalesTarget)}</span>
                     </div>
@@ -481,13 +481,13 @@ function dashRenderTrendSVG(days) {
     <div style="position:relative">
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:150px;display:block" preserveAspectRatio="none">
         <line x1="${padL}" y1="${baseline.toFixed(1)}" x2="${W - padR}" y2="${baseline.toFixed(1)}" stroke="#F1F5F9" stroke-width="1"/>
-        <rect id="dashTrendHoverCol" x="0" y="${padT}" width="${barW.toFixed(1)}" height="${plotH.toFixed(1)}" fill="#0F172A" opacity="0"/>
+        <rect id="dashTrendHoverCol" x="0" y="${padT}" width="${barW.toFixed(1)}" height="${plotH.toFixed(1)}" fill="var(--inv-navy-deep)" opacity="0"/>
         ${bars}
         ${targetLine}
         ${xLabels}
         <rect x="${padL}" y="0" width="${plotW}" height="${H}" fill="transparent" onmousemove="dashTrendHover(event)" onmouseleave="dashTrendHoverOut()" style="cursor:crosshair"/>
       </svg>
-      <div id="dashTrendTooltip" style="position:absolute;top:6px;background:#0F172A;color:#fff;padding:4px 9px;border-radius:6px;font-size:11px;pointer-events:none;display:none;white-space:nowrap;line-height:1.5"></div>
+      <div id="dashTrendTooltip" style="position:absolute;top:6px;background:var(--inv-navy-deep);color:#fff;padding:4px 9px;border-radius:6px;font-size:11px;pointer-events:none;display:none;white-space:nowrap;line-height:1.5"></div>
     </div>
     ${!values.some(v => v > 0) ? '<p class="dash-empty" style="margin-top:8px">لا توجد مبيعات في هذه الفترة</p>' : ''}
     ${dashDailyTarget > 0 ? `<div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:var(--inv-muted)">

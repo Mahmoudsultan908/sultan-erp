@@ -181,7 +181,7 @@ window.supShowStatement = async function(supplierId) {
                 </div>
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المشتريات (آجل)</div>
-                    <div style="font-size:22px;font-weight:800;color:#0F172A">${supFmt(totalCredit)}</div>
+                    <div style="font-size:22px;font-weight:800;color:var(--inv-text)">${supFmt(totalCredit)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المدفوع</div>

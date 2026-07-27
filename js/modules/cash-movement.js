@@ -89,7 +89,7 @@ async function cmLoadData(c, from, to, refType, treasuryId) {
             <td><span class="dash-badge dash-badge-blue">${CASH_REF_LABELS[tx.ref_type] || tx.ref_type}</span></td>
             <td style="text-align:left;color:var(--inv-green);font-weight:700">${tx.direction==='in' ? cmFmt(tx.amount) : '—'}</td>
             <td style="text-align:left;color:var(--inv-red);font-weight:700">${tx.direction==='out' ? cmFmt(tx.amount) : '—'}</td>
-            <td style="text-align:left;font-weight:800;color:${tx.running>=0?'#0F172A':'var(--inv-red)'}">${cmFmt(tx.running)}</td>
+            <td style="text-align:left;font-weight:800;color:${tx.running>=0?'var(--inv-navy-deep)':'var(--inv-red)'}">${cmFmt(tx.running)}</td>
         </tr>`).join('');
 
         const treasuryName = treasuryId ? (_cmTreasuries.find(t=>t.id===treasuryId)?.name || '') : '';

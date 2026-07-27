@@ -228,7 +228,7 @@ window.custShowStatement = async function(customerId) {
                 </div>
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المبيعات (آجل)</div>
-                    <div style="font-size:22px;font-weight:800;color:#0F172A">${custFmt(totalDebit)}</div>
+                    <div style="font-size:22px;font-weight:800;color:var(--inv-text)">${custFmt(totalDebit)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي التحصيلات</div>

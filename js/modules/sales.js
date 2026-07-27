@@ -1022,7 +1022,7 @@ function invRenderMultiPickList(val) {
             <input type="checkbox" ${checked?'checked':''} onchange="invMultiToggle('${p.id}',this.checked)">
             <span style="flex:1">${p.name} <small style="color:var(--inv-muted-light)">${p.code||''} · ${p.unit||''}</small></span>
             <span style="font-size:11px;color:var(--inv-muted-light)">مخزون: ${invGetStock(p.id)}</span>
-            <span style="font-size:12px;color:#0F172A;font-weight:600">${invFmt(invGetSellPrice(p))}</span>
+            <span style="font-size:12px;color:var(--inv-text);font-weight:600">${invFmt(invGetSellPrice(p))}</span>
             <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="1" style="width:76px;padding:6px 8px"
                 onclick="event.stopPropagation()" oninput="invMultiSetQty('${p.id}',this.value)">
         </label>`;
@@ -1829,7 +1829,7 @@ function invShowShortcuts() {
             <div class="mod-modal-header"><h3>⌨️ اختصارات لوحة المفاتيح</h3>
                 <button class="mod-modal-close" onclick="invCloseShortcuts()">✕</button></div>
             <div class="mod-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;font-size:13px">
-                ${invShortcutList().map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #F1F5F9"><span style="color:var(--inv-text-soft)">${s.d}</span><kbd style="background:#0F172A;color:var(--inv-gold-soft);border-radius:5px;padding:2px 8px;font-size:11px;font-family:inherit">${s.k}</kbd></div>`).join('')}
+                ${invShortcutList().map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #F1F5F9"><span style="color:var(--inv-text-soft)">${s.d}</span><kbd style="background:var(--inv-navy-deep);color:var(--inv-gold-soft);border-radius:5px;padding:2px 8px;font-size:11px;font-family:inherit">${s.k}</kbd></div>`).join('')}
             </div></div>`;
         document.body.appendChild(m);
     }

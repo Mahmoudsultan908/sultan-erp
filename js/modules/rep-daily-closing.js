@@ -295,7 +295,7 @@ function rdcRenderDetail(c) {
             ${rows.length ? rows.join('') : `<p style="font-size:12px;color:var(--inv-muted-light);margin:0">${emptyTxt}</p>`}
         </div>`;
     const row = (label, amt, color) => `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px solid #F1F5F9">
-        <span style="color:var(--inv-text-soft)">${label}</span><span style="font-weight:700;color:${color||'#0F172A'}">${rdcFmt(amt)}</span>
+        <span style="color:var(--inv-text-soft)">${label}</span><span style="font-weight:700;color:${color||'var(--inv-navy-deep)'}">${rdcFmt(amt)}</span>
     </div>`;
 
     c.innerHTML = `

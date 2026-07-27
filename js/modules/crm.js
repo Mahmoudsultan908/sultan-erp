@@ -748,7 +748,7 @@ function crmRenderLeadsPage(c) {
                 const active = s === _crmLeadsFilter;
                 const cfg = CRM_LEAD_STAGES[s];
                 const cnt = s === 'الكل' ? scope.length : scope.filter(l => l.status === s).length;
-                return `<button onclick="crmLeadsSetFilter('${s}')" style="white-space:nowrap;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${active && cfg ? cfg.color : '#E2E8F0'};background:${active && cfg ? cfg.color : '#fff'};color:${active ? (cfg ? '#fff' : '#0F172A') : 'var(--inv-muted)'}">${s} (${cnt})</button>`;
+                return `<button onclick="crmLeadsSetFilter('${s}')" style="white-space:nowrap;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${active && cfg ? cfg.color : '#E2E8F0'};background:${active && cfg ? cfg.color : '#fff'};color:${active ? (cfg ? '#fff' : 'var(--inv-navy-deep)') : 'var(--inv-muted)'}">${s} (${cnt})</button>`;
             }).join('')}
         </div>
 

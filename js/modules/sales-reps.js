@@ -321,7 +321,7 @@ window.repShowStatement = async function (repId) {
                 </div>
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">صافي المبيعات (بعد ${repFmt(returnsTotal)} مرتجعات)</div>
-                    <div style="font-size:22px;font-weight:800;color:#0F172A">${repFmt(total)}</div>
+                    <div style="font-size:22px;font-weight:800;color:var(--inv-text)">${repFmt(total)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">العمولة المستحقة (${Number(rep.commission_pct) || 0}%)</div>
