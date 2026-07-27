@@ -172,6 +172,12 @@ function themeEffective() {
     if (saved === 'dark' || saved === 'light') return saved;
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
+// ★ للموديولات اللي بتحسب ألوان pastel فاتحة inline في JS (مش عن طريق
+//   CSS classes) — زي خلفيات صفوف كشف الحساب في customers.js/suppliers.js.
+//   دي مش هتتحدّث تلقائي لو المستخدم بدّل الوضع والمودال فاتح بالفعل
+//   (لازم يقفل ويفتحه تاني)، بس ده مقبول لأن المودالز بتتقفل/تتفتح
+//   عادي، مش شاشة دايمة مفتوحة.
+window.themeIsDark = () => themeEffective() === 'dark';
 function themeUpdateIcon() {
     const btn = document.getElementById('themeToggleBtn');
     if (btn) btn.textContent = themeEffective() === 'dark' ? '☀️' : '🌙';
