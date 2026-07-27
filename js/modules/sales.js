@@ -1332,7 +1332,18 @@ async function invSave(andNew) {
         const limit = Number(c?.credit_limit) || 0;
         if (limit > 0 && (Number(c?.balance)||0) + net > limit) {
             const over = ((Number(c?.balance)||0) + net - limit).toFixed(2);
-            const isAdmin = window._currentUserRole === 'admin';
+            // ★ بنقرأ الدور مباشرة من قاعدة البيانات هنا بدل الاعتماد على
+            //   window._currentUserRole — المتغيّر ده بيتحدّد وقت تسجيل
+            //   الدخول في users-management.js وممكن يتأخر أو يفشل بصمت
+            //   (try/catch فاضي هناك)، فلو حصل كده كان بيبان "ممنوع" لأي
+            //   حد حتى لو أدمن فعلي، أو العكس — القراءة المباشرة هنا مضمونة.
+            let isAdmin = window._currentUserRole === 'admin';
+            if (!isAdmin) {
+                try {
+                    const { data: myProfile } = await sb.from('profiles').select('role').eq('id', currentUser?.id).maybeSingle();
+                    isAdmin = myProfile?.role === 'admin';
+                } catch {}
+            }
             if (!isAdmin) {
                 alert(`🚫 تجاوز الحد الائتماني!\n\nالعميل: ${c.name}\nالحد: ${invFmt(limit)} ج.م\nالرصيد الحالي: ${invFmt(c.balance)} ج.م\nالفاتورة: ${invFmt(net)} ج.م\nالتجاوز: ${over} ج.م\n\nمينفعش تكمل الفاتورة دي — لازم تحصيل جزء من الحساب، أو ترفيع الحد، أو موافقة الأدمن.`);
                 return { ok: false };
