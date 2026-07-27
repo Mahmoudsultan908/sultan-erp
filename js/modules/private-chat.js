@@ -148,9 +148,9 @@ function pchRenderScreen(c) {
     c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">🔒 المحادثات الخاصة</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">محادثة محمية بكلمة سر منفصلة عن كلمة سر الدخول — كل شخص بيحط كلمة السر بتاعته وبيدخلها فى كل مرة يفتحها</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">محادثة محمية بكلمة سر منفصلة عن كلمة سر الدخول — كل شخص بيحط كلمة السر بتاعته وبيدخلها فى كل مرة يفتحها</p></div>
         <div style="display:flex;gap:8px">
-            ${typeof Notification !== 'undefined' && Notification.permission !== 'granted' ? `<button class="mod-btn" style="background:#FFFBEB;color:#D97706" onclick="pchRequestNotifyPermission()">🔔 تفعيل الإشعارات</button>` : ''}
+            ${typeof Notification !== 'undefined' && Notification.permission !== 'granted' ? `<button class="mod-btn" style="background:#FFFBEB;color:var(--inv-gold)" onclick="pchRequestNotifyPermission()">🔔 تفعيل الإشعارات</button>` : ''}
             ${PCH_DB.isAdmin && !_pchUnlockedThreadId ? `<button class="mod-btn mod-btn-primary" onclick="pchOpenNewThread()">+ محادثة جديدة</button>` : ''}
         </div>
     </div>
@@ -166,7 +166,7 @@ function pchThreadListHTML() {
         <div class="mod-card" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:16px" onclick="pchPromptUnlock('${t.id}')">
             <div>
                 <div style="font-weight:700">🔒 ${t.title || ('محادثة مع ' + pchOtherPerson(t))}</div>
-                <div style="font-size:11px;color:#94A3B8;margin-top:2px">مع: ${pchOtherPerson(t)}</div>
+                <div style="font-size:11px;color:var(--inv-muted-light);margin-top:2px">مع: ${pchOtherPerson(t)}</div>
             </div>
             <button class="mod-btn" style="background:#EFF6FF;color:#2563EB">🔓 فتح</button>
         </div>`).join('')}
@@ -194,10 +194,10 @@ window.pchOpenNewThread = function () {
                 <input type="password" id="pchNewMyPass" class="mod-form-input" placeholder="4 حروف/أرقام على الأقل"></div>
             <div class="mod-form-group"><label>كلمة السر بتاعة الطرف التاني</label>
                 <input type="password" id="pchNewTheirPass" class="mod-form-input" placeholder="4 حروف/أرقام على الأقل"></div>
-            <div style="font-size:11px;color:#94A3B8;line-height:1.7">كل واحد هيستخدم كلمة السر بتاعته بس عشان يفتح المحادثة دي (مش نفس السر). قوله كلمة سره على انفراد — وكل واحد فيهم يقدر يغيّرها بنفسه بعد كده من داخل المحادثة من غير ما يحتاج الطرف التاني.</div>
+            <div style="font-size:11px;color:var(--inv-muted-light);line-height:1.7">كل واحد هيستخدم كلمة السر بتاعته بس عشان يفتح المحادثة دي (مش نفس السر). قوله كلمة سره على انفراد — وكل واحد فيهم يقدر يغيّرها بنفسه بعد كده من داخل المحادثة من غير ما يحتاج الطرف التاني.</div>
         </div>
         <div class="mod-modal-footer">
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('pchNewModal').remove()">إلغاء</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('pchNewModal').remove()">إلغاء</button>
             <button class="mod-btn mod-btn-primary" onclick="pchSaveNewThread()">💾 إنشاء</button>
         </div>
     </div>`;
@@ -248,10 +248,10 @@ window.pchPromptUnlock = function (id) {
         <div class="mod-modal-body">
             <div class="mod-form-group"><label>أدخل كلمة السر الخاصة بيك لهذه المحادثة</label>
                 <input type="password" id="pchUnlockPass" class="mod-form-input" onkeydown="if(event.key==='Enter')pchTryUnlock()"></div>
-            <div id="pchUnlockErr" style="color:#DC2626;font-size:12px;display:none">❌ كلمة السر غلط</div>
+            <div id="pchUnlockErr" style="color:var(--inv-red);font-size:12px;display:none">❌ كلمة السر غلط</div>
         </div>
         <div class="mod-modal-footer">
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('pchUnlockModal').remove()">إلغاء</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('pchUnlockModal').remove()">إلغاء</button>
             <button class="mod-btn mod-btn-primary" onclick="pchTryUnlock()">فتح 🔓</button>
         </div>
     </div>`;
@@ -314,8 +314,8 @@ function pchChatViewHTML() {
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
             <div style="font-weight:800">🔒 محادثة مع ${pchOtherPerson(t)}</div>
             <div style="display:flex;gap:6px">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px" onclick="pchLockAndBack()">🔙 رجوع</button>
-                <button class="mod-btn" style="background:#FFFBEB;color:#D97706;font-size:12px;padding:6px 10px" onclick="pchOpenChangePass()">🔑 غيّر كلمة السر بتاعتي</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft);font-size:12px;padding:6px 10px" onclick="pchLockAndBack()">🔙 رجوع</button>
+                <button class="mod-btn" style="background:#FFFBEB;color:var(--inv-gold);font-size:12px;padding:6px 10px" onclick="pchOpenChangePass()">🔑 غيّر كلمة السر بتاعتي</button>
             </div>
         </div>
     </div>
@@ -328,8 +328,8 @@ function pchChatViewHTML() {
     </div>
     <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
         <input type="file" id="pchImageInput" accept="image/*" style="display:none" onchange="pchPickImage(this)">
-        <button class="mod-btn" style="background:#F1F5F9;color:#475569;padding:8px 10px" title="إرسال صورة" onclick="document.getElementById('pchImageInput').click()">📷</button>
-        <button class="mod-btn" id="pchMicBtn" style="background:#F1F5F9;color:#475569;padding:8px 10px" title="تسجيل رسالة صوتية" onclick="pchToggleRecording()">🎤</button>
+        <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft);padding:8px 10px" title="إرسال صورة" onclick="document.getElementById('pchImageInput').click()">📷</button>
+        <button class="mod-btn" id="pchMicBtn" style="background:#F1F5F9;color:var(--inv-text-soft);padding:8px 10px" title="تسجيل رسالة صوتية" onclick="pchToggleRecording()">🎤</button>
         <input type="text" id="pchNewMsg" class="mod-form-input" placeholder="اكتب رسالة..." onkeydown="if(event.key==='Enter')pchSendMessage()">
         <button class="mod-btn mod-btn-primary" onclick="pchSendMessage()">إرسال</button>
     </div>`;
@@ -343,12 +343,12 @@ function pchMessageHTML(m) {
     } else if (m.attachment_type === 'audio' && m._signedUrl) {
         attachmentHTML = `<audio controls src="${m._signedUrl}" style="max-width:220px;display:block"></audio>`;
     } else if (m.attachment_type) {
-        attachmentHTML = `<div style="color:#94A3B8;font-size:11px">⚠️ تعذّر تحميل المرفق (الرابط منتهي)</div>`;
+        attachmentHTML = `<div style="color:var(--inv-muted-light);font-size:11px">⚠️ تعذّر تحميل المرفق (الرابط منتهي)</div>`;
     }
     const textHTML = m.body ? `<div style="${attachmentHTML ? 'margin-top:6px' : ''}">${m.body.replace(/</g, '&lt;')}</div>` : '';
     return `<div style="align-self:${mine ? 'flex-end' : 'flex-start'};max-width:75%">
         <div style="background:${mine ? '#DBEAFE' : '#F1F5F9'};border-radius:12px;padding:8px 12px;font-size:13px;white-space:pre-wrap">${attachmentHTML}${textHTML}</div>
-        <div style="font-size:10px;color:#94A3B8;margin-top:2px;display:flex;gap:6px;align-items:center">
+        <div style="font-size:10px;color:var(--inv-muted-light);margin-top:2px;display:flex;gap:6px;align-items:center">
             <span>${m.sender?.name || ''} · ${new Date(m.created_at).toLocaleString('ar-EG')}</span>
             <span style="cursor:pointer" title="${m.is_pinned ? 'إلغاء التثبيت' : 'تثبيت'}" onclick="pchTogglePin('${m.id}',${!m.is_pinned})">${m.is_pinned ? '📌' : '📍'}</span>
         </div>
@@ -398,7 +398,7 @@ function pchUpdateMicButton() {
     if (!btn) return;
     btn.textContent = _pchIsRecording ? '⏹️' : '🎤';
     btn.style.background = _pchIsRecording ? '#FEE2E2' : '#F1F5F9';
-    btn.style.color = _pchIsRecording ? '#DC2626' : '#475569';
+    btn.style.color = _pchIsRecording ? 'var(--inv-red)' : 'var(--inv-text-soft)';
 }
 
 // تسجيل صوتي عبر MediaRecorder — زرار واحد يبدأ ويوقف (بدل ضغط مطوّل)،
@@ -471,7 +471,7 @@ window.pchOpenChangePass = function () {
                 <input type="password" id="pchNewPass2" class="mod-form-input"></div>
         </div>
         <div class="mod-modal-footer">
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('pchPassModal').remove()">إلغاء</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('pchPassModal').remove()">إلغاء</button>
             <button class="mod-btn mod-btn-primary" onclick="pchSaveChangePass()">💾 حفظ</button>
         </div>
     </div>`;

@@ -26,7 +26,7 @@ window.custShowStatement = async function(customerId) {
         <div class="mod-modal" style="max-width:820px">
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${cust.name}</h3>
                 <div style="display:flex;align-items:center;gap:10px">
-                    <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
+                    <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
                     <button class="mod-modal-close" onclick="custCloseModal('custStmtModal')">&times;</button>
                 </div></div>
             <div class="mod-modal-body" id="custStmtBody">
@@ -222,17 +222,17 @@ window.custShowStatement = async function(customerId) {
         document.getElementById('custStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">الرصيد الحالي</div>
-                    <div style="font-size:22px;font-weight:800;color:${balNow>0?'#DC2626':balNow<0?'#059669':'#64748B'}">${custFmt(balNow)} ج.م</div>
-                    <div style="font-size:11.5px;color:#94A3B8">${balNow>0?'مدين (لنا عليه)':balNow<0?'دائن (لنا عنده)':'مسدد'}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">الرصيد الحالي</div>
+                    <div style="font-size:22px;font-weight:800;color:${balNow>0?'var(--inv-red)':balNow<0?'var(--inv-green)':'var(--inv-muted)'}">${custFmt(balNow)} ج.م</div>
+                    <div style="font-size:11.5px;color:var(--inv-muted-light)">${balNow>0?'مدين (لنا عليه)':balNow<0?'دائن (لنا عنده)':'مسدد'}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">إجمالي المبيعات (آجل)</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المبيعات (آجل)</div>
                     <div style="font-size:22px;font-weight:800;color:#0F172A">${custFmt(totalDebit)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">إجمالي التحصيلات</div>
-                    <div style="font-size:22px;font-weight:800;color:#059669">${custFmt(totalCredit)}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي التحصيلات</div>
+                    <div style="font-size:22px;font-weight:800;color:var(--inv-green)">${custFmt(totalCredit)}</div>
                 </div>
             </div>
 
@@ -244,17 +244,17 @@ window.custShowStatement = async function(customerId) {
             <div id="custStmtTabBody">${custStmtMovesTabHtml()}</div>
 
             <div style="margin-top:16px">
-                <div style="font-size:13px;font-weight:800;color:#1E293B;margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
-                ${docs.length === 0 ? `<div style="font-size:12.5px;color:#94A3B8">لا توجد مستندات مرتبطة بهذا العميل في الأرشيف.</div>` :
+                <div style="font-size:13px;font-weight:800;color:var(--inv-navy);margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
+                ${docs.length === 0 ? `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد مستندات مرتبطة بهذا العميل في الأرشيف.</div>` :
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
-                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:#D97706;text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
+                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
                 </div>`}
             </div>
 
             <div style="margin-top:16px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                    <div style="font-size:13px;font-weight:800;color:#1E293B">🤝 سجل التفاعلات (${interactions.length})</div>
-                    ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="crmOpenAdd('${customerId}','${(cust.name||'').replace(/'/g,"\\'")}')">+ تسجيل تفاعل</button>` : ''}
+                    <div style="font-size:13px;font-weight:800;color:var(--inv-navy)">🤝 سجل التفاعلات (${interactions.length})</div>
+                    ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="crmOpenAdd('${customerId}','${(cust.name||'').replace(/'/g,"\\'")}')">+ تسجيل تفاعل</button>` : ''}
                 </div>
                 <div id="custInteractionsWrap">${custInteractionsHTML(interactions)}</div>
             </div>`;
@@ -277,13 +277,13 @@ function custStmtRowsHtml(moves) {
             : m.type==='transfer-out' || m.type==='transfer-in' ? '#EFF6FF'
             : m.type==='opening' ? '#F5F3FF'
             : m.type==='legacy-carry' ? '#F1F5F9' : '#F8FAFC';
-        const icon = m.type==='sale-credit' ? '<span style="color:#DC2626">🛒</span>'
-            : m.type==='sale-cash' ? '<span style="color:#94A3B8">💰</span>'
-            : m.type.startsWith('return') ? '<span style="color:#D97706">↩️</span>'
+        const icon = m.type==='sale-credit' ? '<span style="color:var(--inv-red)">🛒</span>'
+            : m.type==='sale-cash' ? '<span style="color:var(--inv-muted-light)">💰</span>'
+            : m.type.startsWith('return') ? '<span style="color:var(--inv-gold)">↩️</span>'
             : m.type.startsWith('transfer') ? '<span style="color:#2563EB">🔀</span>'
             : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
-            : m.type==='legacy-carry' ? '<span style="color:#64748B">🗄️</span>'
-            : '<span style="color:#059669">💵</span>';
+            : m.type==='legacy-carry' ? '<span style="color:var(--inv-muted)">🗄️</span>'
+            : '<span style="color:var(--inv-green)">💵</span>';
         const navBtn = m.nav?.kind === 'sale' ? `<button class="cc-edit" title="افتح الفاتورة" onclick="custGoToDoc('sales','${m.nav.no}')">🔗</button>`
             : m.nav?.kind === 'return' ? `<button class="cc-edit" title="افتح المرتجع" onclick="custGoToDoc('sales_return','${m.nav.no}')">🔗</button>`
             : m.nav?.kind === 'payment' ? `<button class="cc-edit" title="افتح سند التحصيل" onclick="custGoToPayment('${m.nav.id}')">🔗</button>`
@@ -294,10 +294,10 @@ function custStmtRowsHtml(moves) {
         <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
         <td>
             ${icon} ${m.desc}
-            ${isCash ? '<span style="font-size:11.5px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
+            ${isCash ? '<span style="font-size:11.5px;color:var(--inv-muted-light)"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
         </td>
-        <td style="text-align:left;font-weight:600;color:#DC2626">${m.debit?custFmt(m.debit):'—'}</td>
-        <td style="text-align:left;font-weight:600;color:#059669">${m.credit?custFmt(m.credit):'—'}</td>
+        <td style="text-align:left;font-weight:600;color:var(--inv-red)">${m.debit?custFmt(m.debit):'—'}</td>
+        <td style="text-align:left;font-weight:600;color:var(--inv-green)">${m.credit?custFmt(m.credit):'—'}</td>
         <td style="text-align:left;font-weight:700">${custFmt(m.balance)}</td>
         <td style="text-align:center">${navBtn}</td>
     </tr>`;
@@ -341,15 +341,15 @@ function custStmtMovesTabHtml() {
             <tbody id="custStmtTbody">${custStmtRowsHtml(_custStmtMoves)}</tbody>
             ${_custStmtMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
                 <td colspan="2">الإجمالي</td>
-                <td style="text-align:left;color:#DC2626">${custFmt(t.tableDebit)}</td>
-                <td style="text-align:left;color:#059669">${custFmt(t.tableCredit)}</td>
+                <td style="text-align:left;color:var(--inv-red)">${custFmt(t.tableDebit)}</td>
+                <td style="text-align:left;color:var(--inv-green)">${custFmt(t.tableCredit)}</td>
                 <td style="text-align:left">${custFmt(t.balNow)}</td>
                 <td></td>
             </tr></tfoot>` : ''}
             </table>
         </div>
         ${Math.abs(_custStmtLegacyDiff) > 0.01 ? `
-        <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:#475569;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
+        <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:var(--inv-text-soft);padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
             🗄️ سطر "رصيد مرحّل من النظام القديم" (${custFmt(_custStmtLegacyDiff)}) هو الفرق بين رصيد العميل الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
             غالبًا عميل منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد العميل نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.
         </div>` : ''}`;
@@ -364,15 +364,15 @@ function custStmtItemsTabHtml() {
     </tr></thead><tbody>
         ${_custStmtItems.map(i => `<tr>
             <td style="font-weight:600">${i.name}</td>
-            <td style="color:#64748B">${i.unit||'—'}</td>
+            <td style="color:var(--inv-muted)">${i.unit||'—'}</td>
             <td style="text-align:left">${custFmt(i.qty)}</td>
-            <td style="text-align:left;color:#64748B">${custFmt(i.qty ? i.total/i.qty : 0)}</td>
+            <td style="text-align:left;color:var(--inv-muted)">${custFmt(i.qty ? i.total/i.qty : 0)}</td>
             <td style="text-align:left;font-weight:700">${custFmt(i.total)}</td>
         </tr>`).join('')}
     </tbody><tfoot><tr style="background:#F8FAFC;font-weight:800">
         <td colspan="2">الإجمالي</td><td style="text-align:left">${custFmt(totalQty)}</td><td></td><td style="text-align:left">${custFmt(totalVal)}</td>
     </tr></tfoot></table></div>
-    <div style="font-size:11.5px;color:#94A3B8;margin-top:8px">إجمالي المشتريات (إجمالي، قبل خصم المرتجعات — تفاصيل المرتجعات فى تبويب "الحركات").</div>`;
+    <div style="font-size:11.5px;color:var(--inv-muted-light);margin-top:8px">إجمالي المشتريات (إجمالي، قبل خصم المرتجعات — تفاصيل المرتجعات فى تبويب "الحركات").</div>`;
 }
 
 function custStmtProfitTabHtml() {
@@ -385,14 +385,14 @@ function custStmtProfitTabHtml() {
         ${_custStmtProfit.map(m => `<tr>
             <td>${m.label}</td>
             <td style="text-align:left">${custFmt(m.revenue)}</td>
-            <td style="text-align:left;color:#64748B">${custFmt(m.cogs)}</td>
-            <td style="text-align:left;font-weight:700;color:${m.profit>=0?'#059669':'#DC2626'}">${custFmt(m.profit)}</td>
+            <td style="text-align:left;color:var(--inv-muted)">${custFmt(m.cogs)}</td>
+            <td style="text-align:left;font-weight:700;color:${m.profit>=0?'var(--inv-green)':'var(--inv-red)'}">${custFmt(m.profit)}</td>
         </tr>`).join('')}
     </tbody><tfoot><tr style="background:#F8FAFC;font-weight:800">
         <td>الإجمالي (12 شهر)</td><td style="text-align:left">${custFmt(totalRevenue)}</td><td style="text-align:left">${custFmt(totalCogs)}</td>
-        <td style="text-align:left;color:${totalProfit>=0?'#059669':'#DC2626'}">${custFmt(totalProfit)}</td>
+        <td style="text-align:left;color:${totalProfit>=0?'var(--inv-green)':'var(--inv-red)'}">${custFmt(totalProfit)}</td>
     </tr></tfoot></table></div>
-    <div style="font-size:11.5px;color:#94A3B8;margin-top:8px">المكسب = صافي المبيعات (بعد خصم مرتجعات نفس الشهر) − تكلفة البضاعة المباعة، حسب سعر التكلفة المسجّل وقت كل عملية.</div>`;
+    <div style="font-size:11.5px;color:var(--inv-muted-light);margin-top:8px">المكسب = صافي المبيعات (بعد خصم مرتجعات نفس الشهر) − تكلفة البضاعة المباعة، حسب سعر التكلفة المسجّل وقت كل عملية.</div>`;
 }
 
 // ينقل لصفحة "إدارة العملاء" (master-data.js) ويفتح نافذة تعديل بيانات
@@ -428,16 +428,16 @@ window.custGoToModule = function(mod) {
 //    إعادة تحميل الكشف كله بعد ما تسجّل تفاعل جديد من crm.js
 // ════════════════════════════════════════════════════════════
 function custInteractionsHTML(interactions) {
-    if (!interactions.length) return `<div style="font-size:12.5px;color:#94A3B8">لا توجد تفاعلات مسجّلة لهذا العميل.</div>`;
+    if (!interactions.length) return `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد تفاعلات مسجّلة لهذا العميل.</div>`;
     const typeLabels = { call: '📞 مكالمة', visit: '🚶 زيارة', complaint: '⚠️ شكوى', note: '📝 ملاحظة' };
     return `<div class="mod-table-wrap"><table class="mod-table"><thead><tr>
         <th>النوع</th><th>المندوب</th><th>التاريخ</th><th>ملاحظات</th><th>المتابعة القادمة</th>
     </tr></thead><tbody>
         ${interactions.map(x => `<tr>
             <td>${typeLabels[x.type] || x.type}</td>
-            <td style="color:#64748B">${x.sales_reps?.name || '—'}</td>
+            <td style="color:var(--inv-muted)">${x.sales_reps?.name || '—'}</td>
             <td style="font-size:12px">${new Date(x.interaction_date).toLocaleDateString('ar-EG')}</td>
-            <td style="color:#64748B">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:#D97706">📎 ${x.archive_documents.title}</a>` : ''}</td>
+            <td style="color:var(--inv-muted)">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:var(--inv-gold)">📎 ${x.archive_documents.title}</a>` : ''}</td>
             <td style="font-size:12px">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') + (x.is_done ? ' ✅' : '') : '—'}</td>
         </tr>`).join('')}
     </tbody></table></div>`;
@@ -462,6 +462,6 @@ function custFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFra
 // null = تسجيل يدوي/قديم قبل إضافة العمود، مفيش بادچ ليه
 function custSourceBadge(source) {
     if (source === 'sultanoo') return '<span style="font-size:9.5px;background:#EFF6FF;color:#2563EB;padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">📱 سلطانو</span>';
-    if (source === 'rep_app') return '<span style="font-size:9.5px;background:#F0FDF4;color:#059669;padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">🚗 مندوب</span>';
+    if (source === 'rep_app') return '<span style="font-size:9.5px;background:#F0FDF4;color:var(--inv-green);padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">🚗 مندوب</span>';
     return '';
 }

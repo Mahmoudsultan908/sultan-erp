@@ -45,11 +45,11 @@ function btRender(c) {
     c.innerHTML = `
     <div style="margin-bottom:20px">
         <h2 style="font-size:22px;font-weight:800">🔀 تحويل الأرصدة</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">تحويل يدوي لرصيد بين عميلين، بين موردين، أو استرداد نقدي من رصيد مورد لخزنة</p>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تحويل يدوي لرصيد بين عميلين، بين موردين، أو استرداد نقدي من رصيد مورد لخزنة</p>
     </div>
 
     <div class="mod-tabs" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        ${BT_TABS.map(t => `<button class="mod-btn" style="background:${t.id===_btTab?'#1E3A8A':'#F1F5F9'};color:${t.id===_btTab?'#fff':'#475569'}" onclick="btSwitchTab('${t.id}')">${t.label}</button>`).join('')}
+        ${BT_TABS.map(t => `<button class="mod-btn" style="background:${t.id===_btTab?'#1E3A8A':'#F1F5F9'};color:${t.id===_btTab?'#fff':'var(--inv-text-soft)'}" onclick="btSwitchTab('${t.id}')">${t.label}</button>`).join('')}
     </div>
 
     <div class="mod-card" style="max-width:600px">

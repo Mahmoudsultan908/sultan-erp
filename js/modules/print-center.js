@@ -34,7 +34,7 @@ function pcNumberPlaceholder() { return PC_PLACEHOLDERS[_pcDocType] || ''; }
 async function renderPrintCenter(c) {
     c.innerHTML = `
     <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">🖨️ مركز الطباعة</h2>
-    <p style="font-size:13px;color:#64748B;margin-top:4px">تصاميم طباعة A4 إضافية للفواتير والسندات — بجانب طباعة الكاشير الحرارية 80mm الموجودة من كل شاشة</p></div>
+    <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تصاميم طباعة A4 إضافية للفواتير والسندات — بجانب طباعة الكاشير الحرارية 80mm الموجودة من كل شاشة</p></div>
     <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:16px">
         💡 "حفظ PDF" بيتم من نافذة الطباعة نفسها — اختار "Save as PDF" بدل اسم الطابعة في نافذة الطباعة اللي هتفتح من المتصفح.
     </div>
@@ -71,7 +71,7 @@ window.pcSearch = async function () {
     const no = document.getElementById('pcDocNo')?.value.trim();
     if (!no) { alert('أدخل رقم المستند'); return; }
     const resultEl = document.getElementById('pc-result');
-    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري البحث...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري البحث...</div>';
 
     try {
         let html;
@@ -149,7 +149,7 @@ window.pcSearch = async function () {
         resultEl.innerHTML = `
         <div class="dash-card" style="padding:20px">
             <div style="font-weight:800;font-size:15px;margin-bottom:6px">✅ ${_pcFoundDoc.title}</div>
-            <div style="font-size:13px;color:#64748B;margin-bottom:16px">${_pcFoundDoc.summary}</div>
+            <div style="font-size:13px;color:var(--inv-muted);margin-bottom:16px">${_pcFoundDoc.summary}</div>
             <button class="mod-btn mod-btn-primary" onclick="pcPrintFound()">🖨️ طباعة A4 / حفظ PDF</button>
         </div>`;
     } catch (err) {
@@ -187,11 +187,11 @@ function pcWrapper(company, title, bodyHTML) {
   body { font-family: 'Cairo', 'Tahoma', sans-serif; color: #0F172A; font-size: 13px; }
   .pc-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0F172A; padding-bottom: 14px; margin-bottom: 20px; }
   .pc-company-name { font-size: 22px; font-weight: 800; }
-  .pc-company-info { font-size: 11.5px; color: #475569; margin-top: 4px; }
+  .pc-company-info { font-size: 11.5px; color: var(--inv-text-soft); margin-top: 4px; }
   .pc-doc-title { font-size: 20px; font-weight: 800; text-align: left; }
-  .pc-doc-date { font-size: 12px; color: #475569; text-align: left; margin-top: 4px; }
+  .pc-doc-date { font-size: 12px; color: var(--inv-text-soft); text-align: left; margin-top: 4px; }
   .pc-meta { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; font-size: 12.5px; flex-wrap: wrap; }
-  .pc-meta .lbl { color: #64748B; }
+  .pc-meta .lbl { color: var(--inv-muted); }
   table.pc-items { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
   table.pc-items th { background: #F1F5F9; padding: 8px 10px; text-align: right; font-size: 11.5px; border-bottom: 2px solid #CBD5E1; }
   table.pc-items td { padding: 7px 10px; border-bottom: 1px solid #E2E8F0; font-size: 12px; }
@@ -199,7 +199,7 @@ function pcWrapper(company, title, bodyHTML) {
   .pc-totals .row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12.5px; }
   .pc-totals .grand { border-top: 2px solid #0F172A; margin-top: 6px; padding-top: 8px; font-size: 16px; font-weight: 800; }
   .pc-footer { margin-top: 50px; display: flex; justify-content: space-between; }
-  .pc-sign { width: 180px; border-top: 1px solid #94A3B8; text-align: center; padding-top: 6px; font-size: 11.5px; color: #64748B; }
+  .pc-sign { width: 180px; border-top: 1px solid var(--inv-muted-light); text-align: center; padding-top: 6px; font-size: 11.5px; color: var(--inv-muted); }
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style>
 </head>

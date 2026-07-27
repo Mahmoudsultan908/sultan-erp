@@ -56,7 +56,7 @@ function wrRenderPage(c) {
     c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">📊 تقارير المخازن التفصيلية</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">تقييم المخزون بسعر التكلفة، وحركة كل صنف في كل مخزن</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تقييم المخزون بسعر التكلفة، وحركة كل صنف في كل مخزن</p></div>
     </div>
     <div class="exp-tabs">
         <button class="exp-tab ${_wrTab === 'valuation' ? 'active' : ''}" onclick="wrSwitchTab('valuation')">💰 تقييم المخزون</button>
@@ -100,19 +100,19 @@ function wrRenderValuation() {
     body.innerHTML = `
     <div class="mod-grid" style="margin-bottom:16px">
         <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🏭</div><div class="mod-card-val">${_wrWarehouses.length}</div><div class="mod-card-lbl">عدد المخازن</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">📦</div><div class="mod-card-val">${_wrStock.filter(s => Number(s.qty) > 0).length}</div><div class="mod-card-lbl">أرصدة أصناف نشطة</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💰</div><div class="mod-card-val">${wrFmt(grandTotal)}</div><div class="mod-card-lbl">قيمة المخزون الإجمالية (تكلفة)</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">📦</div><div class="mod-card-val">${_wrStock.filter(s => Number(s.qty) > 0).length}</div><div class="mod-card-lbl">أرصدة أصناف نشطة</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💰</div><div class="mod-card-val">${wrFmt(grandTotal)}</div><div class="mod-card-lbl">قيمة المخزون الإجمالية (تكلفة)</div></div>
     </div>
 
     <div class="mod-table-wrap">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">🏭 القيمة حسب المخزن</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">🏭 القيمة حسب المخزن</div>
         <table class="mod-table"><thead><tr>
             <th>المخزن</th><th style="text-align:center">عدد الأصناف</th><th style="text-align:center">إجمالي الكمية</th><th style="text-align:left">قيمة المخزون</th>
         </tr></thead><tbody>
             ${_wrWarehouses.length ? _wrWarehouses.map(w => {
                 const agg = byWh[w.id] || { itemCount: 0, qtyTotal: 0, value: 0 };
                 return `<tr>
-                    <td><strong>${w.name}</strong>${w.is_main ? ' <span style="font-size:11.5px;color:#94A3B8">(رئيسي)</span>' : ''}</td>
+                    <td><strong>${w.name}</strong>${w.is_main ? ' <span style="font-size:11.5px;color:var(--inv-muted-light)">(رئيسي)</span>' : ''}</td>
                     <td style="text-align:center">${agg.itemCount}</td>
                     <td style="text-align:center">${wrFmt(agg.qtyTotal)}</td>
                     <td style="text-align:left;font-weight:700">${wrFmt(agg.value)}</td>
@@ -126,16 +126,16 @@ function wrRenderValuation() {
     </div>
 
     <div class="mod-table-wrap" style="margin-top:16px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">🏆 أعلى 15 صنف قيمة (في كل المخازن)</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">🏆 أعلى 15 صنف قيمة (في كل المخازن)</div>
         <table class="mod-table"><thead><tr>
             <th>الصنف</th><th>المخزن</th><th style="text-align:center">الكمية</th><th style="text-align:left">تكلفة الوحدة</th><th style="text-align:left">القيمة</th>
         </tr></thead><tbody>
             ${topRows.length ? topRows.map(r => `<tr>
-                <td><strong>${r.name}</strong>${!r.active ? ' <span style="font-size:11.5px;color:#DC2626">(غير نشط)</span>' : ''}${r.code ? `<div style="font-size:11.5px;color:#94A3B8">${r.code}</div>` : ''}</td>
+                <td><strong>${r.name}</strong>${!r.active ? ' <span style="font-size:11.5px;color:var(--inv-red)">(غير نشط)</span>' : ''}${r.code ? `<div style="font-size:11.5px;color:var(--inv-muted-light)">${r.code}</div>` : ''}</td>
                 <td>${r.whName}</td>
                 <td style="text-align:center">${wrFmt(r.qty)} ${r.unit || ''}</td>
                 <td style="text-align:left">${wrFmt(r.cost)}</td>
-                <td style="text-align:left;font-weight:700;color:#059669">${wrFmt(r.value)}</td>
+                <td style="text-align:left;font-weight:700;color:var(--inv-green)">${wrFmt(r.value)}</td>
             </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📦</span>لا توجد أرصدة مخزون بعد</td></tr>`}
         </tbody></table>
     </div>`;
@@ -169,11 +169,11 @@ function wrRenderMovementForm() {
 }
 
 const WR_TYPE_META = {
-    opening:         { icon: '🏁', color: '#64748B', label: 'رصيد افتتاحي' },
-    purchase:        { icon: '📥', color: '#059669', label: 'شراء' },
-    sale:            { icon: '🛒', color: '#DC2626', label: 'بيع' },
-    sale_return:     { icon: '↩️', color: '#059669', label: 'مرتجع بيع' },
-    purchase_return: { icon: '↩️', color: '#DC2626', label: 'مرتجع شراء' },
+    opening:         { icon: '🏁', color: 'var(--inv-muted)', label: 'رصيد افتتاحي' },
+    purchase:        { icon: '📥', color: 'var(--inv-green)', label: 'شراء' },
+    sale:            { icon: '🛒', color: 'var(--inv-red)', label: 'بيع' },
+    sale_return:     { icon: '↩️', color: 'var(--inv-green)', label: 'مرتجع بيع' },
+    purchase_return: { icon: '↩️', color: 'var(--inv-red)', label: 'مرتجع شراء' },
 };
 
 window.wrRunMovement = async function () {
@@ -184,7 +184,7 @@ window.wrRunMovement = async function () {
     if (!pid) { alert('اختر صنفاً أولاً'); return; }
 
     const resultEl = document.getElementById('wr-movement-result');
-    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري تجميع الحركة...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري تجميع الحركة...</div>';
 
     try {
         const [
@@ -226,8 +226,8 @@ window.wrRunMovement = async function () {
         resultEl.innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📦</div><div class="mod-card-val" style="font-size:16px">${prod?.name || '—'}</div><div class="mod-card-lbl">${wh ? wh.name : 'كل المخازن'}</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">🔄</div><div class="mod-card-val">${moves.length}</div><div class="mod-card-lbl">عدد الحركات (بالفلتر الحالي)</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">✅</div><div class="mod-card-val">${wrFmt(liveTotal)}</div><div class="mod-card-lbl">الرصيد الفعلي الحالي (كل الأوقات)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">🔄</div><div class="mod-card-val">${moves.length}</div><div class="mod-card-lbl">عدد الحركات (بالفلتر الحالي)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">✅</div><div class="mod-card-val">${wrFmt(liveTotal)}</div><div class="mod-card-lbl">الرصيد الفعلي الحالي (كل الأوقات)</div></div>
         </div>
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px">
             💡 الرصيد التراكمي بالجدول بيعكس حركات الفلتر الحالي بس${filtered ? ' — شيل التاريخ لعرض كل الحركة من البداية' : ''}.
@@ -245,8 +245,8 @@ window.wrRunMovement = async function () {
                         <td><span style="color:${meta.color}">${meta.icon}</span> ${meta.label}</td>
                         <td style="font-size:12px">${m.ref}</td>
                         <td style="font-size:12px">${_wrWarehouses.find(w => w.id === m.warehouse_id)?.name || '—'}</td>
-                        <td style="text-align:left;font-weight:700;color:#059669">${m.in ? wrFmt(m.in) : '—'}</td>
-                        <td style="text-align:left;font-weight:700;color:#DC2626">${m.out ? wrFmt(m.out) : '—'}</td>
+                        <td style="text-align:left;font-weight:700;color:var(--inv-green)">${m.in ? wrFmt(m.in) : '—'}</td>
+                        <td style="text-align:left;font-weight:700;color:var(--inv-red)">${m.out ? wrFmt(m.out) : '—'}</td>
                         <td style="text-align:left;font-weight:800">${wrFmt(m.balance)}</td>
                     </tr>`;
                 }).join('') : `<tr><td colspan="7" class="empty-state"><span>📭</span>لا توجد حركات لهذا الصنف بالفلتر المختار</td></tr>`}

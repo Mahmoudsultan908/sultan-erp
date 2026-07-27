@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════
 
 async function renderOpeningBalances(container) {
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px">⏳</div>جاري التحميل...</div>`;
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px">⏳</div>جاري التحميل...</div>`;
     try {
         const [
             { data: existing },
@@ -71,7 +71,7 @@ async function renderOpeningBalances(container) {
                 // رصيد واحد بس بيروح للخزنة الافتراضية دايماً، من غير ما تقدر تختار
                 c.innerHTML = `
                 <div class="dash-card" style="padding:24px;max-width:560px">
-                    <h3 style="margin:0 0 20px;font-size:15px;color:#1E293B">💰 رصيد الخزنة الافتتاحي</h3>
+                    <h3 style="margin:0 0 20px;font-size:15px;color:var(--inv-navy)">💰 رصيد الخزنة الافتتاحي</h3>
                     ${recs.length ? `<div style="margin-bottom:16px">
                         ${recs.map(r => {
                             const t = (treasuries||[]).find(x=>x.id===r.treasury_id);
@@ -130,7 +130,7 @@ async function renderOpeningBalances(container) {
                             ${recs.map(r => {
                                 const cust = (customers||[]).find(c=>c.id===r.customer_id);
                                 return `<tr><td>${cust?.name||'—'}</td><td class="dash-amount">${fmt(r.amount)}</td><td class="dash-muted">${new Date(r.as_of_date).toLocaleDateString('ar-EG')}</td><td>✅</td></tr>`;
-                            }).join('') || '<tr><td colspan="4" style="text-align:center;padding:20px;color:#94A3B8">لم يُدخل أي رصيد بعد</td></tr>'}
+                            }).join('') || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لم يُدخل أي رصيد بعد</td></tr>'}
                         </tbody>
                     </table>
                     <div id="ob-cust-form" style="display:none;padding:16px;background:#F8FAFC;border-top:1px solid #F1F5F9">
@@ -181,7 +181,7 @@ async function renderOpeningBalances(container) {
                             ${recs.map(r => {
                                 const sup = (suppliers||[]).find(s=>s.id===r.supplier_id);
                                 return `<tr><td>${sup?.name||'—'}</td><td class="dash-amount">${fmt(r.amount)}</td><td class="dash-muted">${new Date(r.as_of_date).toLocaleDateString('ar-EG')}</td><td>✅</td></tr>`;
-                            }).join('') || '<tr><td colspan="4" style="text-align:center;padding:20px;color:#94A3B8">لم يُدخل أي رصيد بعد</td></tr>'}
+                            }).join('') || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لم يُدخل أي رصيد بعد</td></tr>'}
                         </tbody>
                     </table>
                     <div id="ob-sup-form" style="display:none;padding:16px;background:#F8FAFC;border-top:1px solid #F1F5F9">
@@ -231,7 +231,7 @@ async function renderOpeningBalances(container) {
                                 const prod = (products||[]).find(p=>p.id===r.product_id);
                                 const wh = (warehouses||[]).find(w=>w.id===r.warehouse_id);
                                 return `<tr><td>${prod?.name||'—'}</td><td>${wh?.name||'—'}</td><td>${r.qty} ${prod?.unit||''}</td><td>${fmt(r.unit_cost)}</td><td class="dash-amount">${fmt(r.amount)}</td><td>✅</td></tr>`;
-                            }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#94A3B8">لم يُدخل مخزون بعد</td></tr>'}
+                            }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لم يُدخل مخزون بعد</td></tr>'}
                         </tbody>
                     </table>
                     <div id="ob-inv-form" style="display:none;padding:16px;background:#F8FAFC;border-top:1px solid #F1F5F9">
@@ -287,8 +287,8 @@ async function renderOpeningBalances(container) {
                 const rec = recs[0];
                 c.innerHTML = `
                 <div class="dash-card" style="padding:24px;max-width:500px">
-                    <h3 style="margin:0 0 20px;font-size:15px;color:#1E293B">📊 أرباح / خسائر سابقة</h3>
-                    <p style="font-size:13px;color:#64748B;margin-bottom:20px">أدخل صافي الأرباح أو الخسائر المتراكمة قبل بداية النظام. القيمة السالبة = خسارة.</p>
+                    <h3 style="margin:0 0 20px;font-size:15px;color:var(--inv-navy)">📊 أرباح / خسائر سابقة</h3>
+                    <p style="font-size:13px;color:var(--inv-muted);margin-bottom:20px">أدخل صافي الأرباح أو الخسائر المتراكمة قبل بداية النظام. القيمة السالبة = خسارة.</p>
                     ${rec ? `<div class="ob-existing"><div class="ob-ex-label">✅ تم الإدخال</div>
                         <div class="ob-ex-val ${Number(rec.amount)>=0?'dash-s-green':'dash-s-red'}">${fmt(Math.abs(rec.amount))} ج.م ${Number(rec.amount)>=0?'(ربح)':'(خسارة)'}</div></div>` : ''}
                     <div class="ob-form">

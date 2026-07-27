@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════
 
 async function renderSettings(container) {
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B">⏳ جاري التحميل...</div>`;
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)">⏳ جاري التحميل...</div>`;
     try {
         const { data: settings } = await sb.from('app_settings').select('*');
         const map = {};
@@ -48,34 +48,34 @@ async function renderSettings(container) {
                 <h3 style="margin:0 0 16px;font-size:15px">📅 إعدادات النظام</h3>
                 <label class="ob-label">تاريخ بداية استخدام النظام</label>
                 <input type="date" id="set-system-start" class="ob-input" style="max-width:250px" value="${get('system_start_date', new Date().toISOString().slice(0,10))}">
-                <p style="font-size:12px;color:#94A3B8;margin-top:6px">يُستخدم كمرجع لإدخال الأرصدة الافتتاحية</p>
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">يُستخدم كمرجع لإدخال الأرصدة الافتتاحية</p>
                 <label class="ob-label" style="margin-top:14px">الهدف اليومي للمبيعات (ج.م)</label>
                 <input type="number" id="set-daily-sales-target" class="ob-input" style="max-width:250px" value="${get('daily_sales_target','0')}" min="0" step="100">
-                <p style="font-size:12px;color:#94A3B8;margin-top:6px">بيتعرض كخط مرجعي على رسم "اتجاه المبيعات" فى لوحة التحكم — سيبه صفر لو مش عايز تفعّله.</p>
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">بيتعرض كخط مرجعي على رسم "اتجاه المبيعات" فى لوحة التحكم — سيبه صفر لو مش عايز تفعّله.</p>
                 <label class="ob-label" style="margin-top:14px">هامش الربح المستهدف شهريًا (ج.م)</label>
                 <input type="number" id="set-monthly-target-margin" class="ob-input" style="max-width:250px" value="${get('monthly_target_profit_margin','0')}" min="0" step="100">
-                <p style="font-size:12px;color:#94A3B8;margin-top:6px">هدف المبيعات الشهري فى لوحة التحكم = (رواتب الموظفين النشطين + بنود المصروفات التشغيلية اللي ليها حد شهري) + الرقم ده. سيبه صفر لو مش عايز تفعّله.</p>
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">هدف المبيعات الشهري فى لوحة التحكم = (رواتب الموظفين النشطين + بنود المصروفات التشغيلية اللي ليها حد شهري) + الرقم ده. سيبه صفر لو مش عايز تفعّله.</p>
             </div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
                 <h3 style="margin:0 0 16px;font-size:15px">🛒 إعدادات سلطانو</h3>
                 <label class="ob-label">الحد الأدنى العام للطلب (ج.م)</label>
                 <input type="number" id="set-sultano-min-order" class="ob-input" style="max-width:250px" value="${get('sultanoo_min_order_amount','0')}" min="0" step="10">
-                <p style="font-size:12px;color:#94A3B8;margin-top:6px">لو منطقة العميل ليها حد أدنى خاص بيها (من شاشة "إدارة المناطق")، بيتطبّق هو بدل الحد العام ده.</p>
-                <p style="font-size:12px;color:#94A3B8;margin-top:14px">الحد الأقصى لكمية أي صنف في الطلب = رصيد المخزون المتاح منه تلقائياً، إلا لو الصنف ليه حد أقصى خاص (من شاشة الأصناف) فبيتطبّق هو بدل رصيد المخزون.</p>
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">لو منطقة العميل ليها حد أدنى خاص بيها (من شاشة "إدارة المناطق")، بيتطبّق هو بدل الحد العام ده.</p>
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:14px">الحد الأقصى لكمية أي صنف في الطلب = رصيد المخزون المتاح منه تلقائياً، إلا لو الصنف ليه حد أقصى خاص (من شاشة الأصناف) فبيتطبّق هو بدل رصيد المخزون.</p>
             </div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
                 <h3 style="margin:0 0 16px;font-size:15px">💾 نسخة احتياطية</h3>
-                <p id="sett-backup-last" style="font-size:13px;color:#64748B;margin-bottom:14px">${settFmtLastBackup(get('last_backup_at', null))}</p>
+                <p id="sett-backup-last" style="font-size:13px;color:var(--inv-muted);margin-bottom:14px">${settFmtLastBackup(get('last_backup_at', null))}</p>
                 <button class="ob-save-btn" id="sett-backup-btn" onclick="settBackupNow()">⬇️ تحميل نسخة احتياطية الآن</button>
-                <p style="font-size:11.5px;color:#94A3B8;margin-top:8px;line-height:1.6">
+                <p style="font-size:11.5px;color:var(--inv-muted-light);margin-top:8px;line-height:1.6">
                     بيتحمّل ملف JSON واحد فيه كل بيانات النظام (الأصناف، العملاء، الموردين، الفواتير، المرتجعات، الحسابات، المخزون...) — احتفظ بيه في مكان آمن (إيميلك، جوجل درايف، فلاشة) بعيد عن الجهاز نفسه.
                 </p>
             </div>
 
             <button class="ob-save-btn" style="margin-top:20px;padding:14px 32px;font-size:14px" onclick="settSaveAll()">💾 حفظ كل الإعدادات</button>
-            <span id="sett-save-msg" style="margin-right:12px;font-size:13px;color:#059669;display:none">✅ تم الحفظ بنجاح</span>
+            <span id="sett-save-msg" style="margin-right:12px;font-size:13px;color:var(--inv-green);display:none">✅ تم الحفظ بنجاح</span>
         </div>`;
 
         window.settSaveAll = async () => {

@@ -67,7 +67,7 @@ function arcRenderPage(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">🗄️ الأرشيف</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">أرشفة المستندات (فواتير ورقية، عقود، صور هوية...)</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">أرشفة المستندات (فواتير ورقية، عقود، صور هوية...)</p></div>
             <button class="mod-btn mod-btn-primary" onclick="arcOpenUpload()">+ رفع مستند</button>
         </div>
 
@@ -88,11 +88,11 @@ function arcRenderPage(c) {
             list.map(d => `<div class="mod-card" style="padding:14px">
                 <div style="font-size:28px;margin-bottom:8px">${arcFileIcon(d.file_type)}</div>
                 <div style="font-weight:700;font-size:13.5px;margin-bottom:4px;word-break:break-word">${d.title}</div>
-                <div style="font-size:11.5px;color:#64748B;margin-bottom:6px">${arcLinkedLabel(d)}${d.category?' · '+d.category:''}</div>
-                <div style="font-size:11px;color:#94A3B8;margin-bottom:10px">${new Date(d.created_at).toLocaleDateString('ar-EG')}</div>
+                <div style="font-size:11.5px;color:var(--inv-muted);margin-bottom:6px">${arcLinkedLabel(d)}${d.category?' · '+d.category:''}</div>
+                <div style="font-size:11px;color:var(--inv-muted-light);margin-bottom:10px">${new Date(d.created_at).toLocaleDateString('ar-EG')}</div>
                 <div style="display:flex;gap:6px">
-                    <a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:#D97706;text-decoration:none;flex:1;text-align:center">👁️ فتح</a>
-                    <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="arcDelete('${d.id}')">🗑️</button>
+                    <a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);text-decoration:none;flex:1;text-align:center">👁️ فتح</a>
+                    <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="arcDelete('${d.id}')">🗑️</button>
                 </div>
             </div>`).join('')}
         </div>`;
@@ -168,10 +168,10 @@ window.arcOpenUpload = function () {
                 </div>
                 <div class="mod-form-group"><label>ملاحظات</label>
                     <input type="text" id="arcNotes" class="mod-form-input" placeholder="اختياري"></div>
-                <div id="arcUploadProgress" style="font-size:12px;color:#64748B"></div>
+                <div id="arcUploadProgress" style="font-size:12px;color:var(--inv-muted)"></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('arcModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('arcModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="arcSaveUpload()">📤 رفع وحفظ</button>
             </div>
         </div>`;
@@ -195,7 +195,7 @@ window.arcLinkSearchInput = function () {
     const source = _arcUploadLinkType === 'customer' ? _arcCustomers : _arcUploadLinkType === 'supplier' ? _arcSuppliers : [];
     const list = flexSearch(source, term, ['name'], 20);
     if (!list.length) {
-        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
+        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:var(--inv-muted-light)">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');
         return;
     }

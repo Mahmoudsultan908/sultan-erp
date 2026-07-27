@@ -71,7 +71,7 @@ async function renderCollections(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <div><h2 style="font-size:22px;font-weight:800">💵 تحصيل العملاء (سندات قبض)</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">تسجيل المبالغ المحصّلة من العملاء — مرتبطة بالخزنة ورصيد العميل</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تسجيل المبالغ المحصّلة من العملاء — مرتبطة بالخزنة ورصيد العميل</p></div>
             <button class="mod-btn mod-btn-primary" onclick="colOpenAdd()">+ تحصيل دفعة جديدة</button>
         </div>
 
@@ -85,9 +85,9 @@ async function renderCollections(c) {
         </div>` : ''}
 
         <div class="mod-grid">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💵</div><div class="mod-card-val">${colFmt(totalCollected)}</div><div class="mod-card-lbl">إجمالي المحصّل</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${colFmt(totalCollected)}</div><div class="mod-card-lbl">إجمالي المحصّل</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">📊</div><div class="mod-card-val">${payments.length}</div><div class="mod-card-lbl">سند قبض</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">📋</div><div class="mod-card-val">${colFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق من العملاء (${debtCustomers.length})</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold)">📋</div><div class="mod-card-val">${colFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق من العملاء (${debtCustomers.length})</div></div>
         </div>
 
         ${colDebtListHTML(debtCustomers)}
@@ -106,11 +106,11 @@ async function renderCollections(c) {
                     <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
                     <td><strong>${p.customers?.name || '—'}</strong>${_colRepById[p.created_by] ? ` <span style="font-size:11px;color:#2563EB">🚗 ${_colRepById[p.created_by]}</span>` : ''}</td>
                     <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
-                    <td style="text-align:left;font-weight:700;color:#059669">${colFmt(p.amount)}</td>
+                    <td style="text-align:left;font-weight:700;color:var(--inv-green)">${colFmt(p.amount)}</td>
                     <td>${p._queue
-                        ? (p.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
-                        : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:#94A3B8;font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
-                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="colOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="colReversePayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
+                        ? (p.status === 'failed' ? '<span style="color:var(--inv-red);font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:var(--inv-gold);font-weight:600">⏳ غير مُزامن</span>')
+                        : (p.status==='confirmed'?'<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:var(--inv-muted-light);font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:var(--inv-gold)">${p.status}</span>`)}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="colOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="colReversePayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
@@ -154,8 +154,8 @@ function colDebtListHTML(debtCustomers) {
     return `
     <div class="mod-card" style="margin-top:16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-            <div class="mod-card-icon" style="background:#FEF3C7;color:#D97706;width:40px;height:40px;font-size:18px">📋</div>
-            <div><div style="font-size:14px;font-weight:800">عملاء لهم مستحقات (مديونيات)</div><div style="font-size:11px;color:#64748B">اضغط "تحصيل" بجوار أي عميل لتحصيل المبلغ فوراً</div></div>
+            <div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold);width:40px;height:40px;font-size:18px">📋</div>
+            <div><div style="font-size:14px;font-weight:800">عملاء لهم مستحقات (مديونيات)</div><div style="font-size:11px;color:var(--inv-muted)">اضغط "تحصيل" بجوار أي عميل لتحصيل المبلغ فوراً</div></div>
         </div>
         ${debtCustomers.slice(0,8).map(c => `<div class="cat-card">
             <div class="cc-ic">👤</div>
@@ -164,10 +164,10 @@ function colDebtListHTML(debtCustomers) {
                 <div class="cc-sub">${c.phone||''} ${c.code?'· '+c.code:''}</div>
             </div>
             <div class="cc-amt">
-                <div class="used" style="color:#DC2626">${colFmt(c.balance)}</div>
+                <div class="used" style="color:var(--inv-red)">${colFmt(c.balance)}</div>
                 <div class="lim">مستحق</div>
             </div>
-            <button class="cc-edit" style="background:#D1FAE5;color:#059669" onclick="colQuickCollect('${c.id}')">💵 تحصيل</button>
+            <button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="colQuickCollect('${c.id}')">💵 تحصيل</button>
         </div>`).join('')}
     </div>`;
 }
@@ -211,7 +211,7 @@ window.colOpenAdd = function(presetCustomerId = null) {
                 <div id="colBalancePreview"></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="colCloseModal('colModal')">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="colCloseModal('colModal')">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="colSave()">💾 تحصيل الدفعة</button>
             </div>
         </div>`;
@@ -244,13 +244,13 @@ window.colCustSearchInput = function(mode) {
     // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
     const list = flexSearch(_colCustomers, term, ['name','phone','code'], 20);
     if (!list.length) {
-        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
+        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:var(--inv-muted-light)">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');
         return;
     }
     ac.innerHTML = list.map((c,i) => `<div class="inv-ac-item" data-i="${i}" data-id="${c.id}" onmousedown="event.preventDefault();colPickCust('${c.id}','${mode}')" onmouseenter="colCustACHover(${i},'${mode}')">
         <div><div class="an">${c.name}</div><div class="as">${c.phone||''}${c.code?' · '+c.code:''}</div></div>
-        <div class="ap"><div class="pr" style="${c.balance>0?'color:#DC2626':''}">${c.balance>0?colFmt(c.balance):''}</div><div class="as">${c.balance>0?'مستحق':''}</div></div>
+        <div class="ap"><div class="pr" style="${c.balance>0?'color:var(--inv-red)':''}">${c.balance>0?colFmt(c.balance):''}</div><div class="as">${c.balance>0?'مستحق':''}</div></div>
     </div>`).join('');
     ac.classList.add('show');
 };
@@ -300,11 +300,11 @@ window.colPreview = function() {
     const bal = Number(c.balance) || 0;
     const after = bal - amount;
     area.innerHTML = `
-        <div class="limit-box" style="border-color:#D1FAE5;background:#ECFDF5">
-            <div class="limit-row"><span class="lr-label">المستحق على العميل:</span><span class="lr-val" style="color:#DC2626">${colFmt(bal)} ج.م</span></div>
+        <div class="limit-box" style="border-color:var(--inv-green-light);background:#ECFDF5">
+            <div class="limit-row"><span class="lr-label">المستحق على العميل:</span><span class="lr-val" style="color:var(--inv-red)">${colFmt(bal)} ج.م</span></div>
             ${amount > 0 ? `
-            <div class="limit-row"><span class="lr-label">هذا التحصيل:</span><span class="lr-val" style="color:#059669">${colFmt(amount)} ج.م</span></div>
-            <div class="limit-row"><span class="lr-label">المستحق بعد التحصيل:</span><span class="lr-val" style="color:${after>0?'#D97706':'#059669'}">${colFmt(after)} ج.م</span></div>` : ''}
+            <div class="limit-row"><span class="lr-label">هذا التحصيل:</span><span class="lr-val" style="color:var(--inv-green)">${colFmt(amount)} ج.م</span></div>
+            <div class="limit-row"><span class="lr-label">المستحق بعد التحصيل:</span><span class="lr-val" style="color:${after>0?'var(--inv-gold)':'var(--inv-green)'}">${colFmt(after)} ج.م</span></div>` : ''}
         </div>`;
 };
 
@@ -452,7 +452,7 @@ window.colOpenEditModal = function(id) {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="colCloseModal('colEditModal')">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="colCloseModal('colEditModal')">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="colSaveEdit()">💾 حفظ التعديل</button>
             </div>
         </div>`;

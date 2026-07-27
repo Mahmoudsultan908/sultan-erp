@@ -16,8 +16,8 @@ const USR_ROLE_LABELS = {
     rep: 'مندوب مبيعات', employee: 'موظف'
 };
 const USR_ROLE_COLORS = {
-    admin: '#7C3AED', accountant: '#2563EB', cashier: '#059669',
-    rep: '#D97706', employee: '#64748B'
+    admin: '#7C3AED', accountant: '#2563EB', cashier: 'var(--inv-green)',
+    rep: 'var(--inv-gold)', employee: 'var(--inv-muted)'
 };
 
 function usrFmtDate(d) { return d ? new Date(d).toLocaleDateString('ar-EG') : '—'; }
@@ -29,7 +29,7 @@ const USR_ONLINE_WINDOW_MS = 3 * 60 * 1000;
 function usrIsOnline(lastSeen) { return lastSeen && (Date.now() - new Date(lastSeen).getTime()) < USR_ONLINE_WINDOW_MS; }
 function usrFmtLastSeen(d) {
     if (!d) return '—';
-    if (usrIsOnline(d)) return '<span style="color:#059669;font-weight:700">🟢 متصل الآن</span>';
+    if (usrIsOnline(d)) return '<span style="color:var(--inv-green);font-weight:700">🟢 متصل الآن</span>';
     return new Date(d).toLocaleString('ar-EG', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
 }
 
@@ -73,14 +73,14 @@ function usrRenderPage(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">👥 إدارة المستخدمين</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إضافة مستخدمين جدد وتحديد صلاحياتهم</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إضافة مستخدمين جدد وتحديد صلاحياتهم</p></div>
             <button class="mod-btn mod-btn-primary" onclick="usrOpenAdd()">+ إضافة مستخدم</button>
         </div>
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">👥</div><div class="mod-card-val">${_usrList.length}</div><div class="mod-card-lbl">إجمالي المستخدمين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">🟢</div><div class="mod-card-val">${_usrList.filter(u=>usrIsOnline(u.last_seen)).length}</div><div class="mod-card-lbl">متصلون الآن</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">🚫</div><div class="mod-card-val">${_usrList.filter(u=>u.is_active===false).length}</div><div class="mod-card-lbl">معطّلون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">🟢</div><div class="mod-card-val">${_usrList.filter(u=>usrIsOnline(u.last_seen)).length}</div><div class="mod-card-lbl">متصلون الآن</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">🚫</div><div class="mod-card-val">${_usrList.filter(u=>u.is_active===false).length}</div><div class="mod-card-lbl">معطّلون</div></div>
         </div>
 
         <div class="mod-table-wrap">
@@ -105,15 +105,15 @@ function usrRenderRows() {
         const displayName = u.name || u.email || '—';
         const active = u.is_active !== false;
         return `<tr>
-            <td><strong>${displayName}</strong>${u.email && u.email!==displayName ? `<div style="font-size:11px;color:#94A3B8;direction:ltr;text-align:right">${u.email}</div>`:''}</td>
+            <td><strong>${displayName}</strong>${u.email && u.email!==displayName ? `<div style="font-size:11px;color:var(--inv-muted-light);direction:ltr;text-align:right">${u.email}</div>`:''}</td>
             <td>
                 <select class="mod-form-input" style="margin:0;padding:5px 10px;font-size:12px;width:auto" onchange="usrChangeRole('${u.id}', this.value)">
                     ${Object.entries(USR_ROLE_LABELS).map(([v,l])=>`<option value="${v}" ${u.role===v?'selected':''}>${l}</option>`).join('')}
                 </select>
             </td>
-            <td><span class="dash-badge ${active?'dash-badge-green':'dash-badge-blue'}" style="${!active?'background:#FEE2E2;color:#DC2626':''}">${active?'✅ نشط':'🚫 معطّل'}</span></td>
+            <td><span class="dash-badge ${active?'dash-badge-green':'dash-badge-blue'}" style="${!active?'background:#FEE2E2;color:var(--inv-red)':''}">${active?'✅ نشط':'🚫 معطّل'}</span></td>
             <td class="dash-muted" style="font-size:12.5px">${usrFmtLastSeen(u.last_seen)}</td>
-            <td><button class="cc-edit" style="${active?'background:#FEE2E2;color:#DC2626':'background:#D1FAE5;color:#059669'}" onclick="usrToggleActive('${u.id}', ${!active})">${active?'🚫 تعطيل':'✅ تفعيل'}</button></td>
+            <td><button class="cc-edit" style="${active?'background:#FEE2E2;color:var(--inv-red)':'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="usrToggleActive('${u.id}', ${!active})">${active?'🚫 تعطيل':'✅ تفعيل'}</button></td>
         </tr>`;
     }).join('');
 }
@@ -136,7 +136,7 @@ window.usrOpenAdd = function() {
                     <input type="email" id="usrEmail" class="mod-form-input" dir="ltr" placeholder="example@sultan.com"></div>
                 <div class="mod-form-group"><label>كلمة المرور المبدئية *</label>
                     <input type="text" id="usrPassword" class="mod-form-input" dir="ltr" placeholder="6 أحرف على الأقل">
-                    <p style="font-size:11px;color:#94A3B8;margin-top:4px">شارك كلمة المرور دي مع الموظف — ينصح يغيّرها بعد أول دخول</p></div>
+                    <p style="font-size:11px;color:var(--inv-muted-light);margin-top:4px">شارك كلمة المرور دي مع الموظف — ينصح يغيّرها بعد أول دخول</p></div>
                 <div class="mod-form-group"><label>الصلاحية *</label>
                     <select id="usrRole" class="mod-form-input">
                         ${Object.entries(USR_ROLE_LABELS).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
@@ -146,7 +146,7 @@ window.usrOpenAdd = function() {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('usrAddModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('usrAddModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="usrSaveNewUser()">💾 إضافة المستخدم</button>
             </div>
         </div>`;
@@ -274,8 +274,8 @@ window.setupApp = async function() {
                 document.getElementById('root').innerHTML = `
                     <div class="login-wrapper"><div class="login-card">
                         <div class="login-logo">🚫</div>
-                        <h2 style="margin-bottom:6px;color:#DC2626">تم تعطيل هذا الحساب</h2>
-                        <p style="color:#64748B;font-size:13px">تواصل مع مدير النظام لإعادة التفعيل</p>
+                        <h2 style="margin-bottom:6px;color:var(--inv-red)">تم تعطيل هذا الحساب</h2>
+                        <p style="color:var(--inv-muted);font-size:13px">تواصل مع مدير النظام لإعادة التفعيل</p>
                         <button class="login-btn" style="margin-top:16px" onclick="location.reload()">رجوع لتسجيل الدخول</button>
                     </div></div>`;
                 return; // ★ لا نكمّل تحميل التطبيق للمستخدم المعطَّل

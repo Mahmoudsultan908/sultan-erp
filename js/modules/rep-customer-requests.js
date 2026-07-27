@@ -34,11 +34,11 @@ function rcrRenderPage(c) {
 
     c.innerHTML = `
     <div style="margin-bottom:16px">
-        <div style="font-size:13px;color:#64748B">عملاء جدد أو تعديلات أضافها المندوبون من تطبيق سلطانو — راجع الاسم والتليفون وعدّلهم لو محتاجين تصحيح قبل الاعتماد.</div>
+        <div style="font-size:13px;color:var(--inv-muted)">عملاء جدد أو تعديلات أضافها المندوبون من تطبيق سلطانو — راجع الاسم والتليفون وعدّلهم لو محتاجين تصحيح قبل الاعتماد.</div>
     </div>
     ${pending.length ? `
     <div class="mod-table-wrap" style="margin-bottom:20px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">⏳ طلبات في انتظار المراجعة (${pending.length})</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">⏳ طلبات في انتظار المراجعة (${pending.length})</div>
         <table class="mod-table"><thead><tr>
             <th style="width:70px">النوع</th><th>المندوب</th><th>الاسم</th><th>التليفون</th><th>العنوان</th><th>معلومات إضافية</th><th style="width:170px"></th>
         </tr></thead>
@@ -49,7 +49,7 @@ function rcrRenderPage(c) {
 
     ${reviewed.length ? `
     <div class="mod-table-wrap">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر الطلبات المراجَعة</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📋 آخر الطلبات المراجَعة</div>
         <table class="mod-table"><thead><tr>
             <th style="width:70px">النوع</th><th>المندوب</th><th>الاسم المقترح</th><th>الحالة</th><th>التاريخ</th>
         </tr></thead><tbody>
@@ -57,8 +57,8 @@ function rcrRenderPage(c) {
                 <td>${r.request_type==='new'?'🆕 جديد':'✏️ تعديل'}</td>
                 <td>${r.source==='sultano' ? '🌐 سلطانو' : '🚗 '+(r.rep?.name||'—')}</td>
                 <td>${r.proposed_name||'—'}</td>
-                <td>${r.status==='approved'?'<span style="color:#059669;font-weight:700">✅ معتمد</span>':'<span style="color:#DC2626;font-weight:700">❌ مرفوض</span>'}</td>
-                <td style="color:#64748B">${r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'—'}</td>
+                <td>${r.status==='approved'?'<span style="color:var(--inv-green);font-weight:700">✅ معتمد</span>':'<span style="color:var(--inv-red);font-weight:700">❌ مرفوض</span>'}</td>
+                <td style="color:var(--inv-muted)">${r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'—'}</td>
             </tr>`).join('')}
         </tbody></table>
     </div>` : ''}`;
@@ -73,7 +73,7 @@ function rcrRowHTML(r) {
         <td><input type="text" class="mod-form-input" id="rcrName-${r.id}" value="${(r.proposed_name||'').replace(/"/g,'&quot;')}" style="min-width:140px"></td>
         <td><input type="text" class="mod-form-input" id="rcrPhone-${r.id}" value="${(r.proposed_phone||'').replace(/"/g,'&quot;')}" dir="ltr" style="min-width:120px"></td>
         <td><input type="text" class="mod-form-input" id="rcrAddr-${r.id}" value="${(r.proposed_address||'').replace(/"/g,'&quot;')}" style="min-width:140px"></td>
-        <td style="font-size:12px;color:#64748B">${isNew ? 'عميل جديد — مسجّل بالفعل وباع له المندوب' : `الحالي: ${cur?.name||'—'} / ${cur?.phone||'—'}${cur?cur.balance>0?` (رصيد ${rcrFmt(cur.balance)})`:'':''}`}</td>
+        <td style="font-size:12px;color:var(--inv-muted)">${isNew ? 'عميل جديد — مسجّل بالفعل وباع له المندوب' : `الحالي: ${cur?.name||'—'} / ${cur?.phone||'—'}${cur?cur.balance>0?` (رصيد ${rcrFmt(cur.balance)})`:'':''}`}</td>
         <td style="white-space:nowrap">
             <button class="cc-edit" style="background:#DCFCE7;color:#166534" onclick="rcrApprove('${r.id}')">✅ اعتماد</button>
             <button class="cc-edit" style="background:#FEE2E2;color:#991B1B;margin-right:4px" onclick="rcrReject('${r.id}')">❌ رفض</button>

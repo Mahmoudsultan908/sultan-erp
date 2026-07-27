@@ -25,7 +25,7 @@ window.supShowStatement = async function(supplierId) {
         <div class="mod-modal" style="max-width:820px">
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${sup.name}</h3>
                 <div style="display:flex;align-items:center;gap:10px">
-                    <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="supGoEditProfile('${sup.id}')">✏️ تعديل بيانات المورد</button>
+                    <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="supGoEditProfile('${sup.id}')">✏️ تعديل بيانات المورد</button>
                     <button class="mod-modal-close" onclick="supCloseModal('supStmtModal')">&times;</button>
                 </div></div>
             <div class="mod-modal-body" id="supStmtBody">
@@ -175,17 +175,17 @@ window.supShowStatement = async function(supplierId) {
         document.getElementById('supStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">المستحق حالياً</div>
-                    <div style="font-size:22px;font-weight:800;color:${balNow>0?'#DC2626':'#059669'}">${supFmt(Math.abs(balNow))} ج.م</div>
-                    <div style="font-size:11.5px;color:#94A3B8">${balNow>0?'مستحق عليه لنا':balNow<0?'لنا عنده (مقدم)':'مسدد'}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">المستحق حالياً</div>
+                    <div style="font-size:22px;font-weight:800;color:${balNow>0?'var(--inv-red)':'var(--inv-green)'}">${supFmt(Math.abs(balNow))} ج.م</div>
+                    <div style="font-size:11.5px;color:var(--inv-muted-light)">${balNow>0?'مستحق عليه لنا':balNow<0?'لنا عنده (مقدم)':'مسدد'}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">إجمالي المشتريات (آجل)</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المشتريات (آجل)</div>
                     <div style="font-size:22px;font-weight:800;color:#0F172A">${supFmt(totalCredit)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">إجمالي المدفوع</div>
-                    <div style="font-size:22px;font-weight:800;color:#059669">${supFmt(totalDebit)}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المدفوع</div>
+                    <div style="font-size:22px;font-weight:800;color:var(--inv-green)">${supFmt(totalDebit)}</div>
                 </div>
             </div>
 
@@ -196,10 +196,10 @@ window.supShowStatement = async function(supplierId) {
             <div id="supStmtTabBody">${supStmtMovesTabHtml()}</div>
 
             <div style="margin-top:16px">
-                <div style="font-size:13px;font-weight:800;color:#1E293B;margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
-                ${docs.length === 0 ? `<div style="font-size:12.5px;color:#94A3B8">لا توجد مستندات مرتبطة بهذا المورد في الأرشيف.</div>` :
+                <div style="font-size:13px;font-weight:800;color:var(--inv-navy);margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
+                ${docs.length === 0 ? `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد مستندات مرتبطة بهذا المورد في الأرشيف.</div>` :
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
-                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:#D97706;text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
+                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
                 </div>`}
             </div>`;
     } catch (err) {
@@ -220,22 +220,22 @@ function supStmtRowsHtml(moves) {
             : m.type==='transfer-out' || m.type==='transfer-in' || m.type==='cash-refund' ? '#EFF6FF'
             : m.type==='opening' ? '#F5F3FF'
             : m.type==='legacy-carry' ? '#F1F5F9' : '#F8FAFC';
-        const icon = m.type==='purchase-credit' ? '<span style="color:#D97706">📥</span>'
-            : m.type==='purchase-cash' ? '<span style="color:#94A3B8">💰</span>'
-            : m.type.startsWith('return') ? '<span style="color:#DC2626">↩️</span>'
+        const icon = m.type==='purchase-credit' ? '<span style="color:var(--inv-gold)">📥</span>'
+            : m.type==='purchase-cash' ? '<span style="color:var(--inv-muted-light)">💰</span>'
+            : m.type.startsWith('return') ? '<span style="color:var(--inv-red)">↩️</span>'
             : m.type==='transfer-out' || m.type==='transfer-in' ? '<span style="color:#2563EB">🔀</span>'
             : m.type==='cash-refund' ? '<span style="color:#2563EB">💰</span>'
             : m.type==='opening' ? '<span style="color:#7C3AED">📋</span>'
-            : m.type==='legacy-carry' ? '<span style="color:#64748B">🗄️</span>'
-            : '<span style="color:#059669">💸</span>';
+            : m.type==='legacy-carry' ? '<span style="color:var(--inv-muted)">🗄️</span>'
+            : '<span style="color:var(--inv-green)">💸</span>';
         return `<tr style="background:${bg}">
         <td style="font-size:12px">${new Date(m.date).toLocaleDateString('ar-EG')}</td>
         <td>
             ${icon} ${m.desc}
-            ${isCash ? '<span style="font-size:11.5px;color:#94A3B8"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
+            ${isCash ? '<span style="font-size:11.5px;color:var(--inv-muted-light)"> (نقدي — بدون أثر على الرصيد)</span>' : ''}
         </td>
-        <td style="text-align:left;font-weight:600;color:#059669">${m.debit?supFmt(m.debit):'—'}</td>
-        <td style="text-align:left;font-weight:600;color:#D97706">${m.credit?supFmt(m.credit):'—'}</td>
+        <td style="text-align:left;font-weight:600;color:var(--inv-green)">${m.debit?supFmt(m.debit):'—'}</td>
+        <td style="text-align:left;font-weight:600;color:var(--inv-gold)">${m.credit?supFmt(m.credit):'—'}</td>
         <td style="text-align:left;font-weight:700">${supFmt(m.balance)}</td>
     </tr>`;
     }).join('');
@@ -275,14 +275,14 @@ function supStmtMovesTabHtml() {
             <tbody id="supStmtTbody">${supStmtRowsHtml(_supStmtMoves)}</tbody>
             ${_supStmtMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
                 <td colspan="2">الإجمالي</td>
-                <td style="text-align:left;color:#059669">${supFmt(t.tableDebit)}</td>
-                <td style="text-align:left;color:#D97706">${supFmt(t.tableCredit)}</td>
+                <td style="text-align:left;color:var(--inv-green)">${supFmt(t.tableDebit)}</td>
+                <td style="text-align:left;color:var(--inv-gold)">${supFmt(t.tableCredit)}</td>
                 <td style="text-align:left">${supFmt(Math.abs(t.balNow||0))}</td>
             </tr></tfoot>` : ''}
             </table>
         </div>
         ${Math.abs(_supStmtLegacyDiff) > 0.01 ? `
-        <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:#475569;padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
+        <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:var(--inv-text-soft);padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
             🗄️ سطر "رصيد مرحّل من النظام القديم" (${supFmt(Math.abs(_supStmtLegacyDiff))}) هو الفرق بين رصيد المورد الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
             غالبًا مورد منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد المورد نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.
         </div>` : ''}`;
@@ -297,15 +297,15 @@ function supStmtItemsTabHtml() {
     </tr></thead><tbody>
         ${_supStmtItems.map(i => `<tr>
             <td style="font-weight:600">${i.name}</td>
-            <td style="color:#64748B">${i.unit||'—'}</td>
+            <td style="color:var(--inv-muted)">${i.unit||'—'}</td>
             <td style="text-align:left">${supFmt(i.qty)}</td>
-            <td style="text-align:left;color:#64748B">${supFmt(i.qty ? i.total/i.qty : 0)}</td>
+            <td style="text-align:left;color:var(--inv-muted)">${supFmt(i.qty ? i.total/i.qty : 0)}</td>
             <td style="text-align:left;font-weight:700">${supFmt(i.total)}</td>
         </tr>`).join('')}
     </tbody><tfoot><tr style="background:#F8FAFC;font-weight:800">
         <td colspan="2">الإجمالي</td><td style="text-align:left">${supFmt(totalQty)}</td><td></td><td style="text-align:left">${supFmt(totalVal)}</td>
     </tr></tfoot></table></div>
-    <div style="font-size:11.5px;color:#94A3B8;margin-top:8px">إجمالي المشتريات منه (إجمالي، قبل خصم المرتجعات — تفاصيل المرتجعات فى تبويب "الحركات").</div>`;
+    <div style="font-size:11.5px;color:var(--inv-muted-light);margin-top:8px">إجمالي المشتريات منه (إجمالي، قبل خصم المرتجعات — تفاصيل المرتجعات فى تبويب "الحركات").</div>`;
 }
 
 // ينقل لصفحة "إدارة الموردين" (master-data.js) ويفتح نافذة تعديل بيانات

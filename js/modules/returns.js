@@ -546,7 +546,7 @@ function retRecentListHTML() {
     const list = [...(RET_DB.pendingList || []), ...(RET_DB.list || [])];
     return `
     <div class="mod-table-wrap" style="margin-top:16px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر ${retType === 'sales' ? 'مرتجعات المبيعات' : 'مرتجعات المشتريات'}</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📋 آخر ${retType === 'sales' ? 'مرتجعات المبيعات' : 'مرتجعات المشتريات'}</div>
         <table class="mod-table"><thead><tr>
             <th>الرقم</th><th>${retType === 'sales' ? 'العميل' : 'المورد'}</th><th>مرتبط بفاتورة</th><th>التاريخ</th><th style="text-align:left">الإجمالي</th><th>الحالة</th>
         </tr></thead>
@@ -554,13 +554,13 @@ function retRecentListHTML() {
             ${list.length ? list.map(r => `<tr>
                 <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${r.return_no || '—'}</span></td>
                 <td>${r.customers?.name || r.suppliers?.name || '—'}</td>
-                <td>${r.sale_id || r.purchase_id ? '<span style="color:#2563EB">🔗 نعم</span>' : '<span style="color:#94A3B8">مستقل</span>'}</td>
+                <td>${r.sale_id || r.purchase_id ? '<span style="color:#2563EB">🔗 نعم</span>' : '<span style="color:var(--inv-muted-light)">مستقل</span>'}</td>
                 <td class="dash-muted">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
-                <td style="text-align:left;font-weight:700;color:#DC2626">${retFmt(r.total)}</td>
+                <td style="text-align:left;font-weight:700;color:var(--inv-red)">${retFmt(r.total)}</td>
                 <td>${r._queue
-                    ? (r.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
-                    : r.status === 'cancelled' ? '<span style="color:#94A3B8">🚫 ملغى (معدّل)</span>' : '<span style="color:#059669;font-weight:600">✅ مؤكد</span>'}</td>
-            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مرتجعات بعد</td></tr>`}
+                    ? (r.status === 'failed' ? '<span style="color:var(--inv-red);font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:var(--inv-gold);font-weight:600">⏳ غير مُزامن</span>')
+                    : r.status === 'cancelled' ? '<span style="color:var(--inv-muted-light)">🚫 ملغى (معدّل)</span>' : '<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>'}</td>
+            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد مرتجعات بعد</td></tr>`}
         </tbody>
         </table>
     </div>`;
@@ -844,7 +844,7 @@ window.retOpenMultiSelect = function () {
                 <div id="retMultiList" style="max-height:360px;overflow-y:auto"></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('retMultiModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('retMultiModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="retMultiConfirm()">➕ إضافة المحدد</button>
             </div>
         </div>`;
@@ -861,10 +861,10 @@ window.retMultiFilter = function () {
             <input type="checkbox" class="ret-multi-chk" value="${p.id}" id="retMultiChk-${p.id}">
             <label for="retMultiChk-${p.id}" style="flex:1;cursor:pointer">
                 <div style="font-weight:700;font-size:13px">${p.name}</div>
-                <div style="font-size:11px;color:#94A3B8">${p.code || ''} · ${retFmt(retGetPrice(p))}</div>
+                <div style="font-size:11px;color:var(--inv-muted-light)">${p.code || ''} · ${retFmt(retGetPrice(p))}</div>
             </label>
             <input type="number" class="mod-form-input ret-multi-qty" data-pid="${p.id}" value="1" min="1" style="width:70px;margin:0" dir="ltr">
-        </div>`).join('') || '<div style="text-align:center;padding:20px;color:#94A3B8">لا توجد أصناف مطابقة</div>';
+        </div>`).join('') || '<div style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد أصناف مطابقة</div>';
 };
 window.retMultiConfirm = function () {
     const checked = document.querySelectorAll('#retMultiList .ret-multi-chk:checked');

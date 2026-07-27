@@ -35,7 +35,7 @@ function whRenderPage(c, stockByWh) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">🏭 إدارة المخازن</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إضافة مخازن جديدة وتحديد المخزن الرئيسي</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إضافة مخازن جديدة وتحديد المخزن الرئيسي</p></div>
             <button class="mod-btn mod-btn-primary" onclick="whOpenAdd()">+ إضافة مخزن</button>
         </div>
 
@@ -54,15 +54,15 @@ function whRenderPage(c, stockByWh) {
                         </div>
                         <div style="display:flex;gap:4px">
                             <button class="cc-edit" onclick="whOpenEdit('${w.id}')">✏️</button>
-                            ${!w.is_main ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="whSetMain('${w.id}')" title="تعيين كمخزن رئيسي">⭐</button>` : ''}
+                            ${!w.is_main ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="whSetMain('${w.id}')" title="تعيين كمخزن رئيسي">⭐</button>` : ''}
                         </div>
                     </div>
                     <div class="dash-summary-row"><span>عدد الأصناف</span><span style="font-weight:700">${s.items}</span></div>
                     <div class="dash-summary-row"><span>إجمالي الكمية</span><span style="font-weight:700">${whFmt(s.qty)}</span></div>
                     <div class="dash-summary-divider"></div>
-                    <div class="dash-summary-row dash-summary-total"><span>قيمة المخزون</span><span style="color:#D97706">${whFmt(s.value)}</span></div>
+                    <div class="dash-summary-row dash-summary-total"><span>قيمة المخزون</span><span style="color:var(--inv-gold)">${whFmt(s.value)}</span></div>
                 </div>`;
-            }).join('') || '<div class="dash-card" style="text-align:center;padding:40px;color:#94A3B8">لا توجد مخازن بعد — أضف أول مخزن</div>'}
+            }).join('') || '<div class="dash-card" style="text-align:center;padding:40px;color:var(--inv-muted-light)">لا توجد مخازن بعد — أضف أول مخزن</div>'}
         </div>`;
 }
 
@@ -80,12 +80,12 @@ function whOpenModal(w) {
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>اسم المخزن *</label>
                     <input type="text" id="whName" class="mod-form-input" value="${w?.name||''}" placeholder="مثال: المخزن الرئيسي، فرع المهندسين"></div>
-                ${!w ? `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#475569;margin-top:8px">
+                ${!w ? `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--inv-text-soft);margin-top:8px">
                     <input type="checkbox" id="whIsMain" style="width:auto"> تعيينه كمخزن رئيسي
                 </label>` : ''}
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('whModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('whModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="whSave('${w?.id||''}')">💾 ${w?'حفظ التعديلات':'إضافة'}</button>
             </div>
         </div>`;

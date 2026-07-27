@@ -31,7 +31,7 @@ async function dashFetchAllRows(table, select, applyFilters) {
 }
 
 async function renderDashboard(container) {
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B">
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)">
         <div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل البيانات...
     </div>`;
 
@@ -178,7 +178,7 @@ async function renderDashboard(container) {
         const DASH_TARGET_WORKDAYS = 26;
         const dailySalesTargetCalc = monthlySalesTarget > 0 ? monthlySalesTarget / DASH_TARGET_WORKDAYS : 0;
         const targetPct = monthlySalesTarget > 0 ? Math.round(netMonthSales / monthlySalesTarget * 100) : 0;
-        const targetColor = targetPct >= 100 ? '#059669' : targetPct >= 60 ? '#D97706' : '#DC2626';
+        const targetColor = targetPct >= 100 ? 'var(--inv-green)' : targetPct >= 60 ? 'var(--inv-gold)' : 'var(--inv-red)';
 
         // ── تقرير الجرد اليومي (صافي المركز المالي) ──────────────────
         // قيمة المخزون (مخازن + عربيات المندوبين) + رصيد الخزنة + مديونية العملاء - مستحقات الموردين
@@ -271,28 +271,28 @@ async function renderDashboard(container) {
                     ${monthlySalesTarget > 0 ? `
                     <div class="dash-summary-row dash-summary-total">
                         <span>المحقق حتى الآن</span>
-                        <span style="color:${targetColor}">${fmt(netMonthSales)} <span style="font-size:11px;color:#94A3B8;font-weight:400">من ${fmt(monthlySalesTarget)}</span></span>
+                        <span style="color:${targetColor}">${fmt(netMonthSales)} <span style="font-size:11px;color:var(--inv-muted-light);font-weight:400">من ${fmt(monthlySalesTarget)}</span></span>
                     </div>
                     <div class="dash-limit-bar" style="margin:6px 0"><div class="dash-limit-fill" style="width:${Math.min(targetPct,100)}%;background:${targetColor}"></div></div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8;margin-bottom:8px">
+                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light);margin-bottom:8px">
                         <span>نسبة التحقيق</span>
                         <span style="color:${targetColor};font-weight:700">${targetPct}%</span>
                     </div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8">
+                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light)">
                         <span>المطلوب بيعه يوميًا (÷ ${DASH_TARGET_WORKDAYS} يوم عمل)</span>
                         <span>${fmt(dailySalesTargetCalc)}</span>
                     </div>
                     <div class="dash-summary-divider"></div>
-                    <div style="font-size:11px;color:#94A3B8;margin-bottom:6px">📐 إزاي اتحسب الرقم ده؟</div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#64748B">
+                    <div style="font-size:11px;color:var(--inv-muted-light);margin-bottom:6px">📐 إزاي اتحسب الرقم ده؟</div>
+                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted)">
                         <span>المصروفات المتوقعة (رواتب + بنود تشغيل)</span>
                         <span>${fmt(expectedSalaries + expectedOpEx)}</span>
                     </div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#64748B">
+                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted)">
                         <span>+ هامش الربح المستهدف (من الإعدادات)</span>
                         <span>${fmt(monthlyTargetMargin)}</span>
                     </div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#64748B">
+                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted)">
                         <span>÷ متوسط هامش الربح الفعلي (آخر 90 يوم)</span>
                         <span>${Math.round(avgMarginPct * 100)}%</span>
                     </div>
@@ -300,7 +300,7 @@ async function renderDashboard(container) {
                         <span>= الهدف الشهري</span>
                         <span>${fmt(monthlySalesTarget)}</span>
                     </div>
-                    <div style="font-size:10.5px;color:#94A3B8;margin-top:6px;line-height:1.5">
+                    <div style="font-size:10.5px;color:var(--inv-muted-light);margin-top:6px;line-height:1.5">
                         يعني: عشان تغطي مصروفاتك المتوقعة وتحقق الهامش اللي حددته، بهامش الربح الحقيقي اللي بتبيع بيه فعلاً، لازم تبيع بالرقم ده الشهر ده.
                     </div>` : `
                     <p class="dash-empty">حدّد "هامش الربح المستهدف شهريًا" من ⚙️ الإعدادات العامة عشان يظهر هدف المبيعات هنا.</p>`}
@@ -319,9 +319,9 @@ async function renderDashboard(container) {
                     <div class="dash-summary-divider"></div>
                     <div class="dash-summary-row dash-summary-total">
                         <span>${netWorth >= 0 ? '✅ صافي المركز المالي' : '📉 صافي المركز المالي'}</span>
-                        <span style="color:${netWorth >= 0 ? '#059669' : '#DC2626'}">${fmt(Math.abs(netWorth))}</span>
+                        <span style="color:${netWorth >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${fmt(Math.abs(netWorth))}</span>
                     </div>
-                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;line-height:1.6">
+                    <div style="font-size:11px;color:var(--inv-muted-light);margin-top:4px;line-height:1.6">
                         ⚠️ هذا رقم لحظي (مخزون + خزنة + مديونيات - مستحقات) وليس "ربح أو خسارة" بالمعنى المحاسبي — لحساب الربح الفعلي يلزم مقارنة فترتين، راجع "ملخص ${monthName}" بجانبه.
                     </div>
                 </div>
@@ -360,7 +360,7 @@ async function renderDashboard(container) {
                         const limit = Number(c.credit_limit) || 0;
                         const bal = Number(c.balance) || 0;
                         const pct = limit > 0 ? Math.min(100, Math.round(bal / limit * 100)) : 0;
-                        const color = pct > 90 ? '#DC2626' : pct > 70 ? '#D97706' : '#059669';
+                        const color = pct > 90 ? 'var(--inv-red)' : pct > 70 ? 'var(--inv-gold)' : 'var(--inv-green)';
                         return `<div class="dash-cust-item">
                             <div class="dash-cust-name">${c.name}</div>
                             <div class="dash-cust-bal" style="color:${color}">${fmt(bal)} ج.م</div>
@@ -407,9 +407,9 @@ async function renderDashboard(container) {
                     <div class="dash-summary-divider"></div>
                     <div class="dash-summary-row dash-summary-total">
                         <span>${monthProfit >= 0 ? '✅ صافي الربح' : '📉 صافي الخسارة'}</span>
-                        <span style="color:${monthProfit >= 0 ? '#059669' : '#DC2626'}">${fmt(Math.abs(monthProfit))}</span>
+                        <span style="color:${monthProfit >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${fmt(Math.abs(monthProfit))}</span>
                     </div>
-                    <div class="dash-summary-row" style="font-size:11px;color:#94A3B8;margin-top:4px">
+                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light);margin-top:4px">
                         <span>هامش الربح</span>
                         <span>${netMonthSales > 0 ? Math.round(monthProfit / netMonthSales * 100) : 0}%</span>
                     </div>
@@ -421,7 +421,7 @@ async function renderDashboard(container) {
         container.innerHTML = `<div class="dash-error">
             <div style="font-size:32px">⚠️</div>
             <div>خطأ في تحميل البيانات</div>
-            <div style="font-size:12px;margin-top:8px;color:#94A3B8">${err.message}</div>
+            <div style="font-size:12px;margin-top:8px;color:var(--inv-muted-light)">${err.message}</div>
             <button class="dash-refresh" onclick="renderDashboard(document.getElementById('app-content'))" style="margin-top:12px">إعادة المحاولة</button>
         </div>`;
     }
@@ -439,9 +439,9 @@ let dashTrendLayout = null;
 // المستخدم فى rep-visits.js (rvRenderGoalsPage): 100%+ أخضر، 60-99% برتقالي، أقل من 60% أحمر.
 // لو مفيش هدف متحدد من الإعدادات (٠)، كل الأعمدة بتاخد اللون الأخضر العادي.
 function dashTrendBarColor(v) {
-    if (dashDailyTarget <= 0) return '#059669';
+    if (dashDailyTarget <= 0) return 'var(--inv-green)';
     const pct = v / dashDailyTarget * 100;
-    return pct >= 100 ? '#059669' : pct >= 60 ? '#F59E0B' : '#EF4444';
+    return pct >= 100 ? 'var(--inv-green)' : pct >= 60 ? 'var(--inv-gold-light)' : '#EF4444';
 }
 
 function dashRenderTrendSVG(days) {
@@ -464,15 +464,15 @@ function dashRenderTrendSVG(days) {
     }).join('');
 
     const targetLine = dashDailyTarget > 0 ? `
-        <line x1="${padL}" y1="${yAt(dashDailyTarget).toFixed(1)}" x2="${W - padR}" y2="${yAt(dashDailyTarget).toFixed(1)}" stroke="#334155" stroke-width="1.2" stroke-dasharray="4,3"/>
-        <text x="${W - padR}" y="${(yAt(dashDailyTarget) - 4).toFixed(1)}" font-size="9.5" fill="#334155" text-anchor="end" font-weight="700">🎯 الهدف: ${dashFmtTrend(dashDailyTarget)}</text>` : '';
+        <line x1="${padL}" y1="${yAt(dashDailyTarget).toFixed(1)}" x2="${W - padR}" y2="${yAt(dashDailyTarget).toFixed(1)}" stroke="var(--inv-navy-light)" stroke-width="1.2" stroke-dasharray="4,3"/>
+        <text x="${W - padR}" y="${(yAt(dashDailyTarget) - 4).toFixed(1)}" font-size="9.5" fill="var(--inv-navy-light)" text-anchor="end" font-weight="700">🎯 الهدف: ${dashFmtTrend(dashDailyTarget)}</text>` : '';
 
     const labelEvery = days <= 7 ? 1 : 5;
     const xLabels = data.map((d, i) => {
         if (i % labelEvery !== 0 && i !== n - 1) return '';
         const dt = new Date(d.date + 'T00:00:00');
         const txt = dt.toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric' });
-        return `<text x="${xAt(i).toFixed(1)}" y="${H - 6}" font-size="9" fill="#94A3B8" text-anchor="middle">${txt}</text>`;
+        return `<text x="${xAt(i).toFixed(1)}" y="${H - 6}" font-size="9" fill="var(--inv-muted-light)" text-anchor="middle">${txt}</text>`;
     }).filter(Boolean).join('');
 
     dashTrendLayout = { data, xAt, n, W, barW, padT, plotH };
@@ -490,7 +490,7 @@ function dashRenderTrendSVG(days) {
       <div id="dashTrendTooltip" style="position:absolute;top:6px;background:#0F172A;color:#fff;padding:4px 9px;border-radius:6px;font-size:11px;pointer-events:none;display:none;white-space:nowrap;line-height:1.5"></div>
     </div>
     ${!values.some(v => v > 0) ? '<p class="dash-empty" style="margin-top:8px">لا توجد مبيعات في هذه الفترة</p>' : ''}
-    ${dashDailyTarget > 0 ? `<div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:#64748B">
+    ${dashDailyTarget > 0 ? `<div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:var(--inv-muted)">
         <span>🟢 حقّق الهدف</span><span>🟠 قرّب منه (٦٠٪+)</span><span>🔴 بعيد عنه</span>
     </div>` : ''}`;
 }

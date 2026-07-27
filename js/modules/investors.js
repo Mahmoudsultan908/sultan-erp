@@ -27,7 +27,7 @@ async function renderInvestors(c) {
 
         c.innerHTML = `
             <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">🤝 المستثمرين — تقفيل الأرباح الشهرية</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">توزيع صافي ربح الشهر بين صاحب المحل والمستثمر حسب نسبة رأس المال والمجهود</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">توزيع صافي ربح الشهر بين صاحب المحل والمستثمر حسب نسبة رأس المال والمجهود</p></div>
 
             <div class="mod-alert-banner info">
                 <span>ℹ️</span>
@@ -48,7 +48,7 @@ async function renderInvestors(c) {
                 </div>
                 <div class="mod-form-group"><label>نسبة نصيب المجهود والإدارة (لصاحب المحل بالكامل)</label>
                     <input type="number" id="invsEffortRatio" class="mod-form-input" value="${((last?.effort_ratio ?? 0.5) * 100).toFixed(0)}" min="0" max="100" step="1">
-                    <small style="color:#94A3B8">% — الباقي بعد المجهود بيتقسم حسب نسبة رأس المال</small>
+                    <small style="color:var(--inv-muted-light)">% — الباقي بعد المجهود بيتقسم حسب نسبة رأس المال</small>
                 </div>
                 <button class="mod-btn mod-btn-primary" style="width:100%" onclick="invsCalcPreview()">🔍 حساب المعاينة</button>
             </div>
@@ -63,11 +63,11 @@ async function renderInvestors(c) {
                     </tr></thead>
                     <tbody>
                         ${_invsHistory.length ? _invsHistory.map(h => `<tr>
-                            <td><strong>${new Date(h.period_month).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long' })}</strong>${h.is_loss ? ' <span style="color:#DC2626;font-size:11px;font-weight:700">(خسارة)</span>' : ''}</td>
-                            <td style="text-align:left;font-weight:700;color:${h.net_profit >= 0 ? '#059669' : '#DC2626'}">${invsFmt(h.net_profit)}</td>
+                            <td><strong>${new Date(h.period_month).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long' })}</strong>${h.is_loss ? ' <span style="color:var(--inv-red);font-size:11px;font-weight:700">(خسارة)</span>' : ''}</td>
+                            <td style="text-align:left;font-weight:700;color:${h.net_profit >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${invsFmt(h.net_profit)}</td>
                             <td style="text-align:left">${invsFmt(h.investor_total)}</td>
                             <td style="text-align:left">${invsFmt(h.owner_total)}</td>
-                            <td style="font-size:12px;color:#64748B">${new Date(h.created_at).toLocaleDateString('ar-EG')}</td>
+                            <td style="font-size:12px;color:var(--inv-muted)">${new Date(h.created_at).toLocaleDateString('ar-EG')}</td>
                         </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📜</span>لا يوجد شهور مقفولة بعد</td></tr>`}
                     </tbody></table>
                 </div>
@@ -146,7 +146,7 @@ window.invsCalcPreview = async function() {
     const effort_ratio = (parseFloat(document.getElementById('invsEffortRatio').value) || 0) / 100;
 
     const area = document.getElementById('invsPreviewArea');
-    area.innerHTML = '<div style="text-align:center;padding:20px;color:#64748B">⏳ جاري جمع أرقام الشهر...</div>';
+    area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--inv-muted)">⏳ جاري جمع أرقام الشهر...</div>';
     try {
         const monthNums = await invsFetchMonthNumbers(monthStr);
         const result = invsCompute({ investor_capital, owner_capital, effort_ratio, ...monthNums });
@@ -155,7 +155,7 @@ window.invsCalcPreview = async function() {
         area.innerHTML = `
             <div class="mod-card">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-                    <div class="mod-card-icon" style="background:${result.is_loss?'#FEE2E2':'#F0FDF4'};color:${result.is_loss?'#DC2626':'#059669'};width:40px;height:40px;font-size:18px">${result.is_loss?'📉':'📊'}</div>
+                    <div class="mod-card-icon" style="background:${result.is_loss?'#FEE2E2':'#F0FDF4'};color:${result.is_loss?'var(--inv-red)':'var(--inv-green)'};width:40px;height:40px;font-size:18px">${result.is_loss?'📉':'📊'}</div>
                     <div style="font-size:15px;font-weight:800">معاينة ${new Date(_invsPreview.period_month).toLocaleDateString('ar-EG',{year:'numeric',month:'long'})}</div>
                 </div>
                 ${result.is_loss ? `<div class="mod-alert-banner danger" style="margin-bottom:14px"><span>⚠️</span><span>خسارة الشهر — المستثمر هيتحمّل نصيبه من رأس المال بس (مش من المجهود).</span></div>` : ''}
@@ -164,14 +164,14 @@ window.invsCalcPreview = async function() {
                     <div class="mod-card" style="box-shadow:none;border-color:#F1F5F9"><div class="mod-card-val" style="font-size:16px">${invsFmt(monthNums.cogs)}</div><div class="mod-card-lbl">تكلفة البضاعة المباعة</div></div>
                     <div class="mod-card" style="box-shadow:none;border-color:#F1F5F9"><div class="mod-card-val" style="font-size:16px">${invsFmt(monthNums.operating_expenses)}</div><div class="mod-card-lbl">مصروفات تشغيلية</div></div>
                 </div>
-                <div style="font-size:12px;color:#94A3B8;margin-bottom:14px">بضاعة آجل حالية للموردين (للعرض بس، مش داخلة في الحساب): ${invsFmt(monthNums.payables_credit)} ج.م</div>
+                <div style="font-size:12px;color:var(--inv-muted-light);margin-bottom:14px">بضاعة آجل حالية للموردين (للعرض بس، مش داخلة في الحساب): ${invsFmt(monthNums.payables_credit)} ج.م</div>
                 <div class="mod-table-wrap" style="margin-bottom:0">
                     <table class="mod-table"><tbody>
-                        <tr><td>صافي ربح الشهر</td><td style="text-align:left;font-weight:800;color:${result.is_loss?'#DC2626':'#059669'}">${invsFmt(result.net_profit)}</td></tr>
+                        <tr><td>صافي ربح الشهر</td><td style="text-align:left;font-weight:800;color:${result.is_loss?'var(--inv-red)':'var(--inv-green)'}">${invsFmt(result.net_profit)}</td></tr>
                         <tr><td>نسبة المستثمر من رأس المال المملوك</td><td style="text-align:left">${(result.investor_ratio*100).toFixed(1)}%</td></tr>
                         <tr><td>نسبة صاحب المحل من رأس المال المملوك</td><td style="text-align:left">${(result.owner_ratio*100).toFixed(1)}%</td></tr>
-                        <tr style="background:#FFFBEB"><td><strong>نصيب المستثمر الإجمالي</strong></td><td style="text-align:left;font-weight:800;color:#D97706">${invsFmt(result.investor_total)}</td></tr>
-                        <tr style="background:#FFFBEB"><td><strong>نصيب صاحب المحل الإجمالي</strong> ${!result.is_loss?`<small style="color:#94A3B8">(مجهود ${invsFmt(result.effort_amount)} + رأس مال ${invsFmt(result.owner_capital_share)})</small>`:''}</td><td style="text-align:left;font-weight:800;color:#D97706">${invsFmt(result.owner_total)}</td></tr>
+                        <tr style="background:#FFFBEB"><td><strong>نصيب المستثمر الإجمالي</strong></td><td style="text-align:left;font-weight:800;color:var(--inv-gold)">${invsFmt(result.investor_total)}</td></tr>
+                        <tr style="background:#FFFBEB"><td><strong>نصيب صاحب المحل الإجمالي</strong> ${!result.is_loss?`<small style="color:var(--inv-muted-light)">(مجهود ${invsFmt(result.effort_amount)} + رأس مال ${invsFmt(result.owner_capital_share)})</small>`:''}</td><td style="text-align:left;font-weight:800;color:var(--inv-gold)">${invsFmt(result.owner_total)}</td></tr>
                     </tbody></table>
                 </div>
                 <div class="mod-form-group" style="margin-top:14px"><label>ملاحظات (اختياري)</label>

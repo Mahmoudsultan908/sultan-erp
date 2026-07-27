@@ -17,11 +17,11 @@ let _prlTableMissing = false;
 let _prlLastEvalMap = {}; // employee_id -> { date, avg }
 
 function prlEvalColor(avg) {
-    if (avg >= 9) return { color: '#059669', bg: '#F0FDF4' };
+    if (avg >= 9) return { color: 'var(--inv-green)', bg: '#F0FDF4' };
     if (avg >= 7) return { color: '#2563EB', bg: '#EFF6FF' };
-    if (avg >= 5) return { color: '#D97706', bg: '#FFFBEB' };
+    if (avg >= 5) return { color: 'var(--inv-gold)', bg: '#FFFBEB' };
     if (avg >= 3) return { color: '#EA580C', bg: '#FFF7ED' };
-    return { color: '#DC2626', bg: '#FEF2F2' };
+    return { color: 'var(--inv-red)', bg: '#FEF2F2' };
 }
 
 function prlFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -67,15 +67,15 @@ function prlRenderPage(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <div><h2 style="font-size:22px;font-weight:800">👥 الموظفون والرواتب</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة الموظفين وصرف الرواتب والسلف</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إدارة الموظفين وصرف الرواتب والسلف</p></div>
             <button class="mod-btn mod-btn-primary" onclick="prlOpenAdd()">+ إضافة موظف</button>
         </div>
 
         ${_prlTableMissing ? `<div style="background:#FEF3C7;color:#92400E;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول الموظفين لسه مش موجود — شغّل <code>employees_payroll_migration.sql</code> في Supabase.</div>` : ''}
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">👥</div><div class="mod-card-val">${activeEmps.length}</div><div class="mod-card-lbl">عدد الموظفين النشطين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">💰</div><div class="mod-card-val">${prlFmt(totalBase)}</div><div class="mod-card-lbl">إجمالي الرواتب الأساسية</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">👥</div><div class="mod-card-val">${activeEmps.length}</div><div class="mod-card-lbl">عدد الموظفين النشطين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">💰</div><div class="mod-card-val">${prlFmt(totalBase)}</div><div class="mod-card-lbl">إجمالي الرواتب الأساسية</div></div>
         </div>
 
         <div class="mod-table-wrap">
@@ -89,14 +89,14 @@ function prlRenderPage(c) {
                     const lastEval = _prlLastEvalMap[e.id];
                     return `<tr>
                     <td style="font-weight:600">${e.name}</td>
-                    <td style="color:#64748B">${e.job_title || '—'}</td>
-                    <td dir="ltr" style="color:#64748B">${e.phone || '—'}</td>
-                    <td style="font-size:12px">${lastEval ? `${new Date(lastEval.date).toLocaleDateString('ar-EG')} <span style="background:${prlEvalColor(lastEval.avg).bg};color:${prlEvalColor(lastEval.avg).color};padding:1px 8px;border-radius:10px;font-weight:700;margin-right:4px">${lastEval.avg.toFixed(1)}</span>` : '<span style="color:#94A3B8">—</span>'}</td>
+                    <td style="color:var(--inv-muted)">${e.job_title || '—'}</td>
+                    <td dir="ltr" style="color:var(--inv-muted)">${e.phone || '—'}</td>
+                    <td style="font-size:12px">${lastEval ? `${new Date(lastEval.date).toLocaleDateString('ar-EG')} <span style="background:${prlEvalColor(lastEval.avg).bg};color:${prlEvalColor(lastEval.avg).color};padding:1px 8px;border-radius:10px;font-weight:700;margin-right:4px">${lastEval.avg.toFixed(1)}</span>` : '<span style="color:var(--inv-muted-light)">—</span>'}</td>
                     <td style="text-align:left;font-weight:700">${prlFmt(e.base_salary)}</td>
-                    <td style="text-align:center">${e.is_active !== false ? '<span style="color:#059669;font-weight:600">✅ نشط</span>' : '<span style="color:#94A3B8;font-weight:600">🚫 غير نشط</span>'}</td>
+                    <td style="text-align:center">${e.is_active !== false ? '<span style="color:var(--inv-green);font-weight:600">✅ نشط</span>' : '<span style="color:var(--inv-muted-light);font-weight:600">🚫 غير نشط</span>'}</td>
                     <td style="text-align:center;white-space:nowrap">
                         <button class="cc-edit" onclick="prlOpenEdit('${e.id}')">✏️</button>
-                        <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="prlShowStatement('${e.id}')">📄 كشف حساب</button>
+                        <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="prlShowStatement('${e.id}')">📄 كشف حساب</button>
                         ${typeof eevOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FEF9C3;color:#B45309" onclick="eevOpenAdd('${e.id}')" title="تقييم سريع">⭐</button>` : ''}
                     </td>
                 </tr>`;
@@ -136,7 +136,7 @@ function prlOpenModal(x) {
                 </div>
                 <div class="mod-form-group"><label>أيام العمل بالشهر</label>
                     <input type="number" id="prlWorkDays" class="mod-form-input" value="${x?.work_days_per_month ?? 30}" min="1" max="31" step="1">
-                    <div style="font-size:11px;color:#94A3B8;margin-top:3px">بيتحسب منها سعر يوم الغياب = الراتب الأساسي ÷ أيام العمل</div></div>
+                    <div style="font-size:11px;color:var(--inv-muted-light);margin-top:3px">بيتحسب منها سعر يوم الغياب = الراتب الأساسي ÷ أيام العمل</div></div>
                 <div class="mod-form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                     <input type="checkbox" id="prlIsActive" ${x?.is_active !== false ? 'checked' : ''}> نشط
                 </label></div>
@@ -144,7 +144,7 @@ function prlOpenModal(x) {
                     <input type="text" id="prlNotes" class="mod-form-input" value="${x?.notes || ''}" placeholder="اختياري"></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('prlModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('prlModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="prlSave()">💾 ${x ? 'حفظ التعديلات' : 'إضافة الموظف'}</button>
             </div>
         </div>`;
@@ -257,29 +257,29 @@ async function prlRenderStatement() {
             </div>
             <div class="mod-grid" style="margin:12px 0 16px">
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">الراتب الأساسي</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">الراتب الأساسي</div>
                     <div style="font-size:20px;font-weight:800">${prlFmt(emp.base_salary)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">مصروف/مسحوب هذا الشهر</div>
-                    <div style="font-size:20px;font-weight:800;color:#DC2626">${prlFmt(taken)}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">مصروف/مسحوب هذا الشهر</div>
+                    <div style="font-size:20px;font-weight:800;color:var(--inv-red)">${prlFmt(taken)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">خصم غياب (${absentDays.length} يوم × ${prlFmt(dailyRate)})</div>
-                    <div style="font-size:20px;font-weight:800;color:#DC2626">${prlFmt(absenceDeduction)}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">خصم غياب (${absentDays.length} يوم × ${prlFmt(dailyRate)})</div>
+                    <div style="font-size:20px;font-weight:800;color:var(--inv-red)">${prlFmt(absenceDeduction)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">حوافز</div>
-                    <div style="font-size:20px;font-weight:800;color:#059669">${prlFmt(incentivesSum)}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">حوافز</div>
+                    <div style="font-size:20px;font-weight:800;color:var(--inv-green)">${prlFmt(incentivesSum)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">الباقي الصافي</div>
-                    <div style="font-size:20px;font-weight:800;color:${remaining >= 0 ? '#059669' : '#DC2626'}">${prlFmt(remaining)}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">الباقي الصافي</div>
+                    <div style="font-size:20px;font-weight:800;color:${remaining >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${prlFmt(remaining)}</div>
                 </div>
             </div>
             <div style="display:flex;gap:10px;margin-bottom:16px">
                 <button class="mod-btn mod-btn-primary" style="flex:1" onclick="prlOpenPayout(${Math.round(remaining*100)/100})">💸 تسجيل صرف</button>
-                <button class="mod-btn" style="flex:1;background:#F0FDF4;color:#059669" onclick="prlOpenIncentive()">➕ تسجيل حافز</button>
+                <button class="mod-btn" style="flex:1;background:#F0FDF4;color:var(--inv-green)" onclick="prlOpenIncentive()">➕ تسجيل حافز</button>
             </div>
             <div id="prlPayoutForm"></div>
             <div id="prlIncentiveForm"></div>
@@ -291,7 +291,7 @@ async function prlRenderStatement() {
                     ${rows.length === 0 ? `<tr><td colspan="4" class="empty-state"><span>📭</span>مفيش أي صرف مسجّل للموظف ده الشهر ده.</td></tr>` :
                     rows.map(r => `<tr>
                         <td>${r.expense_categories?.name || '—'}</td>
-                        <td style="color:#64748B">${r.description || '—'}</td>
+                        <td style="color:var(--inv-muted)">${r.description || '—'}</td>
                         <td style="font-size:12px">${new Date(r.expense_date).toLocaleDateString('ar-EG')}</td>
                         <td style="text-align:left;font-weight:700">${prlFmt(r.amount)}</td>
                     </tr>`).join('')}
@@ -303,7 +303,7 @@ async function prlRenderStatement() {
                 <table class="mod-table"><thead><tr><th>التاريخ</th><th>ملاحظات</th></tr></thead>
                 <tbody>${absentDays.map(a => `<tr>
                     <td style="font-size:12px">${new Date(a.record_date).toLocaleDateString('ar-EG')}</td>
-                    <td style="color:#64748B">${a.notes || '—'}</td>
+                    <td style="color:var(--inv-muted)">${a.notes || '—'}</td>
                 </tr>`).join('')}</tbody></table>
             </div>` : ''}
             ${incentives.length ? `
@@ -311,9 +311,9 @@ async function prlRenderStatement() {
             <div class="mod-table-wrap">
                 <table class="mod-table"><thead><tr><th>السبب</th><th>التاريخ</th><th style="text-align:left">المبلغ</th></tr></thead>
                 <tbody>${incentives.map(i => `<tr>
-                    <td style="color:#64748B">${i.reason || '—'}</td>
+                    <td style="color:var(--inv-muted)">${i.reason || '—'}</td>
                     <td style="font-size:12px">${new Date(i.incentive_date).toLocaleDateString('ar-EG')}</td>
-                    <td style="text-align:left;font-weight:700;color:#059669">${prlFmt(i.amount)}</td>
+                    <td style="text-align:left;font-weight:700;color:var(--inv-green)">${prlFmt(i.amount)}</td>
                 </tr>`).join('')}</tbody></table>
             </div>` : ''}`;
     } catch (err) {
@@ -362,7 +362,7 @@ window.prlOpenPayout = async function (suggestedAmount) {
         <div class="mod-form-group"><label>البيان</label>
             <input type="text" id="prlPayoutDesc" class="mod-form-input" placeholder="مثال: راتب شهر ${_prlStmtMonth}"></div>
         <div style="display:flex;gap:10px">
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('prlPayoutForm').innerHTML=''">إلغاء</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('prlPayoutForm').innerHTML=''">إلغاء</button>
             <button class="mod-btn mod-btn-primary" onclick="prlSavePayout()">💾 تأكيد الصرف</button>
         </div>
     </div>`;
@@ -375,7 +375,7 @@ window.prlPayoutCatSearchInput = function () {
     const term = (document.getElementById('prlPayoutCatSearch')?.value || '').trim().toLowerCase();
     const list = term ? _prlPayoutCategories.filter(c => (c.name || '').toLowerCase().includes(term)) : _prlPayoutCategories;
     if (!list.length) {
-        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
+        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:var(--inv-muted-light)">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');
         return;
     }
@@ -454,8 +454,8 @@ window.prlOpenIncentive = function () {
         <div class="mod-form-group"><label>السبب</label>
             <input type="text" id="prlIncentiveReason" class="mod-form-input" placeholder="مثال: تحصيل ممتاز الأسبوع ده"></div>
         <div style="display:flex;gap:10px">
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('prlIncentiveForm').innerHTML=''">إلغاء</button>
-            <button class="mod-btn mod-btn-primary" style="background:#059669" onclick="prlSaveIncentive()">💾 تأكيد الحافز</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('prlIncentiveForm').innerHTML=''">إلغاء</button>
+            <button class="mod-btn mod-btn-primary" style="background:var(--inv-green)" onclick="prlSaveIncentive()">💾 تأكيد الحافز</button>
         </div>
     </div>`;
 };

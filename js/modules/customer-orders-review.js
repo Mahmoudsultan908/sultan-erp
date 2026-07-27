@@ -40,7 +40,7 @@ async function renderCustomerOrdersLink(c) {
     c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">🔗 ربط برنامج طلبات العملاء</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">طلبات وتسجيلات واردة من "سلطانو" — كل حاجة بتفضل معلّقة لحد ما تراجعها وتعتمدها من هنا</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">طلبات وتسجيلات واردة من "سلطانو" — كل حاجة بتفضل معلّقة لحد ما تراجعها وتعتمدها من هنا</p></div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
         <button class="mod-btn ${_corTab==='orders'?'mod-btn-primary':''}" onclick="corSwitchTab('orders')">📦 طلبات سلطانو</button>
@@ -86,7 +86,7 @@ function corRenderOrdersPage(c) {
     c.innerHTML = `
     ${pending.length ? `
     <div class="mod-table-wrap" style="margin-bottom:20px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">⏳ طلبات في انتظار المراجعة (${pending.length})</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">⏳ طلبات في انتظار المراجعة (${pending.length})</div>
         <table class="mod-table"><thead><tr>
             <th>رقم الطلب</th><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>ملاحظات</th><th>التاريخ</th><th style="width:190px"></th>
         </tr></thead>
@@ -95,7 +95,7 @@ function corRenderOrdersPage(c) {
 
     ${reviewed.length ? `
     <div class="mod-table-wrap">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر الطلبات المراجَعة</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📋 آخر الطلبات المراجَعة</div>
         <table class="mod-table"><thead><tr>
             <th>رقم الطلب</th><th>العميل</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th>
         </tr></thead><tbody>
@@ -107,8 +107,8 @@ function corRenderOrdersPage(c) {
                     <select class="mod-form-input" style="margin:0;padding:4px 8px;font-size:12px;width:auto" onchange="corUpdateDeliveryStatus('${o.id}',this.value)">
                         ${['preparing','delivering','delivered'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${COR_STATUS_LABELS[s]}</option>`).join('')}
                     </select>
-                ` : '<span style="color:#DC2626;font-weight:700">❌ مرفوض</span>'}</td>
-                <td style="color:#64748B">${o.created_at ? new Date(o.created_at).toLocaleDateString('ar-EG') : '—'}</td>
+                ` : '<span style="color:var(--inv-red);font-weight:700">❌ مرفوض</span>'}</td>
+                <td style="color:var(--inv-muted)">${o.created_at ? new Date(o.created_at).toLocaleDateString('ar-EG') : '—'}</td>
             </tr>`).join('')}
         </tbody></table>
     </div>` : ''}`;
@@ -119,11 +119,11 @@ function corRowHTML(o) {
     const itemsSummary = items.map(it => `${it.products?.name || '—'} × ${corFmt(it.qty)}`).join('، ');
     return `<tr data-cor-id="${o.id}">
         <td>${o.order_no || '—'}</td>
-        <td>${o.customers?.name || '—'}<div style="font-size:11px;color:#64748B" dir="ltr">${o.customers?.phone || ''}</div></td>
+        <td>${o.customers?.name || '—'}<div style="font-size:11px;color:var(--inv-muted)" dir="ltr">${o.customers?.phone || ''}</div></td>
         <td style="font-size:12px;max-width:260px">${itemsSummary || '—'}</td>
         <td>${corFmt(o.total)}</td>
-        <td style="font-size:12px;color:#64748B">${o.notes || '—'}</td>
-        <td style="color:#64748B">${o.created_at ? new Date(o.created_at).toLocaleString('ar-EG') : '—'}</td>
+        <td style="font-size:12px;color:var(--inv-muted)">${o.notes || '—'}</td>
+        <td style="color:var(--inv-muted)">${o.created_at ? new Date(o.created_at).toLocaleString('ar-EG') : '—'}</td>
         <td style="white-space:nowrap">
             <button class="cc-edit" style="background:#DCFCE7;color:#166534" onclick="corApproveOrder('${o.id}')">✅ اعتماد/مراجعة</button>
             <button class="cc-edit" style="background:#FEE2E2;color:#991B1B;margin-right:4px" onclick="corRejectOrder('${o.id}')">❌ رفض</button>
@@ -200,10 +200,10 @@ function corRenderBannersPage(c) {
             ${COR_BANNERS.map(b => `<tr>
                 <td>${b.image_url ? `<img src="${b.image_url}" style="width:50px;height:36px;object-fit:cover;border-radius:6px">` : '—'}</td>
                 <td>${b.title}</td>
-                <td style="font-size:12px;color:#64748B">${b.link_type==='category' ? (COR_CATS.find(x=>x.id===b.link_value)?.name || 'قسم محذوف') : '—'}</td>
+                <td style="font-size:12px;color:var(--inv-muted)">${b.link_type==='category' ? (COR_CATS.find(x=>x.id===b.link_value)?.name || 'قسم محذوف') : '—'}</td>
                 <td style="font-size:12px">${b.display_type==='popup' ? '📱 بوب أب عند الفتح' : '🔄 شريط دوّار'}</td>
                 <td>${b.display_order}</td>
-                <td>${b.is_active ? '<span style="color:#059669;font-weight:700">✅ فعّال</span>' : '<span style="color:#94A3B8">⏸️ متوقف</span>'}</td>
+                <td>${b.is_active ? '<span style="color:var(--inv-green);font-weight:700">✅ فعّال</span>' : '<span style="color:var(--inv-muted-light)">⏸️ متوقف</span>'}</td>
                 <td style="white-space:nowrap">
                     <button class="cc-edit" onclick="corOpenBannerModal('${b.id}')">✏️</button>
                     <button class="cc-edit" style="background:#FEE2E2;color:#991B1B;margin-right:4px" onclick="corDeleteBanner('${b.id}')">🗑️</button>
@@ -257,7 +257,7 @@ window.corOpenBannerModal = function(id) {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('corBannerModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('corBannerModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="corSaveBanner('${id||''}')">💾 حفظ</button>
             </div>
         </div>`;

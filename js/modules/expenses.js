@@ -102,7 +102,7 @@ async function renderExpenses(container) {
     container.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <div><h2 style="font-size:22px;font-weight:800">المصروفات المالية</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">متابعة وتسجيل المصروفات برقابة الحد الأقصى الشهري</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">متابعة وتسجيل المصروفات برقابة الحد الأقصى الشهري</p></div>
             <button class="mod-btn mod-btn-primary" onclick="expOpenAdd()">+ تسجيل مصروف جديد</button>
         </div>
 
@@ -119,8 +119,8 @@ async function renderExpenses(container) {
         <!-- ===== تبويب المصروفات ===== -->
         <div id="expPanelTransactions">
             <div class="mod-grid">
-                <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">💸</div><div class="mod-card-val">${_expFmt(total)}</div><div class="mod-card-lbl">إجمالي المصروفات</div></div>
-                <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">📅</div><div class="mod-card-val">${_expFmt(monthTotal)}</div><div class="mod-card-lbl">مصروفات هذا الشهر</div></div>
+                <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold)">💸</div><div class="mod-card-val">${_expFmt(total)}</div><div class="mod-card-lbl">إجمالي المصروفات</div></div>
+                <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📅</div><div class="mod-card-val">${_expFmt(monthTotal)}</div><div class="mod-card-lbl">مصروفات هذا الشهر</div></div>
                 <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">📊</div><div class="mod-card-val">${activeExpenses.length}</div><div class="mod-card-lbl">عملية منفذة</div></div>
             </div>
 
@@ -149,12 +149,12 @@ function _expMonthExpTableHTML(expenses) {
             expenses.map(e => `<tr>
                 <td>${new Date(e.expense_date).toLocaleDateString('ar-EG')}</td>
                 <td><span style="background:#F1F5F9;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600">${e.expense_categories?.name || '—'}</span></td>
-                <td style="color:#475569">${_expRepById[e.created_by] ? `<span style="font-size:11px;color:#2563EB">🚗 ${_expRepById[e.created_by]}</span> ` : ''}${e.description || '—'}</td>
-                <td style="text-align:left;font-weight:700;color:#DC2626">${_expFmt(e.amount)}</td>
+                <td style="color:var(--inv-text-soft)">${_expRepById[e.created_by] ? `<span style="font-size:11px;color:#2563EB">🚗 ${_expRepById[e.created_by]}</span> ` : ''}${e.description || '—'}</td>
+                <td style="text-align:left;font-weight:700;color:var(--inv-red)">${_expFmt(e.amount)}</td>
                 <td>${e._queue
-                    ? (e.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
-                    : e.status === 'cancelled' ? '<span style="color:#94A3B8;font-weight:600">🚫 ملغي</span>'
-                    : '<span style="color:#059669;font-weight:600">✅ مؤكد</span>'}</td>
+                    ? (e.status === 'failed' ? '<span style="color:var(--inv-red);font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:var(--inv-gold);font-weight:600">⏳ غير مُزامن</span>')
+                    : e.status === 'cancelled' ? '<span style="color:var(--inv-muted-light);font-weight:600">🚫 ملغي</span>'
+                    : '<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>'}</td>
                 <td style="white-space:nowrap">${e._queue ? '' : `
                     <button class="cc-edit" onclick="expPrintVoucher('${e.id}')">🖨️</button>
                     ${e.status === 'confirmed' ? `<button class="cc-edit" style="background:#FEE2E2;color:#991B1B" onclick="expCancelExpense('${e.id}')">❌ إلغاء</button>` : ''}
@@ -174,13 +174,13 @@ function _expGlobalLimitCardHTML(monthTotal) {
     return `
     <div class="mod-card" style="margin-top:16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-            <div class="mod-card-icon" style="background:#FEF2F2;color:#DC2626;width:40px;height:40px;font-size:18px">🎯</div>
-            <div><div style="font-size:14px;font-weight:800">الحد الإجمالي الشهري للمصروفات</div><div style="font-size:11px;color:#64748B">مراقبة إجمالي مصروفات الشهر كله</div></div>
+            <div class="mod-card-icon" style="background:#FEF2F2;color:var(--inv-red);width:40px;height:40px;font-size:18px">🎯</div>
+            <div><div style="font-size:14px;font-weight:800">الحد الإجمالي الشهري للمصروفات</div><div style="font-size:11px;color:var(--inv-muted)">مراقبة إجمالي مصروفات الشهر كله</div></div>
         </div>
-        <div class="limit-row"><span class="lr-label">المصروف حتى الآن:</span><span class="lr-val">${_expFmt(monthTotal)} ج.م</span><span class="lr-val" style="margin:0;color:#94A3B8;font-weight:600">/ ${_expFmt(_expGlobalLimit)} ج.م</span></div>
+        <div class="limit-row"><span class="lr-label">المصروف حتى الآن:</span><span class="lr-val">${_expFmt(monthTotal)} ج.م</span><span class="lr-val" style="margin:0;color:var(--inv-muted-light);font-weight:600">/ ${_expFmt(_expGlobalLimit)} ج.م</span></div>
         <div class="limit-bar"><div class="limit-fill ${cls}" style="width:${Math.min(pct, 100).toFixed(1)}%"></div></div>
         <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:11px;color:#64748B">${pct.toFixed(1)}% من الحد — متبقّي ${_expFmt(Math.max(_expGlobalLimit - monthTotal, 0))} ج.م</span>
+            <span style="font-size:11px;color:var(--inv-muted)">${pct.toFixed(1)}% من الحد — متبقّي ${_expFmt(Math.max(_expGlobalLimit - monthTotal, 0))} ج.م</span>
             ${stt}
         </div>
     </div>`;
@@ -193,12 +193,12 @@ function _expCatsPanelHTML(categories, catUsage) {
     <div class="mod-table-wrap">
         <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0">
             <div style="font-size:14px;font-weight:800;color:#0F172A">📄 كشف حساب المصروفات حسب البند + الحدود الشهرية</div>
-            <div style="font-size:12px;color:#64748B;margin-top:4px">اختَر الفترة اللي عايز تشوف مصروفات كل بند فيها (افتراضيًا الشهر الحالي) — وعدّل الحد الشهري لأي بند من هنا كمان</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-top:4px">اختَر الفترة اللي عايز تشوف مصروفات كل بند فيها (افتراضيًا الشهر الحالي) — وعدّل الحد الشهري لأي بند من هنا كمان</div>
             <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:12px 0 0">
                 <div><label class="ob-label">من تاريخ</label><input type="date" id="expCatsFrom" class="ob-input" style="margin:0" value="${_expCatsFrom}"></div>
                 <div><label class="ob-label">إلى تاريخ</label><input type="date" id="expCatsTo" class="ob-input" style="margin:0" value="${_expCatsTo}"></div>
                 <button class="ob-add-btn" onclick="expCatsApplyRange()">🔍 تطبيق</button>
-                ${!isCurrentMonth ? `<span style="font-size:11px;color:#D97706;align-self:center">⚠️ الأرقام دلوقتي لفترة غير الشهر الحالي — نسبة الحد الشهري تقريبية للمقارنة بس</span>` : ''}
+                ${!isCurrentMonth ? `<span style="font-size:11px;color:var(--inv-gold);align-self:center">⚠️ الأرقام دلوقتي لفترة غير الشهر الحالي — نسبة الحد الشهري تقريبية للمقارنة بس</span>` : ''}
             </div>
             <div class="mod-form-group" style="margin:12px 0 0;max-width:320px">
                 <input type="text" id="expCatSearch" class="mod-form-input" placeholder="🔍 بحث عن بند بالاسم..." oninput="expFilterCatItems(this.value)">
@@ -215,19 +215,19 @@ function _expCatsPanelHTML(categories, catUsage) {
                     return `<div class="cat-card" data-cat-name="${(c.name || '').toLowerCase()}" style="${isActive ? '' : 'opacity:.55'}">
                         <div class="cc-ic">📋</div>
                         <div class="cc-info">
-                            <div class="cc-name">${c.name}${!isActive ? ' <span style="font-size:11px;color:#94A3B8;font-weight:600">(معطّل)</span>' : ''}</div>
+                            <div class="cc-name">${c.name}${!isActive ? ' <span style="font-size:11px;color:var(--inv-muted-light);font-weight:600">(معطّل)</span>' : ''}</div>
                             <div class="cc-sub">${c.code || 'بدون كود'} · ${c.subtype || 'operating'} · حساب: ${c.account_code || '—'}</div>
                         </div>
                         <div class="cc-bar-wrap">
                             <div class="limit-bar" style="margin:0"><div class="limit-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
-                            <div style="font-size:11px;color:#94A3B8;text-align:center;margin-top:2px">${pct.toFixed(0)}%</div>
+                            <div style="font-size:11px;color:var(--inv-muted-light);text-align:center;margin-top:2px">${pct.toFixed(0)}%</div>
                         </div>
                         <div class="cc-amt">
                             <div class="used">${_expFmt(used)}</div>
                             <div class="lim">/ ${lim > 0 ? _expFmt(lim) : '∞'}</div>
                         </div>
                         <button class="cc-edit" onclick="expOpenLimit('${c.id}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})">✏️ الحد</button>
-                        <button class="cc-edit" style="${isActive ? 'background:#FEE2E2;color:#991B1B' : 'background:#D1FAE5;color:#059669'}" onclick="expToggleCategoryActive('${c.id}', ${isActive})">${isActive ? '⛔ تعطيل' : '✅ تفعيل'}</button>
+                        <button class="cc-edit" style="${isActive ? 'background:#FEE2E2;color:#991B1B' : 'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="expToggleCategoryActive('${c.id}', ${isActive})">${isActive ? '⛔ تعطيل' : '✅ تفعيل'}</button>
                     </div>`;
                 }).join('')}
             </div>
@@ -282,7 +282,7 @@ window.expCatSearchInput = function () {
     const term = (document.getElementById('expModalCatSearch')?.value || '').trim().toLowerCase();
     const list = term ? _expModalCategories.filter(c => (c.name || '').toLowerCase().includes(term)) : _expModalCategories;
     if (!list.length) {
-        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
+        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:var(--inv-muted-light)">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');
         return;
     }
@@ -393,7 +393,7 @@ window.expOpenAdd = async function() {
                     </select>
                 </div>
                 ${employees.length ? `
-                <div class="mod-form-group"><label>ربط بموظف <small style="color:#94A3B8;font-weight:400">(اختياري — بيخصم من كشف حساب الموظف فى صفحة الرواتب)</small></label>
+                <div class="mod-form-group"><label>ربط بموظف <small style="color:var(--inv-muted-light);font-weight:400">(اختياري — بيخصم من كشف حساب الموظف فى صفحة الرواتب)</small></label>
                     <select id="expEmployeeId" class="mod-form-input">
                         <option value="">بدون ربط بموظف</option>
                         ${employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
@@ -411,7 +411,7 @@ window.expOpenAdd = async function() {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="expCloseModal('expModal')">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="expCloseModal('expModal')">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="saveExpense()">حفظ المصروف</button>
             </div>
         </div>`;
@@ -505,13 +505,13 @@ window.expCheckLimit = async function() {
         catExceeded = pct >= 100;
         catHTML = `
             <div class="limit-box">
-                <div style="font-size:12px;color:#64748B;margin-bottom:6px">📦 بند: <strong style="color:#0F172A">${catName}</strong> — شهر ${_expMonthLabel()}</div>
+                <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">📦 بند: <strong style="color:#0F172A">${catName}</strong> — شهر ${_expMonthLabel()}</div>
                 <div class="limit-row"><span class="lr-label">المصروف السابق:</span><span class="lr-val">${_expFmt(used)} ج.م</span></div>
-                <div class="limit-row"><span class="lr-label">هذا المصروف:</span><span class="lr-val" style="color:#DC2626">${_expFmt(amount)} ج.م</span></div>
-                <div class="limit-row"><span class="lr-label">الإجمالي بعد الإضافة:</span><span class="lr-val">${_expFmt(total)} ج.م</span><span style="color:#94A3B8;font-size:11px">/ ${_expFmt(catLimit)} ج.م</span></div>
+                <div class="limit-row"><span class="lr-label">هذا المصروف:</span><span class="lr-val" style="color:var(--inv-red)">${_expFmt(amount)} ج.م</span></div>
+                <div class="limit-row"><span class="lr-label">الإجمالي بعد الإضافة:</span><span class="lr-val">${_expFmt(total)} ج.م</span><span style="color:var(--inv-muted-light);font-size:11px">/ ${_expFmt(catLimit)} ج.م</span></div>
                 <div class="limit-bar"><div class="limit-fill ${cls}" style="width:${Math.min(pct,100).toFixed(1)}%"></div></div>
                 <div style="display:flex;justify-content:space-between;align-items:center">
-                    <span style="font-size:11px;color:#64748B">${pct.toFixed(1)}% — متبقّي ${_expFmt(Math.max(catLimit-total,0))} ج.م</span>
+                    <span style="font-size:11px;color:var(--inv-muted)">${pct.toFixed(1)}% — متبقّي ${_expFmt(Math.max(catLimit-total,0))} ج.م</span>
                     ${pct>=100?'<span class="limit-status red">🔴 تجاوز</span>':pct>=80?'<span class="limit-status orange">🟠 تحذير</span>':'<span class="limit-status green">🟢 سليم</span>'}
                 </div>
             </div>`;
@@ -527,12 +527,12 @@ window.expCheckLimit = async function() {
         globalExceeded = gPct >= 100;
         globalHTML = `
             <div class="limit-box" style="border-color:#DBEAFE;background:#EFF6FF">
-                <div style="font-size:12px;color:#64748B;margin-bottom:6px">🎯 الحد الإجمالي الشهري لكل المصروفات</div>
+                <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">🎯 الحد الإجمالي الشهري لكل المصروفات</div>
                 <div class="limit-row"><span class="lr-label">مصروفات الشهر:</span><span class="lr-val">${_expFmt(monthTotal)} ج.م</span></div>
-                <div class="limit-row"><span class="lr-label">بعد هذا المصروف:</span><span class="lr-val">${_expFmt(gTotal)} ج.م</span><span style="color:#94A3B8;font-size:11px">/ ${_expFmt(_expGlobalLimit)} ج.م</span></div>
+                <div class="limit-row"><span class="lr-label">بعد هذا المصروف:</span><span class="lr-val">${_expFmt(gTotal)} ج.م</span><span style="color:var(--inv-muted-light);font-size:11px">/ ${_expFmt(_expGlobalLimit)} ج.م</span></div>
                 <div class="limit-bar"><div class="limit-fill ${gCls}" style="width:${Math.min(gPct,100).toFixed(1)}%"></div></div>
                 <div style="display:flex;justify-content:space-between;align-items:center">
-                    <span style="font-size:11px;color:#64748B">${gPct.toFixed(1)}% — متبقّي ${_expFmt(Math.max(_expGlobalLimit-gTotal,0))} ج.م</span>
+                    <span style="font-size:11px;color:var(--inv-muted)">${gPct.toFixed(1)}% — متبقّي ${_expFmt(Math.max(_expGlobalLimit-gTotal,0))} ج.م</span>
                     ${gPct>=100?'<span class="limit-status red">🔴 تجاوز</span>':gPct>=80?'<span class="limit-status orange">🟠 تحذير</span>':'<span class="limit-status green">🟢 سليم</span>'}
                 </div>
             </div>`;
@@ -673,14 +673,14 @@ window.expOpenLimit = function(catId, catName) {
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>الحد الشهري الجديد (ج.م)</label>
                     <input type="number" id="expNewLimit" class="mod-form-input" placeholder="0 = بدون حد" step="0.01" dir="ltr">
-                    <small style="font-size:11px;color:#64748B;display:block;margin-top:6px">اكتب 0 لإلغاء الحد لهذا البند (بدون رقابة)</small>
+                    <small style="font-size:11px;color:var(--inv-muted);display:block;margin-top:6px">اكتب 0 لإلغاء الحد لهذا البند (بدون رقابة)</small>
                 </div>
                 <div class="mod-form-group"><label>سبب التعديل (اختياري)</label>
                     <textarea id="expLimitReason" class="mod-form-input" style="resize:vertical;min-height:60px" placeholder="لماذا تم تعديل الحد؟"></textarea>
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="expCloseModal('expLimitModal')">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="expCloseModal('expLimitModal')">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="expSaveLimit('${catId}')">💾 حفظ الحد</button>
             </div>
         </div>`;

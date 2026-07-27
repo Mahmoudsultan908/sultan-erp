@@ -74,17 +74,17 @@ function custRenderPage(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">👥 العملاء</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة بيانات العملاء وكشوف حساباتهم</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إدارة بيانات العملاء وكشوف حساباتهم</p></div>
             <div style="display:flex;gap:8px">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="mdOpenLookupManager('customer')">⚙️ المناطق/التصنيفات/المجموعات</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="mdOpenLookupManager('customer')">⚙️ المناطق/التصنيفات/المجموعات</button>
                 <button class="mod-btn mod-btn-primary" onclick="custOpenAdd()">+ إضافة عميل</button>
             </div>
         </div>
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${_mgCustList.length}</div><div class="mod-card-lbl">إجمالي العملاء</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💵</div><div class="mod-card-val">${mdFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${mdFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
         </div>
 
         <div class="mod-card" style="margin-bottom:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
@@ -138,12 +138,12 @@ function custRenderRows() {
             <td>${cls?.name||'—'}</td>
             <td>${grp?.name||'—'}</td>
             <td>${rep?`🚗 ${rep.name}`:'—'}</td>
-            <td style="font-size:12px;color:#94A3B8">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
+            <td style="font-size:12px;color:var(--inv-muted-light)">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
             <td style="text-align:left">${x.credit_limit>0?mdFmt(x.credit_limit):'—'}</td>
-            <td style="text-align:left;font-weight:700;color:${bal>0?'#DC2626':'#059669'}">${mdFmt(bal)}</td>
+            <td style="text-align:left;font-weight:700;color:${bal>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(bal)}</td>
             <td style="text-align:center;white-space:nowrap">
                 <button class="cc-edit" onclick="custOpenEdit('${x.id}')">✏️</button>
-                <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="custShowStatement('${x.id}')">📄 كشف حساب</button>
+                <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="custShowStatement('${x.id}')">📄 كشف حساب</button>
                 ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenAdd('${x.id}','${(x.name||'').replace(/'/g,"\\'")}')" title="تسجيل تفاعل سريع">📞</button>` : ''}
             </td>
         </tr>`;
@@ -199,7 +199,7 @@ function custOpenModal(x) {
                         </select></div>
                 </div>
                 ${_mgCustReps.length ? `
-                <div class="mod-form-group"><label>المندوب الأساسي <small style="color:#94A3B8;font-weight:400">(يتنسب تلقائي لأي فاتورة بيع جديدة للعميل ده)</small></label>
+                <div class="mod-form-group"><label>المندوب الأساسي <small style="color:var(--inv-muted-light);font-weight:400">(يتنسب تلقائي لأي فاتورة بيع جديدة للعميل ده)</small></label>
                     <select id="custDefaultRep" class="mod-form-input">
                         <option value="">بدون مندوب افتراضي</option>
                         ${_mgCustReps.map(r=>`<option value="${r.id}" ${x?.default_rep_id===r.id?'selected':''}>🚗 ${r.name}</option>`).join('')}
@@ -221,12 +221,12 @@ function custOpenModal(x) {
                         🔒 قفل بيع الآجل لهذا العميل — المندوب يقدر يبيعله نقدي ويحصّل منه بس، مايقدرش يسجّل آجل
                     </label>
                 </div>
-                ${x ? `<div style="background:#F8FAFC;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#64748B;margin-top:6px">
+                ${x ? `<div style="background:#F8FAFC;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--inv-muted);margin-top:6px">
                     💡 الرصيد الحالي (${mdFmt(x.balance||0)} ج.م) لا يُعدَّل من هنا — يتغيّر تلقائياً من الفواتير والتحصيل فقط.
                 </div>` : ''}
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('custMgModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('custMgModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="custSave()">💾 ${x?'حفظ التعديلات':'إضافة العميل'}</button>
             </div>
         </div>`;
@@ -326,14 +326,14 @@ function suppRenderPage(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">🏭 الموردين</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة بيانات الموردين وكشوف حساباتهم</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إدارة بيانات الموردين وكشوف حساباتهم</p></div>
             <button class="mod-btn mod-btn-primary" onclick="suppOpenAdd()">+ إضافة مورد</button>
         </div>
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">🏭</div><div class="mod-card-val">${_mgSuppList.length}</div><div class="mod-card-lbl">إجمالي الموردين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">✅</div><div class="mod-card-val">${debtFree}</div><div class="mod-card-lbl">موردين بلا مستحقات</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold)">🏭</div><div class="mod-card-val">${_mgSuppList.length}</div><div class="mod-card-lbl">إجمالي الموردين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">✅</div><div class="mod-card-val">${debtFree}</div><div class="mod-card-lbl">موردين بلا مستحقات</div></div>
         </div>
 
         <div class="mod-card" style="margin-bottom:16px">
@@ -357,10 +357,10 @@ function suppRenderRows() {
         <td><strong>${x.name}</strong></td>
         <td dir="ltr" style="text-align:right">${x.phone||'—'}</td>
         <td>${x.code||'—'}</td>
-        <td style="text-align:left;font-weight:700;color:${Number(x.balance)>0?'#DC2626':'#059669'}">${mdFmt(x.balance)}</td>
+        <td style="text-align:left;font-weight:700;color:${Number(x.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(x.balance)}</td>
         <td style="text-align:center;white-space:nowrap">
             <button class="cc-edit" onclick="suppOpenEdit('${x.id}')">✏️</button>
-            <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="supShowStatement('${x.id}')">📄 كشف حساب</button>
+            <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="supShowStatement('${x.id}')">📄 كشف حساب</button>
         </td>
     </tr>`).join('');
 }
@@ -388,12 +388,12 @@ function suppOpenModal(x) {
                 </div>
                 <div class="mod-form-group"><label>العنوان</label>
                     <input type="text" id="suppAddress" class="mod-form-input" value="${x?.address||''}"></div>
-                ${x ? `<div style="background:#F8FAFC;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#64748B;margin-top:6px">
+                ${x ? `<div style="background:#F8FAFC;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--inv-muted);margin-top:6px">
                     💡 المستحق الحالي (${mdFmt(x.balance||0)} ج.م) لا يُعدَّل من هنا — يتغيّر تلقائياً من فواتير الشراء والدفع فقط.
                 </div>` : ''}
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('suppMgModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('suppMgModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="suppSave()">💾 ${x?'حفظ التعديلات':'إضافة المورد'}</button>
             </div>
         </div>`;
@@ -483,7 +483,7 @@ async function mdRenderLookup(type) {
                 <button class="mod-btn mod-btn-primary" onclick="mdAddGroup()">+</button>
             </div>
             ${(groups||[]).map(g=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F1F5F9">
-                <span>${g.name}</span></div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:16px">لا توجد مجموعات بعد</p>'}`;
+                <span>${g.name}</span></div>`).join('') || '<p style="color:var(--inv-muted-light);text-align:center;padding:16px">لا توجد مجموعات بعد</p>'}`;
     }
 }
 
@@ -498,11 +498,11 @@ function mdRegionListHTML(items) {
         ${items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F1F5F9">
             <span>${i.name}</span>
             <div style="display:flex;align-items:center;gap:6px">
-                <label style="font-size:11px;color:#94A3B8">حد أدنى للطلب (سلطانو)</label>
+                <label style="font-size:11px;color:var(--inv-muted-light)">حد أدنى للطلب (سلطانو)</label>
                 <input type="number" id="regMinOrder-${i.id}" class="mod-form-input" value="${i.min_order_amount||0}" min="0" step="10" style="width:90px;margin:0">
                 <button class="mod-btn" style="padding:4px 10px;font-size:12px" onclick="mdSaveRegionMinOrder('${i.id}')">💾</button>
             </div>
-        </div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:16px">لا توجد عناصر بعد</p>'}`;
+        </div>`).join('') || '<p style="color:var(--inv-muted-light);text-align:center;padding:16px">لا توجد عناصر بعد</p>'}`;
 }
 
 window.mdSaveRegionMinOrder = async function(id) {
@@ -520,7 +520,7 @@ function mdLookupListHTML(items, type, placeholder) {
             <button class="mod-btn mod-btn-primary" onclick="mdAddLookup('${type}')">+</button>
         </div>
         ${items.map(i=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F1F5F9">
-            <span>${i.name}</span></div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:16px">لا توجد عناصر بعد</p>'}`;
+            <span>${i.name}</span></div>`).join('') || '<p style="color:var(--inv-muted-light);text-align:center;padding:16px">لا توجد عناصر بعد</p>'}`;
 }
 
 window.mdAddLookup = async function(type) {

@@ -27,15 +27,15 @@ async function csiRenderPage(c) {
     const isCust = _csiMode === 'customer';
     c.innerHTML = `
         <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">${isCust?'👥 استيراد العملاء بالديون':'🏭 استيراد الموردين بالديون'}</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">${isCust?'استيراد جماعي للعملاء مع أرصدتهم المستحقة':'استيراد جماعي للموردين مع مديونياتنا لهم'}</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">${isCust?'استيراد جماعي للعملاء مع أرصدتهم المستحقة':'استيراد جماعي للموردين مع مديونياتنا لهم'}</p></div>
 
         <div class="dash-card" style="padding:24px;margin-bottom:16px">
             <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="csiDownloadTemplate()">📄 تنزيل القالب الفارغ</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="csiDownloadTemplate()">📄 تنزيل القالب الفارغ</button>
                 <div style="flex:1;min-width:220px">
                     <input type="file" id="csiFileInput" accept=".xlsx,.xls" style="display:none" onchange="csiHandleFile(this.files[0])">
                     <button class="mod-btn mod-btn-primary" onclick="document.getElementById('csiFileInput').click()">📂 اختر ملف Excel</button>
-                    <span id="csiFileName" style="font-size:12.5px;color:#64748B;margin-right:10px"></span>
+                    <span id="csiFileName" style="font-size:12.5px;color:var(--inv-muted);margin-right:10px"></span>
                 </div>
             </div>
             <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#1E40AF;margin-top:14px">
@@ -134,8 +134,8 @@ function csiRenderPreview() {
     document.getElementById('csiPreviewArea').innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📋</div><div class="mod-card-val">${_csiParsedRows.length}</div><div class="mod-card-lbl">إجمالي الصفوف</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">✅</div><div class="mod-card-val">${validRows.length}</div><div class="mod-card-lbl">صفوف سليمة</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${errorRows.length}</div><div class="mod-card-lbl">صفوف بها أخطاء</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">✅</div><div class="mod-card-val">${validRows.length}</div><div class="mod-card-lbl">صفوف سليمة</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${errorRows.length}</div><div class="mod-card-lbl">صفوف بها أخطاء</div></div>
         </div>
 
         ${errorRows.length ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px;margin-bottom:16px">
@@ -159,13 +159,13 @@ function csiRenderPreview() {
                     <td>${r.errors.length ? '❌' : '✅'}</td>
                 </tr>`).join('')}
             </tbody></table>
-            ${_csiParsedRows.length > 50 ? `<p style="text-align:center;padding:10px;color:#94A3B8;font-size:12px">... و${_csiParsedRows.length-50} صف آخر</p>` : ''}
+            ${_csiParsedRows.length > 50 ? `<p style="text-align:center;padding:10px;color:var(--inv-muted-light);font-size:12px">... و${_csiParsedRows.length-50} صف آخر</p>` : ''}
         </div>
 
         <button class="mod-btn mod-btn-primary" style="padding:14px 32px;font-size:14px" onclick="csiExecuteImport()" ${!validRows.length?'disabled':''}>
             💾 استيراد ${validRows.length} ${isCust?'عميل':'مورد'} الآن
         </button>
-        <span id="csiImportProgress" style="margin-right:14px;font-size:13px;color:#64748B"></span>`;
+        <span id="csiImportProgress" style="margin-right:14px;font-size:13px;color:var(--inv-muted)"></span>`;
 }
 
 // ════════════════════════════════════════════════════════════

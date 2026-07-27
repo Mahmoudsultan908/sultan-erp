@@ -39,11 +39,11 @@ let _crmLeadsSearch = '';
 
 const CRM_LEAD_STAGES = {
     'جديد':        { color: '#3b82f6', days: 3, icon: '🆕' },
-    'تم التواصل':  { color: '#d97706', days: 3, icon: '📞' },
+    'تم التواصل':  { color: 'var(--inv-gold)', days: 3, icon: '📞' },
     'مهتم':        { color: '#7c3aed', days: 2, icon: '💡' },
     'طلب أسعار':   { color: '#9333ea', days: 2, icon: '💰' },
-    'اشترى':       { color: '#059669', days: 7, icon: '✅' },
-    'خسرناه':      { color: '#dc2626', days: null, icon: '❌' },
+    'اشترى':       { color: 'var(--inv-green)', days: 7, icon: '✅' },
+    'خسرناه':      { color: 'var(--inv-red)', days: null, icon: '❌' },
 };
 const CRM_LEAD_STAGE_KEYS = Object.keys(CRM_LEAD_STAGES);
 
@@ -257,7 +257,7 @@ function crmRenderShell(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">🤝 إدارة علاقات العملاء</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">عملاء محتملون وواتساب + متابعات العملاء الحاليين</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">عملاء محتملون وواتساب + متابعات العملاء الحاليين</p></div>
         </div>
         <div class="ob-tabs" style="margin-bottom:16px">
             <button class="ob-tab ${_crmMode === 'tasks' ? 'active' : ''}" onclick="crmSwitchMode('tasks')">📋 مهام اليوم</button>
@@ -323,8 +323,8 @@ function crmRenderPage(c) {
         ${_crmTableMissing ? `<div style="background:#FEF3C7;color:#92400E;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول التفاعلات لسه مش موجود — شغّل <code>crm_migration.sql</code> في Supabase.</div>` : ''}
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⏰</div><div class="mod-card-val">${overdue}</div><div class="mod-card-lbl">متابعات متأخرة</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">📅</div><div class="mod-card-val">${dueToday}</div><div class="mod-card-lbl">متابعات اليوم</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⏰</div><div class="mod-card-val">${overdue}</div><div class="mod-card-lbl">متابعات متأخرة</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">📅</div><div class="mod-card-val">${dueToday}</div><div class="mod-card-lbl">متابعات اليوم</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🔜</div><div class="mod-card-val">${upcoming}</div><div class="mod-card-lbl">متابعات قادمة</div></div>
         </div>
 
@@ -346,15 +346,15 @@ function crmRenderPage(c) {
                     return `<tr style="${overdueRow ? 'background:#FEF2F2' : ''}">
                         <td style="font-weight:600">${x.customers?.name || '—'}</td>
                         <td>${CRM_TYPE_LABELS[x.type] || x.type}</td>
-                        <td style="color:#64748B">${assignedName}</td>
+                        <td style="color:var(--inv-muted)">${assignedName}</td>
                         <td style="font-size:12px">${new Date(x.interaction_date).toLocaleDateString('ar-EG')}</td>
-                        <td style="color:#64748B;max-width:220px">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:#D97706">📎 ${x.archive_documents.title}</a>` : ''}</td>
-                        <td style="font-size:12px;${overdueRow ? 'color:#DC2626;font-weight:700' : ''}">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') : '—'}</td>
+                        <td style="color:var(--inv-muted);max-width:220px">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:var(--inv-gold)">📎 ${x.archive_documents.title}</a>` : ''}</td>
+                        <td style="font-size:12px;${overdueRow ? 'color:var(--inv-red);font-weight:700' : ''}">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') : '—'}</td>
                         <td style="text-align:center;white-space:nowrap">
                             ${waLink ? `<a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${waLink}" target="_blank">📲</a>` : ''}
-                            ${x.is_done ? '<span style="color:#059669;font-weight:600;font-size:12px">✅ تمّت</span>' :
-                              x.next_follow_up_date ? `<button class="cc-edit" style="background:#F0FDF4;color:#059669" onclick="crmMarkDone('${x.id}')">✅ تمّت المتابعة</button>` : ''}
-                            <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="crmDelete('${x.id}')">🗑️</button>
+                            ${x.is_done ? '<span style="color:var(--inv-green);font-weight:600;font-size:12px">✅ تمّت</span>' :
+                              x.next_follow_up_date ? `<button class="cc-edit" style="background:#F0FDF4;color:var(--inv-green)" onclick="crmMarkDone('${x.id}')">✅ تمّت المتابعة</button>` : ''}
+                            <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="crmDelete('${x.id}')">🗑️</button>
                         </td>
                     </tr>`;
                 }).join('')}
@@ -421,7 +421,7 @@ window.crmOpenAdd = async function (presetCustomerId = null, presetCustomerName 
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>العميل / العملاء *</label>
                     ${presetCustomerId ? `
-                        <div class="mod-form-input" style="background:#F8FAFC;color:#475569">${presetCustomerName}</div>
+                        <div class="mod-form-input" style="background:#F8FAFC;color:var(--inv-text-soft)">${presetCustomerName}</div>
                     ` : `
                         <button type="button" class="mod-btn" style="width:100%;background:#EFF6FF;color:#2563EB;justify-content:center" onclick="crmOpenCustPicker()">☑️ اختيار عملاء (<span id="crmMultiCount">0</span> محدد)</button>
                         <div id="crmMultiChips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px"></div>
@@ -454,10 +454,10 @@ window.crmOpenAdd = async function (presetCustomerId = null, presetCustomerName 
                     <textarea id="crmNotes" class="mod-form-input" rows="3" placeholder="اختياري"></textarea></div>
                 <div class="mod-form-group"><label>مرفق (اختياري)</label>
                     <input type="file" id="crmFile" class="mod-form-input">
-                    <div style="font-size:11px;color:#94A3B8;margin-top:2px">هيتحفظ في الأرشيف تلقائياً ومربوط بالعميل ده</div></div>
+                    <div style="font-size:11px;color:var(--inv-muted-light);margin-top:2px">هيتحفظ في الأرشيف تلقائياً ومربوط بالعميل ده</div></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('crmModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('crmModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="crmSave()">💾 حفظ</button>
             </div>
         </div>`;
@@ -498,7 +498,7 @@ window.crmOpenCustPicker = function () {
             <div id="crmPickList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto"></div>
         </div>
         <div class="mod-modal-footer">
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('crmPickModal').remove()">تم</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('crmPickModal').remove()">تم</button>
         </div>
     </div>`;
     document.body.appendChild(m);
@@ -510,7 +510,7 @@ function crmRenderPickList(val) {
     const box = document.getElementById('crmPickList');
     if (!box) return;
     const list = flexSearch(_crmCustomers, val, ['name'], 200);
-    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
+    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--inv-muted-light)">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.map(c => {
         const checked = _crmMultiCustIds.some(x => x.id === c.id);
         return `<label style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
@@ -597,7 +597,7 @@ function crmBuildTaskQueue() {
         .filter(l => crmLeadUrgent(l))
         .filter(l => !mineOnly || l.assigned_to === currentUser.id)
         .map(l => {
-            const cfg = CRM_LEAD_STAGES[l.status] || { color: '#64748B', icon: '?' };
+            const cfg = CRM_LEAD_STAGES[l.status] || { color: 'var(--inv-muted)', icon: '?' };
             const isDateDue = l.next_follow_up_date && l.next_follow_up_date <= today;
             const reason = isDateDue
                 ? (l.next_follow_up_date < today ? `متابعة متأخرة من ${new Date(l.next_follow_up_date).toLocaleDateString('ar-EG')}` : 'متابعة مستحقة اليوم')
@@ -637,7 +637,7 @@ function crmRenderTasksPage(c) {
                 <button class="ob-tab ${_crmTasksView === 'mine' ? 'active' : ''}" onclick="crmTasksSetView('mine')">👤 مهامي</button>
                 <button class="ob-tab ${_crmTasksView === 'all' ? 'active' : ''}" onclick="crmTasksSetView('all')">👥 الكل</button>
             </div>
-            <div style="font-size:13px;color:#64748B">${queue.length} مهمة مستحقة</div>
+            <div style="font-size:13px;color:var(--inv-muted)">${queue.length} مهمة مستحقة</div>
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
@@ -645,18 +645,18 @@ function crmRenderTasksPage(c) {
             </tr></thead><tbody>
                 ${queue.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>✅</span>مفيش أي مهمة مستحقة النهارده — كله متابَع!</td></tr>` :
                 queue.map(t => `<tr style="background:#FEF2F2">
-                    <td style="font-weight:600">${t.name}<div style="font-size:11px;color:#94A3B8">${t.sub || ''}</div></td>
-                    <td>${t.badge ? `<span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid ${t.badgeColor};color:${t.badgeColor}">${t.badge}</span>` : `<span style="font-size:12px;color:#64748B">${t.sub}</span>`}</td>
-                    <td style="font-size:12px;color:#DC2626;font-weight:600">${t.reason}</td>
+                    <td style="font-weight:600">${t.name}<div style="font-size:11px;color:var(--inv-muted-light)">${t.sub || ''}</div></td>
+                    <td>${t.badge ? `<span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid ${t.badgeColor};color:${t.badgeColor}">${t.badge}</span>` : `<span style="font-size:12px;color:var(--inv-muted)">${t.sub}</span>`}</td>
+                    <td style="font-size:12px;color:var(--inv-red);font-weight:600">${t.reason}</td>
                     <td style="font-size:12px">${t.lastContact}</td>
                     <td style="text-align:center;white-space:nowrap">
                         ${t.kind === 'lead' ? `
                             ${crmWaButtonHTML(t.lead)}
-                            <button class="cc-edit" style="background:#F0FDF4;color:#059669" onclick="crmQuickTouchLead('${t.id}')">📞 اتصلت</button>
+                            <button class="cc-edit" style="background:#F0FDF4;color:var(--inv-green)" onclick="crmQuickTouchLead('${t.id}')">📞 اتصلت</button>
                             <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenEditLead('${t.id}')">✏️</button>
                         ` : `
                             ${t.waLink ? `<a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${t.waLink}" target="_blank">📲</a>` : ''}
-                            <button class="cc-edit" style="background:#F0FDF4;color:#059669" onclick="crmMarkDone('${t.id}')">✅ تمّت</button>
+                            <button class="cc-edit" style="background:#F0FDF4;color:var(--inv-green)" onclick="crmMarkDone('${t.id}')">✅ تمّت</button>
                         `}
                     </td>
                 </tr>`).join('')}
@@ -715,7 +715,7 @@ function crmRenderLeadsPage(c) {
                 <button class="ob-tab ${_crmLeadsView==='all'?'active':''}" onclick="crmLeadsSetView('all')">👥 الكل</button>
             </div>
             <div style="display:flex;gap:8px">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="crmOpenTemplatesModal()">✏️ رسائل الواتساب</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="crmOpenTemplatesModal()">✏️ رسائل الواتساب</button>
                 <button class="mod-btn mod-btn-primary" onclick="crmOpenAddLead()">+ عميل محتمل جديد</button>
             </div>
         </div>
@@ -723,8 +723,8 @@ function crmRenderLeadsPage(c) {
         <div class="mod-grid" style="margin-bottom:14px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">👥</div><div class="mod-card-val">${total}</div><div class="mod-card-lbl">إجمالي العملاء المحتملين</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#DBEAFE;color:#3B82F6">🆕</div><div class="mod-card-val">${newC}</div><div class="mod-card-lbl">عملاء جدد</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">✅</div><div class="mod-card-val">${ordered}</div><div class="mod-card-lbl">اشتروا</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${urgent}</div><div class="mod-card-lbl">تحتاج متابعة</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">✅</div><div class="mod-card-val">${ordered}</div><div class="mod-card-lbl">اشتروا</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${urgent}</div><div class="mod-card-lbl">تحتاج متابعة</div></div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:14px">
@@ -734,8 +734,8 @@ function crmRenderLeadsPage(c) {
                 const pct = total > 0 ? Math.round(cnt/total*100) : 0;
                 return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px 4px;text-align:center">
                     <div style="font-size:20px;font-weight:900;color:${cfg.color}">${cnt}</div>
-                    <div style="font-size:10px;color:#64748B;margin-top:2px">${cfg.icon} ${s}</div>
-                    <div style="font-size:9px;color:#94A3B8">${pct}%</div>
+                    <div style="font-size:10px;color:var(--inv-muted);margin-top:2px">${cfg.icon} ${s}</div>
+                    <div style="font-size:9px;color:var(--inv-muted-light)">${pct}%</div>
                 </div>`;
             }).join('')}
         </div>
@@ -748,7 +748,7 @@ function crmRenderLeadsPage(c) {
                 const active = s === _crmLeadsFilter;
                 const cfg = CRM_LEAD_STAGES[s];
                 const cnt = s === 'الكل' ? scope.length : scope.filter(l => l.status === s).length;
-                return `<button onclick="crmLeadsSetFilter('${s}')" style="white-space:nowrap;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${active && cfg ? cfg.color : '#E2E8F0'};background:${active && cfg ? cfg.color : '#fff'};color:${active ? (cfg ? '#fff' : '#0F172A') : '#64748B'}">${s} (${cnt})</button>`;
+                return `<button onclick="crmLeadsSetFilter('${s}')" style="white-space:nowrap;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${active && cfg ? cfg.color : '#E2E8F0'};background:${active && cfg ? cfg.color : '#fff'};color:${active ? (cfg ? '#fff' : '#0F172A') : 'var(--inv-muted)'}">${s} (${cnt})</button>`;
             }).join('')}
         </div>
 
@@ -759,20 +759,20 @@ function crmRenderLeadsPage(c) {
             <tbody>
                 ${list.length === 0 ? `<tr><td colspan="7" class="empty-state"><span>🎯</span>لا يوجد عملاء محتملون مطابقون.</td></tr>` :
                 list.map(l => {
-                    const cfg = CRM_LEAD_STAGES[l.status] || { color: '#64748B', icon: '?' };
+                    const cfg = CRM_LEAD_STAGES[l.status] || { color: 'var(--inv-muted)', icon: '?' };
                     const urg = crmLeadUrgent(l);
                     return `<tr style="${urg ? 'background:#FEF2F2' : ''}">
-                        <td style="font-weight:600">${l.name}${l.converted_customer_id ? ' <span style="font-size:10px;color:#059669">(تحوّل لعميل)</span>' : ''}</td>
-                        <td style="color:#64748B">${l.shop || '—'}<div style="font-size:11px;color:#94A3B8">${l.area || ''}</div></td>
+                        <td style="font-weight:600">${l.name}${l.converted_customer_id ? ' <span style="font-size:10px;color:var(--inv-green)">(تحوّل لعميل)</span>' : ''}</td>
+                        <td style="color:var(--inv-muted)">${l.shop || '—'}<div style="font-size:11px;color:var(--inv-muted-light)">${l.area || ''}</div></td>
                         <td><span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid ${cfg.color};color:${cfg.color}">${cfg.icon} ${l.status}</span></td>
-                        <td style="font-size:12px;color:#64748B">${crmAgentName(l)}</td>
+                        <td style="font-size:12px;color:var(--inv-muted)">${crmAgentName(l)}</td>
                         <td style="font-size:12px">${l.last_contact_date ? new Date(l.last_contact_date).toLocaleDateString('ar-EG') : 'لم يتم التواصل'}</td>
-                        <td style="font-size:12px;${urg ? 'color:#DC2626;font-weight:700' : ''}">${l.next_follow_up_date ? new Date(l.next_follow_up_date).toLocaleDateString('ar-EG') : '—'}</td>
+                        <td style="font-size:12px;${urg ? 'color:var(--inv-red);font-weight:700' : ''}">${l.next_follow_up_date ? new Date(l.next_follow_up_date).toLocaleDateString('ar-EG') : '—'}</td>
                         <td style="text-align:center;white-space:nowrap">
                             ${crmWaButtonHTML(l)}
                             <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenEditLead('${l.id}')">✏️</button>
-                            ${l.status === 'اشترى' && !l.converted_customer_id ? `<button class="cc-edit" style="background:#D1FAE5;color:#059669" onclick="crmConvertLead('${l.id}')">👤 تحويل لعميل</button>` : ''}
-                            <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="crmDeleteLead('${l.id}')">🗑️</button>
+                            ${l.status === 'اشترى' && !l.converted_customer_id ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="crmConvertLead('${l.id}')">👤 تحويل لعميل</button>` : ''}
+                            <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="crmDeleteLead('${l.id}')">🗑️</button>
                         </td>
                     </tr>`;
                 }).join('')}
@@ -890,7 +890,7 @@ function crmOpenLeadModal(lead) {
                     <textarea class="mod-form-input" id="lm-notes" rows="3">${lead?.notes || ''}</textarea></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('crmLeadModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('crmLeadModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="crmSaveLead(${isEdit})">💾 حفظ</button>
             </div>
         </div>`;
@@ -980,7 +980,7 @@ window.crmOpenTemplatesModal = function () {
                     <code>{days}</code> = عدد الأيام من آخر تواصل &nbsp;|&nbsp;
                     <code>{top_product}</code> = أكتر صنف بيتباع دلوقتي
                 </div>
-                <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;margin:6px 0">رسائل العملاء المحتملين (Leads)</div>
+                <div style="font-size:11px;font-weight:700;color:var(--inv-muted-light);letter-spacing:.5px;text-transform:uppercase;margin:6px 0">رسائل العملاء المحتملين (Leads)</div>
                 ${CRM_LEAD_STAGE_KEYS.filter(s => s !== 'خسرناه').map(s => `
                     <div class="mod-form-group">
                         <label style="color:${CRM_LEAD_STAGES[s].color}">${CRM_LEAD_STAGES[s].icon} رسالة "${s}" (الافتراضية)</label>
@@ -989,14 +989,14 @@ window.crmOpenTemplatesModal = function () {
                     <div id="crmVariantsBox-${s}" style="margin:0 0 16px;padding:10px;background:#F8FAFC;border-radius:8px">
                         ${crmRenderVariantRows(s)}
                     </div>`).join('')}
-                <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;margin:14px 0 6px">رسالة متابعة عميل حالي (مش Lead)</div>
+                <div style="font-size:11px;font-weight:700;color:var(--inv-muted-light);letter-spacing:.5px;text-transform:uppercase;margin:14px 0 6px">رسالة متابعة عميل حالي (مش Lead)</div>
                 <div class="mod-form-group">
                     <label style="color:#0891B2">🤝 رسالة متابعة عميل موجود بالفعل</label>
                     <textarea class="mod-form-input" id="tpl-${CRM_CUSTOMER_TPL_KEY}" rows="5" style="font-size:12px">${_crmTemplates[CRM_CUSTOMER_TPL_KEY] || CRM_DEFAULT_CUSTOMER_TPL}</textarea>
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#FEE2E2;color:#DC2626" onclick="crmResetTemplates()">↩️ استعادة الافتراضي</button>
+                <button class="mod-btn" style="background:#FEE2E2;color:var(--inv-red)" onclick="crmResetTemplates()">↩️ استعادة الافتراضي</button>
                 <button class="mod-btn mod-btn-primary" onclick="crmSaveTemplates()">💾 حفظ القوالب</button>
             </div>
         </div>`;
@@ -1011,12 +1011,12 @@ function crmRenderVariantRows(stage) {
     const variants = _crmEditingVariants[stage] || {};
     const names = Object.keys(variants);
     return `
-        <div style="font-size:11px;font-weight:700;color:#94A3B8;margin-bottom:6px">نسخ إضافية لمرحلة "${stage}" (اختياري)</div>
+        <div style="font-size:11px;font-weight:700;color:var(--inv-muted-light);margin-bottom:6px">نسخ إضافية لمرحلة "${stage}" (اختياري)</div>
         ${names.map(name => `
             <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
                 <input class="mod-form-input" style="width:110px;font-size:11px;padding:6px" value="${name}" onchange="crmRenameVariant('${stage}','${name.replace(/'/g, "\\'")}',this.value)">
                 <textarea class="mod-form-input" style="flex:1;font-size:11px" rows="3" oninput="crmEditVariantText('${stage}','${name.replace(/'/g, "\\'")}',this.value)">${variants[name] || ''}</textarea>
-                <button type="button" class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="crmRemoveVariant('${stage}','${name.replace(/'/g, "\\'")}')">✕</button>
+                <button type="button" class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="crmRemoveVariant('${stage}','${name.replace(/'/g, "\\'")}')">✕</button>
             </div>`).join('')}
         <button type="button" class="mod-btn" style="background:#EFF6FF;color:#2563EB;font-size:11px;padding:6px 10px" onclick="crmAddVariant('${stage}')">➕ نسخة جديدة</button>
     `;

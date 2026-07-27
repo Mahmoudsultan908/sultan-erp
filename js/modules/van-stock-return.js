@@ -187,7 +187,7 @@ function vrRenderMultiPickList(val) {
     if (!box) return;
     const base = vrRepProducts();
     const list = flexSearch(base, val, ['name','code']);
-    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد أصناف بعربية هذا المندوب</div>'; return; }
+    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--inv-muted-light)">لا توجد أصناف بعربية هذا المندوب</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _vrMultiSelected[p.id];
         const checked = sel != null;
@@ -195,8 +195,8 @@ function vrRenderMultiPickList(val) {
         const stock = vrGetStock(p.id);
         return `<label class="inv-multi-row" data-pid="${p.id}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
             <input type="checkbox" ${checked ? 'checked' : ''} onchange="vrMultiToggle('${p.id}',this.checked)">
-            <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code || ''} · ${p.unit || ''}</small></span>
-            <span style="font-size:11px;color:#94A3B8">بالعربية: ${vrFmt(stock)}</span>
+            <span style="flex:1">${p.name} <small style="color:var(--inv-muted-light)">${p.code || ''} · ${p.unit || ''}</small></span>
+            <span style="font-size:11px;color:var(--inv-muted-light)">بالعربية: ${vrFmt(stock)}</span>
             <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="0.001" style="width:76px;padding:6px 8px"
                 onclick="event.stopPropagation()" oninput="vrMultiSetQty('${p.id}',this.value)">
         </label>`;
@@ -275,7 +275,7 @@ function vrRecentListHTML() {
     const list = VR_DB.list || [];
     return `
     <div class="mod-table-wrap" style="margin-top:16px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر عمليات الإرجاع</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📋 آخر عمليات الإرجاع</div>
         <table class="mod-table"><thead><tr>
             <th>رقم العملية</th><th>التاريخ</th><th>عربية المندوب</th><th>إلى مخزن</th><th>عدد الأصناف</th><th style="text-align:left">إجمالي الكمية</th><th>ملاحظات</th><th></th>
         </tr></thead>
@@ -290,7 +290,7 @@ function vrRecentListHTML() {
                     <td>${t.wh?.name || '—'}</td>
                     <td>${items.length}</td>
                     <td style="text-align:left;font-weight:700">${vrFmt(totalQty)}</td>
-                    <td style="color:#64748B">${t.notes || '—'}</td>
+                    <td style="color:var(--inv-muted)">${t.notes || '—'}</td>
                     <td><button class="cc-edit" onclick="vrReprint(${i})">🖨️</button></td>
                 </tr>`;
             }).join('') : `<tr><td colspan="8" class="empty-state"><span>↩️</span>لا توجد عمليات إرجاع حتى الآن.</td></tr>`}

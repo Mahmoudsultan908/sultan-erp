@@ -96,14 +96,14 @@ function prodRenderPage(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">🏷️ الأصناف</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة الأصناف، الباركود، والأسعار</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إدارة الأصناف، الباركود، والأسعار</p></div>
             <button class="mod-btn mod-btn-primary" onclick="prodOpenAdd()">+ إضافة صنف جديد</button>
         </div>
 
         <div class="mod-grid">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🏷️</div><div class="mod-card-val" id="prodCardTotal">${_prodList.length}</div><div class="mod-card-lbl">إجمالي الأصناف</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">📦</div><div class="mod-card-val" id="prodCardInStock">${_prodList.filter(p=>p._totalStock>0).length}</div><div class="mod-card-lbl">متوفر بالمخزون</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">🔴</div><div class="mod-card-val" id="prodCardOutStock">${_prodList.filter(p=>p._totalStock<=0).length}</div><div class="mod-card-lbl">نفد المخزون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">📦</div><div class="mod-card-val" id="prodCardInStock">${_prodList.filter(p=>p._totalStock>0).length}</div><div class="mod-card-lbl">متوفر بالمخزون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">🔴</div><div class="mod-card-val" id="prodCardOutStock">${_prodList.filter(p=>p._totalStock<=0).length}</div><div class="mod-card-lbl">نفد المخزون</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#F5F3FF;color:#7C3AED">📁</div><div class="mod-card-val" id="prodCardCats">${_prodCategories.length}</div><div class="mod-card-lbl">مجموعات</div></div>
         </div>
 
@@ -117,10 +117,10 @@ function prodRenderPage(c) {
                 <option value="">كل الشركات</option>
                 ${_prodCompanies.map(co=>`<option value="${co.id}">${co.name}</option>`).join('')}
             </select>
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCategoryManager()">📁 إدارة المجموعات</button>
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodOpenCompanyManager()">🏢 إدارة الشركات</button>
-            <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="prodOpenNewRestockedReport()">🆕 أصناف جديدة/اتشرت تاني</button>
-            <button class="mod-btn" style="background:#F0FDF4;color:#059669" onclick="prodHubSwitchTab('import')">📥 استيراد Excel</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="prodOpenCategoryManager()">📁 إدارة المجموعات</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="prodOpenCompanyManager()">🏢 إدارة الشركات</button>
+            <button class="mod-btn" style="background:#F0FDF4;color:var(--inv-green)" onclick="prodOpenNewRestockedReport()">🆕 أصناف جديدة/اتشرت تاني</button>
+            <button class="mod-btn" style="background:#F0FDF4;color:var(--inv-green)" onclick="prodHubSwitchTab('import')">📥 استيراد Excel</button>
             <button class="mod-btn" style="background:#EFF6FF;color:#2563EB" onclick="prodExportXls()">📤 تصدير Excel</button>
         </div>
 
@@ -165,9 +165,9 @@ function prodRenderRows() {
     tbody.innerHTML = rows.map(p => {
         const cat = _prodCategories.find(c=>c.id===p.category_id);
         const co = _prodCompanies.find(c=>c.id===p.company_id);
-        const stockColor = p._totalStock <= 0 ? '#DC2626' : p._totalStock <= (p.reorder_point||0) ? '#D97706' : '#059669';
+        const stockColor = p._totalStock <= 0 ? 'var(--inv-red)' : p._totalStock <= (p.reorder_point||0) ? 'var(--inv-gold)' : 'var(--inv-green)';
         return `<tr>
-            <td><strong>${p.name}</strong>${p.barcode?`<div style="font-size:11.5px;color:#94A3B8;direction:ltr;text-align:right">${p.barcode}</div>`:''}</td>
+            <td><strong>${p.name}</strong>${p.barcode?`<div style="font-size:11.5px;color:var(--inv-muted-light);direction:ltr;text-align:right">${p.barcode}</div>`:''}</td>
             <td><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace;direction:ltr;display:inline-block">${p.code||'—'}</span></td>
             <td>${cat?.name || '—'}</td>
             <td>${co?.name || '—'}</td>
@@ -180,7 +180,7 @@ function prodRenderRows() {
             <td style="display:flex;gap:4px;justify-content:center">
                 <button class="cc-edit" onclick="prodOpenEdit('${p.id}')">✏️</button>
                 <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="prodOpenDuplicate('${p.id}')" title="تكرار الصنف">🔁</button>
-                <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="prodToggleActive('${p.id}', ${p.is_active===false})">${p.is_active===false?'↩️':'🗑️'}</button>
+                <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="prodToggleActive('${p.id}', ${p.is_active===false})">${p.is_active===false?'↩️':'🗑️'}</button>
             </td>
         </tr>`;
     }).join('');
@@ -310,7 +310,7 @@ async function prodOpenModal(p, opts) {
                     <input type="text" id="prodName" class="mod-form-input" value="${p?.name||''}" placeholder="مثال: بسكويت تايجر">
                 </div>
                 <div class="mod-form-group">
-                    <label>صورة الصنف <small style="color:#94A3B8;font-weight:400">(بتظهر للعميل في سلطانو)</small></label>
+                    <label>صورة الصنف <small style="color:var(--inv-muted-light);font-weight:400">(بتظهر للعميل في سلطانو)</small></label>
                     <div style="display:flex;align-items:center;gap:10px">
                         <img id="prodImagePreview" src="${p?.images?.[0]||''}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#F1F5F9;${p?.images?.[0]?'':'display:none'}">
                         <input type="file" id="prodImageFile" class="mod-form-input" accept="image/*" style="margin:0" onchange="prodPreviewImage(this)">
@@ -322,12 +322,12 @@ async function prodOpenModal(p, opts) {
                         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                             <input type="checkbox" id="prodIsBestseller" ${p?.is_bestseller?'checked':''} style="width:auto">🔥 الأكثر مبيعاً في سلطانو
                         </label>
-                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:#DC2626">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:var(--inv-red)">
                             <input type="checkbox" id="prodHiddenSultano" ${p?.hidden_from_sultano?'checked':''} style="width:auto">🚫 إخفاء عن سلطانو (حتى لو متوفر بالمخزون)
                         </label>
                     </div>
                     <div class="mod-form-group" style="margin-top:8px">
-                        <label>الحد الأقصى للطلب في سلطانو <small style="color:#94A3B8;font-weight:400">(سيب فاضي = يستخدم رصيد المخزون كحد أقصى)</small></label>
+                        <label>الحد الأقصى للطلب في سلطانو <small style="color:var(--inv-muted-light);font-weight:400">(سيب فاضي = يستخدم رصيد المخزون كحد أقصى)</small></label>
                         <input type="number" id="prodMaxOrderQty" class="mod-form-input" value="${p?.max_order_qty??''}" min="1" step="1" placeholder="رصيد المخزون">
                     </div>
                 </div>
@@ -370,7 +370,7 @@ async function prodOpenModal(p, opts) {
                         <input type="number" id="prodReorderPoint" class="mod-form-input" value="${p?.reorder_point||0}" min="0" step="1"></div>
                 </div>
                 <div class="mod-form-group">
-                    <label>المؤجل الافتراضي <small style="color:#94A3B8;font-weight:400">(يتسحب تلقائي عند إضافة الصنف لفاتورة شراء جديدة)</small></label>
+                    <label>المؤجل الافتراضي <small style="color:var(--inv-muted-light);font-weight:400">(يتسحب تلقائي عند إضافة الصنف لفاتورة شراء جديدة)</small></label>
                     <div style="display:flex;align-items:center;gap:6px">
                         <input type="number" id="prodDefaultDeferredRate" class="mod-form-input" value="${p?.default_deferred_rate||0}"
                             min="0" ${_prodModalDefaultDeferredType==='percent'?'max="100"':''} step="0.1" style="background:#F5F3FF;color:#7C3AED">
@@ -378,17 +378,17 @@ async function prodOpenModal(p, opts) {
                     </div>
                 </div>
                 ${_prodModalDeferredRate > 0 ? `
-                <p style="font-size:11px;color:#94A3B8;margin-top:-4px">
+                <p style="font-size:11px;color:var(--inv-muted-light);margin-top:-4px">
                     ℹ️ هامش الربح تحت محسوب بعد خصم مؤجل تقديري ${prodFmt(_prodModalDeferredRate)} ج.م/وحدة
                     (آخر مؤجل مسجّل لهذا الصنف من فواتير الشراء).
                 </p>` : ''}
 
                 <div class="mod-form-group" style="margin-top:6px">
-                    <label style="font-weight:800;color:#1E293B">💰 مستويات البيع</label>
+                    <label style="font-weight:800;color:var(--inv-navy)">💰 مستويات البيع</label>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
                         ${_prodPriceLevels.map(lvl => `
                         <div>
-                            <label style="font-size:11.5px;color:#64748B">${lvl.name}</label>
+                            <label style="font-size:11.5px;color:var(--inv-muted)">${lvl.name}</label>
                             <input type="number" class="mod-form-input prod-price-lvl" data-level-id="${lvl.id}"
                                 value="${existingPrices[lvl.id]||0}" min="0" step="0.01" style="margin:2px 0 0" oninput="prodUpdateMargins()">
                             <div id="prodMarginLvl-${lvl.id}" style="font-size:11px;margin-top:2px;min-height:14px"></div>
@@ -397,7 +397,7 @@ async function prodOpenModal(p, opts) {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="prodCloseModal()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="prodCloseModal()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="prodSave()">💾 ${(p && !isDuplicate) ? 'حفظ التعديلات' : 'إضافة الصنف'}</button>
             </div>
         </div>`;
@@ -447,7 +447,7 @@ window.prodUpdateMargins = function() {
         if (price <= 0) { marginEl.textContent = ''; return; }
         const margin = ((price - effectiveCost) / price) * 100;
         marginEl.textContent = `هامش الربح: ${margin.toFixed(1)}%`;
-        marginEl.style.color = margin >= 0 ? '#059669' : '#DC2626';
+        marginEl.style.color = margin >= 0 ? 'var(--inv-green)' : 'var(--inv-red)';
     });
 };
 
@@ -468,15 +468,15 @@ window.prodOpenCategoryManager = function() {
                     ${_prodCategories.map(cat=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;gap:8px">
                         <img src="${cat.image_url||''}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#F1F5F9;${cat.image_url?'':'display:none'}">
                         <span style="flex:1">${cat.name}</span>
-                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748B;white-space:nowrap;cursor:pointer">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--inv-muted);white-space:nowrap;cursor:pointer">
                             <input type="checkbox" style="width:auto" ${cat.show_when_empty?'checked':''} onchange="prodToggleShowWhenEmpty('product_categories','${cat.id}',this.checked)">🔜 لو فاضي
                         </label>
                         <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
                             📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_categories','${cat.id}',this)">
                         </label>
-                        <button class="cc-edit" style="background:#FFFBEB;color:#D97706;padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_categories','${cat.id}')">✏️</button>
-                        <button class="cc-edit" style="background:#FEE2E2;color:#DC2626;padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_categories','${cat.id}')">🗑️</button>
-                    </div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:20px">لا توجد مجموعات بعد</p>'}
+                        <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_categories','${cat.id}')">✏️</button>
+                        <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red);padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_categories','${cat.id}')">🗑️</button>
+                    </div>`).join('') || '<p style="color:var(--inv-muted-light);text-align:center;padding:20px">لا توجد مجموعات بعد</p>'}
                 </div>
             </div>
         </div>`;
@@ -606,15 +606,15 @@ window.prodOpenCompanyManager = function() {
                     ${_prodCompanies.map(co=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;gap:8px">
                         <img src="${co.image_url||''}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#F1F5F9;${co.image_url?'':'display:none'}">
                         <span style="flex:1">${co.name}</span>
-                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748B;white-space:nowrap;cursor:pointer">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--inv-muted);white-space:nowrap;cursor:pointer">
                             <input type="checkbox" style="width:auto" ${co.show_when_empty?'checked':''} onchange="prodToggleShowWhenEmpty('product_companies','${co.id}',this.checked)">🔜 لو فاضي
                         </label>
                         <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
                             📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_companies','${co.id}',this)">
                         </label>
-                        <button class="cc-edit" style="background:#FFFBEB;color:#D97706;padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_companies','${co.id}')">✏️</button>
-                        <button class="cc-edit" style="background:#FEE2E2;color:#DC2626;padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_companies','${co.id}')">🗑️</button>
-                    </div>`).join('') || '<p style="color:#94A3B8;text-align:center;padding:20px">لا توجد شركات بعد</p>'}
+                        <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_companies','${co.id}')">✏️</button>
+                        <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red);padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_companies','${co.id}')">🗑️</button>
+                    </div>`).join('') || '<p style="color:var(--inv-muted-light);text-align:center;padding:20px">لا توجد شركات بعد</p>'}
                 </div>
             </div>
         </div>`;
@@ -685,7 +685,7 @@ window.prodOpenNewRestockedReport = async function() {
         </tr>`).join('');
 
         body.innerHTML = `
-            <p style="font-size:12px;color:#94A3B8;margin-bottom:14px">بيانات آخر ${days} أيام</p>
+            <p style="font-size:12px;color:var(--inv-muted-light);margin-bottom:14px">بيانات آخر ${days} أيام</p>
             <h4 style="margin:0 0 8px;font-size:14px">🆕 أصناف جديدة (${newProducts.length})</h4>
             ${newProducts.length ? `<div class="mod-table-wrap" style="margin-bottom:20px"><table class="mod-table"><thead><tr>
                 <th>الصنف</th><th>الكود</th><th style="text-align:left">تاريخ الإضافة</th>

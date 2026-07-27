@@ -28,7 +28,7 @@ async function accFetchAllRows(table, select, applyFilters) {
     return { data: all, error: null };
 }
 const ACC_TYPE_LABELS = { asset:'أصول', liability:'خصوم', equity:'حقوق ملكية', revenue:'إيرادات', expense:'مصروفات' };
-const ACC_TYPE_COLORS = { asset:'#2563EB', liability:'#DC2626', equity:'#7C3AED', revenue:'#059669', expense:'#D97706' };
+const ACC_TYPE_COLORS = { asset:'#2563EB', liability:'var(--inv-red)', equity:'#7C3AED', revenue:'var(--inv-green)', expense:'var(--inv-gold)' };
 
 // ════════════════════════════════════════════════════════════
 // ██ 1) شجرة الحسابات ██
@@ -45,7 +45,7 @@ async function renderChartOfAccounts(c) {
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">📒 شجرة الحسابات</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">الحسابات المحاسبية الأساسية للنظام</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">الحسابات المحاسبية الأساسية للنظام</p></div>
             <button class="mod-btn mod-btn-primary" onclick="accOpenAddAccount()">+ حساب جديد</button>
         </div>
         ${Object.keys(ACC_TYPE_LABELS).map(type => {
@@ -58,7 +58,7 @@ async function renderChartOfAccounts(c) {
                 </div>
                 ${items.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #F8FAFC">
                     <div><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace;direction:ltr;display:inline-block;margin-left:8px">${a.code}</span><strong>${a.name}</strong></div>
-                    <span style="font-size:11px;color:${a.is_active===false?'#DC2626':'#94A3B8'}">${a.is_active===false?'معطّل':'نشط'}</span>
+                    <span style="font-size:11px;color:${a.is_active===false?'var(--inv-red)':'var(--inv-muted-light)'}">${a.is_active===false?'معطّل':'نشط'}</span>
                 </div>`).join('')}
             </div>`;
         }).join('')}`;
@@ -89,7 +89,7 @@ window.accOpenAddAccount = async function() {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('accAddModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('accAddModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="accSaveAccount()">💾 إضافة</button>
             </div>
         </div>`;
@@ -133,7 +133,7 @@ async function renderJournalView(c) {
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <div><h2 style="font-size:22px;font-weight:800">📝 القيود اليومية</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">آخر 200 قيد — كل القيود تُنشأ تلقائياً من العمليات (بيع/شراء/تحصيل/دفع/مصروف)</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">آخر 200 قيد — كل القيود تُنشأ تلقائياً من العمليات (بيع/شراء/تحصيل/دفع/مصروف)</p></div>
         </div>
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#1E40AF;margin-bottom:16px">
             💡 كل القيود هنا تلقائية بالكامل من محرك النظام — لا يمكن إضافة أو تعديل قيد يدوياً (حماية من الأخطاء المالية).
@@ -162,13 +162,13 @@ window.accViewEntry = async function(entryId) {
             <div class="mod-modal-header"><h3>📝 تفاصيل القيد — ${entry?.ref||''}</h3>
                 <button class="mod-modal-close" onclick="document.getElementById('accViewModal').remove()">&times;</button></div>
             <div class="mod-modal-body">
-                <p style="font-size:13px;color:#64748B;margin-bottom:14px">${entry?.description||''}</p>
+                <p style="font-size:13px;color:var(--inv-muted);margin-bottom:14px">${entry?.description||''}</p>
                 <table class="dash-table" style="margin:0">
                     <thead><tr><th>الحساب</th><th style="text-align:left">مدين</th><th style="text-align:left">دائن</th></tr></thead>
                     <tbody>${(lines||[]).map(l=>`<tr>
                         <td>${l.accounts?.name||l.account_code}</td>
                         <td style="text-align:left;color:#2563EB;font-weight:700">${l.debit>0?accFmt(l.debit):'—'}</td>
-                        <td style="text-align:left;color:#DC2626;font-weight:700">${l.credit>0?accFmt(l.credit):'—'}</td>
+                        <td style="text-align:left;color:var(--inv-red);font-weight:700">${l.credit>0?accFmt(l.credit):'—'}</td>
                     </tr>`).join('')}</tbody>
                 </table>
             </div>
@@ -216,7 +216,7 @@ async function accLoadTrialBalance(c, from, to) {
                 <td><strong>${a.name}</strong></td>
                 <td style="font-size:11px;color:${ACC_TYPE_COLORS[a.type]}">${ACC_TYPE_LABELS[a.type]}</td>
                 <td style="text-align:left;color:#2563EB;font-weight:700">${t.dr>0?accFmt(t.dr):'—'}</td>
-                <td style="text-align:left;color:#DC2626;font-weight:700">${t.cr>0?accFmt(t.cr):'—'}</td>
+                <td style="text-align:left;color:var(--inv-red);font-weight:700">${t.cr>0?accFmt(t.cr):'—'}</td>
             </tr>`;
         }).filter(Boolean).join('');
 
@@ -224,21 +224,21 @@ async function accLoadTrialBalance(c, from, to) {
 
         c.innerHTML = `
         <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">⚖️ ميزان المراجعة</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">التأكد من توازن كل الحسابات (إجمالي المدين = إجمالي الدائن)</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">التأكد من توازن كل الحسابات (إجمالي المدين = إجمالي الدائن)</p></div>
 
         <div class="dash-card" style="padding:16px;margin-bottom:16px">
             <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
                 <div><label class="ob-label">من تاريخ</label><input type="date" id="tbFrom" class="ob-input" style="margin:0" value="${from}"></div>
                 <div><label class="ob-label">إلى تاريخ</label><input type="date" id="tbTo" class="ob-input" style="margin:0" value="${to}"></div>
                 <button class="ob-add-btn" onclick="accApplyTbFilter()">🔍 تطبيق</button>
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="renderTrialBalance(document.getElementById('app-content'))">الكل</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="renderTrialBalance(document.getElementById('app-content'))">الكل</button>
             </div>
         </div>
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📊</div><div class="mod-card-val">${accFmt(totalDr)}</div><div class="mod-card-lbl">إجمالي المدين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">📊</div><div class="mod-card-val">${accFmt(totalCr)}</div><div class="mod-card-lbl">إجمالي الدائن</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'#D1FAE5':'#FEF3C7'};color:${balanced?'#059669':'#D97706'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازن':'غير متوازن'}</div><div class="mod-card-lbl">حالة الميزان</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📊</div><div class="mod-card-val">${accFmt(totalCr)}</div><div class="mod-card-lbl">إجمالي الدائن</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'var(--inv-green-light)':'#FEF3C7'};color:${balanced?'var(--inv-green)':'var(--inv-gold)'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازن':'غير متوازن'}</div><div class="mod-card-lbl">حالة الميزان</div></div>
         </div>
 
         <div class="mod-table-wrap" id="tb-table-wrap">
@@ -249,7 +249,7 @@ async function accLoadTrialBalance(c, from, to) {
             <tfoot><tr style="background:#F8FAFC;font-weight:700">
                 <td colspan="3" style="padding:12px">الإجمالي</td>
                 <td style="text-align:left;color:#2563EB;padding:12px">${accFmt(totalDr)}</td>
-                <td style="text-align:left;color:#DC2626;padding:12px">${accFmt(totalCr)}</td>
+                <td style="text-align:left;color:var(--inv-red);padding:12px">${accFmt(totalCr)}</td>
             </tr></tfoot>
             </table>
         </div>
@@ -320,27 +320,27 @@ async function renderBalanceSheet(c, asOfDate) {
                 ${items.map(a=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAFC;font-size:13px">
                     <span>${a.name}</span><span style="font-weight:700">${accFmt(a.balance)}</span></div>`).join('')}
                 ${extra ? `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAFC;font-size:13px">
-                    <span>${extra.label}</span><span style="font-weight:700;color:${extra.value>=0?'#059669':'#DC2626'}">${accFmt(Math.abs(extra.value))}</span></div>` : ''}
+                    <span>${extra.label}</span><span style="font-weight:700;color:${extra.value>=0?'var(--inv-green)':'var(--inv-red)'}">${accFmt(Math.abs(extra.value))}</span></div>` : ''}
             </div>`;
 
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">🏦 الميزانية العمومية</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">حتى ${new Date(asOfDate).toLocaleDateString('ar-EG')} — الأصول = الخصوم + حقوق الملكية</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">حتى ${new Date(asOfDate).toLocaleDateString('ar-EG')} — الأصول = الخصوم + حقوق الملكية</p></div>
         </div>
 
         <div class="dash-card" style="padding:16px;margin-bottom:16px">
             <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
                 <div><label class="ob-label">حتى تاريخ</label><input type="date" id="bsAsOf" class="ob-input" style="margin:0" value="${asOfDate}"></div>
                 <button class="ob-add-btn" onclick="accApplyBsFilter()">🔍 تطبيق</button>
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="renderBalanceSheet(document.getElementById('app-content'))">اليوم</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="renderBalanceSheet(document.getElementById('app-content'))">اليوم</button>
             </div>
         </div>
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🏦</div><div class="mod-card-val">${accFmt(totalAssets)}</div><div class="mod-card-lbl">إجمالي الأصول</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">📉</div><div class="mod-card-val">${accFmt(totalLiabilities)}</div><div class="mod-card-lbl">إجمالي الخصوم</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'#D1FAE5':'#FEF3C7'};color:${balanced?'#059669':'#D97706'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازنة':'غير متوازنة'}</div><div class="mod-card-lbl">حالة الميزانية</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📉</div><div class="mod-card-val">${accFmt(totalLiabilities)}</div><div class="mod-card-lbl">إجمالي الخصوم</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'var(--inv-green-light)':'#FEF3C7'};color:${balanced?'var(--inv-green)':'var(--inv-gold)'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازنة':'غير متوازنة'}</div><div class="mod-card-lbl">حالة الميزانية</div></div>
         </div>
 
         <div class="dash-row" id="bs-rows">
@@ -351,10 +351,10 @@ async function renderBalanceSheet(c, asOfDate) {
                 </div>
             </div>
             <div class="dash-card" style="flex:1">
-                ${section('📉 الخصوم', byType.liability, '#DC2626')}
+                ${section('📉 الخصوم', byType.liability, 'var(--inv-red)')}
                 ${section('💼 حقوق الملكية', byType.equity, '#7C3AED', { label: netProfit>=0?'صافي الربح (الفترة الحالية)':'صافي الخسارة (الفترة الحالية)', value: netProfit })}
                 <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:2px solid #E2E8F0;font-weight:800;font-size:14px">
-                    <span>إجمالي الخصوم وحقوق الملكية</span><span style="color:#DC2626">${accFmt(totalLiabilities + totalEquity)}</span>
+                    <span>إجمالي الخصوم وحقوق الملكية</span><span style="color:var(--inv-red)">${accFmt(totalLiabilities + totalEquity)}</span>
                 </div>
             </div>
         </div>

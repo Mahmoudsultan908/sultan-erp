@@ -74,7 +74,7 @@ async function ecOpenAdd() {
                     <input type="number" id="ecLimit" class="mod-form-input" placeholder="0 = بدون حد" min="0" step="0.01"></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('ecAddModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('ecAddModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="ecSaveNew()">💾 إضافة البند</button>
             </div>
         </div>`;

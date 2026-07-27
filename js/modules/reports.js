@@ -64,7 +64,7 @@ async function renderReports(container) {
 
     async function renderReportContent(id) {
         const c = document.getElementById('rep-content');
-        c.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B">⏳ جاري التحميل...</div>`;
+        c.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)">⏳ جاري التحميل...</div>`;
 
         if (id === 'pl') return renderPL(c);
         if (id === 'customers') return renderCustomerStatement(c);
@@ -126,7 +126,7 @@ async function renderReports(container) {
             const data = months.map((m, i) => ({ label: m.label, value: results[i].netProfit }));
             el.innerHTML = repMiniBarSVG(data);
         } catch {
-            el.innerHTML = '<p style="color:#94A3B8;font-size:12px">تعذّر تحميل الرسم البياني</p>';
+            el.innerHTML = '<p style="color:var(--inv-muted-light);font-size:12px">تعذّر تحميل الرسم البياني</p>';
         }
     }
 
@@ -142,7 +142,7 @@ async function renderReports(container) {
             c.innerHTML = `
             <div class="dash-card" style="padding:20px;margin-bottom:16px">
                 <div class="dash-card-header" style="margin-bottom:6px"><span>📈 اتجاه صافي الربح — آخر 6 شهور</span></div>
-                <div id="pl-trend-chart"><p style="color:#94A3B8;font-size:12px">⏳ جاري التحميل...</p></div>
+                <div id="pl-trend-chart"><p style="color:var(--inv-muted-light);font-size:12px">⏳ جاري التحميل...</p></div>
             </div>
             <div class="dash-card" style="padding:20px;margin-bottom:16px">
                 <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
@@ -159,16 +159,16 @@ async function renderReports(container) {
             <div class="dash-card" style="padding:24px;max-width:550px" id="pl-card">
                 <h3 style="margin:0 0 16px;font-size:15px">قائمة الدخل (${from} إلى ${to})</h3>
                 <div class="dash-summary-row"><span>صافي المبيعات</span><span class="dash-s-green">${fmt(netSales)}</span></div>
-                <div class="dash-summary-row" style="font-size:11px;color:#94A3B8"><span>(إجمالي ${fmt(totalSales)} - مرتجعات ${fmt(totalReturns)})</span><span></span></div>
+                <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light)"><span>(إجمالي ${fmt(totalSales)} - مرتجعات ${fmt(totalReturns)})</span><span></span></div>
                 <div class="dash-summary-row"><span>(-) تكلفة البضاعة المباعة</span><span class="dash-s-red">${fmt(totalCOGS)}</span></div>
-                <div class="dash-summary-row" style="font-size:11px;color:#94A3B8"><span>(تكلفة مبيعات ${fmt(cogsSales)} - تكلفة مرتجعات ${fmt(cogsReturns)})</span><span></span></div>
+                <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light)"><span>(تكلفة مبيعات ${fmt(cogsSales)} - تكلفة مرتجعات ${fmt(cogsReturns)})</span><span></span></div>
                 <div class="dash-summary-row"><span>(-) إجمالي المصروفات</span><span class="dash-s-red">${fmt(totalExpenses)}</span></div>
                 <div class="dash-summary-divider"></div>
                 <div class="dash-summary-row dash-summary-total">
                     <span>${netProfit>=0?'✅ صافي الربح':'📉 صافي الخسارة'}</span>
-                    <span style="color:${netProfit>=0?'#059669':'#DC2626'}">${fmt(Math.abs(netProfit))}</span>
+                    <span style="color:${netProfit>=0?'var(--inv-green)':'var(--inv-red)'}">${fmt(Math.abs(netProfit))}</span>
                 </div>
-                <div class="dash-summary-row" style="font-size:11px;color:#94A3B8"><span>هامش الربح</span><span>${margin.toFixed(1)}%</span></div>
+                <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light)"><span>هامش الربح</span><span>${margin.toFixed(1)}%</span></div>
             </div>
             <div style="display:flex;gap:10px;margin-top:14px">
                 <button class="mod-btn" onclick="window._plExport()">📊 تصدير Excel</button>
@@ -211,8 +211,8 @@ async function renderReports(container) {
             body.innerHTML = !rows.length ? `<tr><td colspan="3" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين</td></tr>` :
                 rows.map(cu => `<tr>
                     <td><strong>${cu.name}</strong></td>
-                    <td style="text-align:left;font-weight:700;color:${Number(cu.balance)>0?'#DC2626':'#059669'}">${fmt(cu.balance)}</td>
-                    <td style="text-align:center"><button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="custShowStatement('${cu.id}')">📄 كشف حساب</button></td>
+                    <td style="text-align:left;font-weight:700;color:${Number(cu.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${fmt(cu.balance)}</td>
+                    <td style="text-align:center"><button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="custShowStatement('${cu.id}')">📄 كشف حساب</button></td>
                 </tr>`).join('');
         };
         c.innerHTML = `
@@ -241,8 +241,8 @@ async function renderReports(container) {
             body.innerHTML = !rows.length ? `<tr><td colspan="3" class="empty-state"><span>🏭</span>لا يوجد موردين مطابقين</td></tr>` :
                 rows.map(s => `<tr>
                     <td><strong>${s.name}</strong></td>
-                    <td style="text-align:left;font-weight:700;color:${Number(s.balance)>0?'#DC2626':'#059669'}">${fmt(s.balance)}</td>
-                    <td style="text-align:center"><button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="supShowStatement('${s.id}')">📄 كشف حساب</button></td>
+                    <td style="text-align:left;font-weight:700;color:${Number(s.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${fmt(s.balance)}</td>
+                    <td style="text-align:center"><button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="supShowStatement('${s.id}')">📄 كشف حساب</button></td>
                 </tr>`).join('');
         };
         c.innerHTML = `
@@ -290,7 +290,7 @@ async function renderReports(container) {
                 <div class="dash-summary-divider"></div>
                 <div class="dash-summary-row dash-summary-total">
                     <span>${netVat>=0?'مستحق للمصلحة':'مستحق لنا (خصم)'}</span>
-                    <span style="color:${netVat>=0?'#DC2626':'#059669'}">${fmt(Math.abs(netVat))}</span>
+                    <span style="color:${netVat>=0?'var(--inv-red)':'var(--inv-green)'}">${fmt(Math.abs(netVat))}</span>
                 </div>
             </div>`;
 
@@ -317,7 +317,7 @@ async function renderReports(container) {
 
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-            <div style="font-size:12px;color:#64748B">المتوقع/المستلم/المتبقي من فواتير الشراء المؤجلة الحالية. المؤجلات القديمة (قبل تتبع النظام) تُسجَّل يدوياً وتظهر في الجدول تحت.</div>
+            <div style="font-size:12px;color:var(--inv-muted)">المتوقع/المستلم/المتبقي من فواتير الشراء المؤجلة الحالية. المؤجلات القديمة (قبل تتبع النظام) تُسجَّل يدوياً وتظهر في الجدول تحت.</div>
             <button class="mod-btn mod-btn-primary" onclick="repDefOpenAddHistorical()">+ إضافة مؤجل قديم</button>
         </div>
         <div class="dash-card" style="padding:0;overflow:hidden">
@@ -329,14 +329,14 @@ async function renderReports(container) {
                         <td>${s.items_count}</td>
                         <td>${fmt(s.total_expected)}</td>
                         <td class="dash-s-green">${fmt(s.total_received)}</td>
-                        <td class="dash-amount" style="color:${s.total_remaining>0?'#D97706':'#059669'}">${fmt(s.total_remaining)}</td>
-                        <td>${s.total_remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:#ECFDF5;color:#059669" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 تسجيل استلام</button>` : ''}</td>
-                    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مؤجلات مسجلة</td></tr>'}
+                        <td class="dash-amount" style="color:${s.total_remaining>0?'var(--inv-gold)':'var(--inv-green)'}">${fmt(s.total_remaining)}</td>
+                        <td>${s.total_remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:#ECFDF5;color:var(--inv-green)" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 تسجيل استلام</button>` : ''}</td>
+                    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد مؤجلات مسجلة</td></tr>'}
                 </tbody>
             </table>
         </div>
 
-        <div style="margin-top:18px;font-size:13px;font-weight:800;color:#334155">📜 مؤجلات مسجّلة يدوياً (قديمة قبل تتبع النظام)</div>
+        <div style="margin-top:18px;font-size:13px;font-weight:800;color:var(--inv-navy-light)">📜 مؤجلات مسجّلة يدوياً (قديمة قبل تتبع النظام)</div>
         <div class="dash-card" style="padding:0;overflow:hidden;margin-top:8px">
             <table class="dash-table" style="margin:0">
                 <thead><tr><th>المورد</th><th>المبلغ</th><th>المستلم</th><th>المتبقي</th><th>الاستحقاق</th><th>ملاحظات</th><th></th></tr></thead>
@@ -347,12 +347,12 @@ async function renderReports(container) {
                         <td><strong>${m.suppliers?.name || '—'}</strong></td>
                         <td>${fmt(m.amount)}</td>
                         <td class="dash-s-green">${fmt(m.received_amount)}</td>
-                        <td class="dash-amount" style="color:${remaining>0?'#D97706':'#059669'}">${fmt(remaining)}</td>
+                        <td class="dash-amount" style="color:${remaining>0?'var(--inv-gold)':'var(--inv-green)'}">${fmt(remaining)}</td>
                         <td>${m.due_date || '—'}</td>
-                        <td style="font-size:11px;color:#64748B">${m.notes || '—'}</td>
-                        <td>${remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:#ECFDF5;color:#059669" onclick="repDefReceiveManual('${m.id}',${remaining})">💰 استلام</button>` : '<span style="color:#059669;font-size:11px">✅ مكتمل</span>'}</td>
+                        <td style="font-size:11px;color:var(--inv-muted)">${m.notes || '—'}</td>
+                        <td>${remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:#ECFDF5;color:var(--inv-green)" onclick="repDefReceiveManual('${m.id}',${remaining})">💰 استلام</button>` : '<span style="color:var(--inv-green);font-size:11px">✅ مكتمل</span>'}</td>
                     </tr>`;
-                    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94A3B8">لا توجد مؤجلات يدوية مسجلة</td></tr>'}
+                    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد مؤجلات يدوية مسجلة</td></tr>'}
                 </tbody>
             </table>
         </div>`;
@@ -389,7 +389,7 @@ async function renderReports(container) {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="repDefCloseModal('repDefAddModal')">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="repDefCloseModal('repDefAddModal')">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="repDefSaveHistorical()">💾 حفظ</button>
             </div>
         </div>`;
@@ -446,10 +446,10 @@ async function renderReports(container) {
             <div class="mod-modal-header"><h3>💰 تسجيل استلام مؤجل — ${supplierName}</h3>
                 <button class="mod-modal-close" onclick="repDefCloseModal('repDefReceiveModal')">&times;</button></div>
             <div class="mod-modal-body" id="repDefReceiveBody">
-                <div style="text-align:center;padding:20px;color:#64748B">⏳ جاري التحميل...</div>
+                <div style="text-align:center;padding:20px;color:var(--inv-muted)">⏳ جاري التحميل...</div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="repDefCloseModal('repDefReceiveModal')">إغلاق</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="repDefCloseModal('repDefReceiveModal')">إغلاق</button>
                 <button class="mod-btn mod-btn-primary" onclick="repDefConfirmReceiveReal('${supplierId}')">✅ تأكيد استلام المحدد</button>
             </div>
         </div>`;
@@ -457,18 +457,18 @@ async function renderReports(container) {
 
         const body = document.getElementById('repDefReceiveBody');
         if (!supplierId) {
-            body.innerHTML = `<div style="color:#94A3B8;font-size:12px">تعذّر تحديد المورد تلقائياً — استخدم جدول "مؤجلات مسجّلة يدوياً" بالأسفل لو المؤجل ده يدوي، أو راجع المطوّر.</div>`;
+            body.innerHTML = `<div style="color:var(--inv-muted-light);font-size:12px">تعذّر تحديد المورد تلقائياً — استخدم جدول "مؤجلات مسجّلة يدوياً" بالأسفل لو المؤجل ده يدوي، أو راجع المطوّر.</div>`;
             return;
         }
         try {
             const { data: pending, error } = await sb.rpc('fn_list_pending_deferred_rebates', { p_supplier_id: supplierId });
             if (error) throw error;
             if (!pending || !pending.length) {
-                body.innerHTML = `<div style="color:#94A3B8;font-size:12px">لا توجد بنود مؤجلة معلّقة من فواتير شراء لهذا المورد.</div>`;
+                body.innerHTML = `<div style="color:var(--inv-muted-light);font-size:12px">لا توجد بنود مؤجلة معلّقة من فواتير شراء لهذا المورد.</div>`;
                 return;
             }
             body.innerHTML = `
-            <div style="font-size:11px;color:#64748B;margin-bottom:8px">حدد البنود اللي المورد استلمها فعلاً (خصم/استرداد) ثم اضغط "تأكيد استلام المحدد".</div>
+            <div style="font-size:11px;color:var(--inv-muted);margin-bottom:8px">حدد البنود اللي المورد استلمها فعلاً (خصم/استرداد) ثم اضغط "تأكيد استلام المحدد".</div>
             <table class="mod-table"><thead><tr><th></th><th>الصنف</th><th>الكمية</th><th>المؤجل/وحدة</th><th>الاستحقاق</th><th>المبلغ المتوقع</th></tr></thead>
             <tbody>
                 ${pending.map(p => `<tr>

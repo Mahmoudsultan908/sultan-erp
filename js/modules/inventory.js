@@ -35,7 +35,7 @@ function stkCountSwitchTab(tab) {
 // عنصر فرعي بدل الـ container الرئيسي عشان شريط التابات يفضل ظاهر)
 // ════════════════════════════════════════════════════════════
 async function invRenderStockView(root) {
-    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل المخزون...</div>`;
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل المخزون...</div>`;
     try {
         const [{ data: stock }, { data: warehouses }, { data: companies }, { data: purchaseItems }, { data: saleItems }] = await Promise.all([
             sb.from('inventory_stock')
@@ -121,18 +121,18 @@ async function invRenderStockView(root) {
                 const sold30 = sold30d[s.product_id] || 0;
                 const turnover = qty > 0 ? (sold30 / qty) : (sold30 > 0 ? Infinity : 0);
                 return `<tr>
-                    <td><strong>${s.products?.name || '—'}</strong><div style="font-size:11px;color:#94A3B8">${s.products?.product_categories?.name || ''}</div></td>
+                    <td><strong>${s.products?.name || '—'}</strong><div style="font-size:11px;color:var(--inv-muted-light)">${s.products?.product_categories?.name || ''}</div></td>
                     <td style="direction:ltr;text-align:center">${s.products?.code || '—'}</td>
                     <td>${coMap[s.products?.company_id] || '—'}</td>
                     <td>${whMap[s.warehouse_id] || '—'}</td>
                     <td class="inv-qty-cell"><span class="inv-qty ${status === 'zero' ? 'inv-qty-zero' : status === 'low' ? 'inv-qty-low' : ''}">${fmt(qty)}</span> <small>${s.products?.unit || 'وحدة'}</small></td>
                     <td>${reorder > 0 ? fmt(reorder) : '—'}</td>
-                    <td style="font-size:12px">${lp ? `${new Date(lp.date).toLocaleDateString('ar-EG')} — ${fmt(lp.qty)}<div style="color:#94A3B8">اتباع منها: ${fmt(soldSinceLastPurchase[s.product_id] || 0)}</div>` : '—'}</td>
-                    <td style="font-size:12px;font-weight:700;color:${turnover >= 1 ? '#059669' : turnover > 0 ? '#D97706' : '#94A3B8'}">${turnover === Infinity ? '∞' : fmt(turnover)}</td>
+                    <td style="font-size:12px">${lp ? `${new Date(lp.date).toLocaleDateString('ar-EG')} — ${fmt(lp.qty)}<div style="color:var(--inv-muted-light)">اتباع منها: ${fmt(soldSinceLastPurchase[s.product_id] || 0)}</div>` : '—'}</td>
+                    <td style="font-size:12px;font-weight:700;color:${turnover >= 1 ? 'var(--inv-green)' : turnover > 0 ? 'var(--inv-gold)' : 'var(--inv-muted-light)'}">${turnover === Infinity ? '∞' : fmt(turnover)}</td>
                     <td><span class="${statusClass}">${statusLabel}</span>${stagnant ? '<div style="margin-top:3px"><span style="background:#F3F4F6;color:#6B7280;font-size:10.5px;padding:2px 7px;border-radius:20px;font-weight:700">🐌 راكد</span></div>' : ''}</td>
                     <td class="inv-val-cell">${fmt(val)} ج.م</td>
                 </tr>`;
-            }).join('') : `<tr><td colspan="9" style="text-align:center;padding:30px;color:#94A3B8">لا توجد نتائج</td></tr>`;
+            }).join('') : `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--inv-muted-light)">لا توجد نتائج</td></tr>`;
 
             document.getElementById('inv-total-val').textContent = fmt(totalVal) + ' ج.م';
             document.getElementById('inv-low-count').textContent = lowCount;
@@ -205,7 +205,7 @@ async function invRenderStockView(root) {
             <div class="dash-card" style="padding:0;overflow-x:auto">
                 <table class="dash-table" style="margin:0;white-space:nowrap">
                     <thead><tr><th>الصنف</th><th>الكود</th><th>الشركة</th><th>المخزن</th><th>الكمية</th><th>حد الطلب</th><th>آخر شراء</th><th>دوران (30 يوم)</th><th>الحالة</th><th>القيمة</th></tr></thead>
-                    <tbody id="inv-tbody"><tr><td colspan="10" style="text-align:center;padding:30px;color:#94A3B8">جاري التحميل...</td></tr></tbody>
+                    <tbody id="inv-tbody"><tr><td colspan="10" style="text-align:center;padding:30px;color:var(--inv-muted-light)">جاري التحميل...</td></tr></tbody>
                 </table>
             </div>`;
 
@@ -229,7 +229,7 @@ let stkCountWarehouses = [];
 let stkCountRows = []; // { product_id, name, code, unit, system_qty }
 
 async function stkCountRenderForm(root) {
-    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
     try {
         if (!stkCountWarehouses.length) {
             const { data } = await sb.from('warehouses').select('id,name,is_main').order('is_main', { ascending: false });
@@ -243,7 +243,7 @@ async function stkCountRenderForm(root) {
 }
 
 async function stkCountLoadWarehouse(root, warehouseId) {
-    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
     try {
         const [{ data: products }, { data: stock }] = await Promise.all([
             sb.from('products').select('id,name,code,unit').order('name'),
@@ -275,7 +275,7 @@ function stkCountRenderTable(root, warehouseId, search) {
             ${stkCountWarehouses.map(w => `<option value="${w.id}" ${w.id === warehouseId ? 'selected' : ''}>${w.name}${w.is_main ? ' (رئيسي)' : ''}</option>`).join('')}
         </select>
         <input type="text" id="stk-search" placeholder="🔍 بحث باسم أو كود..." value="${search || ''}" style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-family:Cairo,sans-serif;font-size:13px">
-        <span id="stk-counted-badge" style="font-size:12px;color:#64748B;font-weight:700"></span>
+        <span id="stk-counted-badge" style="font-size:12px;color:var(--inv-muted);font-weight:700"></span>
     </div>
     <div class="dash-card" style="padding:0;overflow:hidden">
         <table class="dash-table" style="margin:0">
@@ -288,7 +288,7 @@ function stkCountRenderTable(root, warehouseId, search) {
                     <td class="dash-muted">${r.system_qty} <small>${r.unit}</small></td>
                     <td><input type="number" step="any" class="stk-count-input" data-pid="${r.product_id}" style="width:100px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:Cairo,sans-serif" oninput="stkCountUpdateDiff(this)"></td>
                     <td class="stk-diff-cell" data-pid-diff="${r.product_id}">—</td>
-                </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:30px;color:#94A3B8">لا توجد نتائج</td></tr>`}
+                </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--inv-muted-light)">لا توجد نتائج</td></tr>`}
             </tbody>
         </table>
     </div>
@@ -316,7 +316,7 @@ function stkCountUpdateDiff(inputEl) {
     if (inputEl.value === '') { diffCell.textContent = '—'; diffCell.style.color = ''; stkCountUpdateBadge(); return; }
     const diff = Number(inputEl.value) - row.system_qty;
     diffCell.textContent = (diff > 0 ? '+' : '') + diff;
-    diffCell.style.color = diff > 0 ? '#059669' : diff < 0 ? '#DC2626' : '#94A3B8';
+    diffCell.style.color = diff > 0 ? 'var(--inv-green)' : diff < 0 ? 'var(--inv-red)' : 'var(--inv-muted-light)';
     stkCountUpdateBadge();
 }
 

@@ -85,7 +85,7 @@ window.gxSwitchTab = function (tab) {
 function gxRenderPage(c) {
     c.innerHTML = `
     <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">🔄 استيراد وتصدير عام</h2>
-    <p style="font-size:13px;color:#64748B;margin-top:4px">تصدير أي جدول لإكسل، واستيراد بيانات مرجعية عامة — أداة إدارية لمدير النظام</p></div>
+    <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تصدير أي جدول لإكسل، واستيراد بيانات مرجعية عامة — أداة إدارية لمدير النظام</p></div>
     <div class="ob-tabs">
         <button class="ob-tab ${_gxTab === 'export' ? 'active' : ''}" onclick="gxSwitchTab('export')">📤 تصدير</button>
         <button class="ob-tab ${_gxTab === 'import' ? 'active' : ''}" onclick="gxSwitchTab('import')">📥 استيراد</button>
@@ -151,10 +151,10 @@ function gxRenderImportTab() {
             ${GX_IMPORT_TABLES.map(([v, l]) => `<option value="${v}">${l} <span style="direction:ltr">(${v})</span></option>`).join('')}
         </select>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px">
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="gxDownloadTemplate()">📄 تنزيل بيانات الجدول الحالي كقالب</button>
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="gxDownloadTemplate()">📄 تنزيل بيانات الجدول الحالي كقالب</button>
             <input type="file" id="gxFileInput" accept=".xlsx,.xls" style="display:none" onchange="gxHandleFile(this.files[0])">
             <button class="mod-btn mod-btn-primary" onclick="document.getElementById('gxFileInput').click()">📂 اختر ملف Excel</button>
-            <span id="gxFileName" style="font-size:12.5px;color:#64748B"></span>
+            <span id="gxFileName" style="font-size:12.5px;color:var(--inv-muted)"></span>
         </div>
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;padding:10px 14px;border-radius:8px;font-size:12px;margin-top:14px">
             💡 لو عمود <code>id</code> في صف معيّن فيه قيمة موجودة فعلاً، هيتحدّث الصف ده. لو فاضي، هيتضاف صف جديد. أي عمود فاضي في الملف بيتم تجاهله (مش هيبعت قيمة فاضية تكسر نوع العمود).
@@ -220,7 +220,7 @@ function gxRenderPreview(table) {
             <table class="mod-table"><thead><tr>${cols.map(c => `<th style="white-space:nowrap">${c}</th>`).join('')}</tr></thead>
             <tbody>${_gxParsedRows.slice(0, 10).map(r => `<tr>${cols.map(c => `<td style="white-space:nowrap">${r[c] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody></table>
         </div>
-        ${_gxParsedRows.length > 10 ? `<div style="font-size:12px;color:#94A3B8;margin-top:6px">...و${_gxParsedRows.length - 10} صف إضافي</div>` : ''}
+        ${_gxParsedRows.length > 10 ? `<div style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">...و${_gxParsedRows.length - 10} صف إضافي</div>` : ''}
         <button class="mod-btn mod-btn-primary" style="margin-top:14px" onclick="gxConfirmImport('${table}')">✅ تأكيد الاستيراد إلى ${table}</button>
     </div>`;
 }

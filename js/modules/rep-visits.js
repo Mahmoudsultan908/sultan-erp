@@ -72,13 +72,13 @@ function rvRenderPage(c) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:10px">
             <input type="date" id="rvDate" class="mod-form-input" style="margin:0;width:auto" value="${RV_DATE}" onchange="rvOnDateChange(this.value)">
-            <span style="font-size:13px;color:#64748B">${RV_LIST.length} زيارة مسجّلة — ${visited} باع/حصّل، ${skipped} رفض</span>
+            <span style="font-size:13px;color:var(--inv-muted)">${RV_LIST.length} زيارة مسجّلة — ${visited} باع/حصّل، ${skipped} رفض</span>
         </div>
         <button class="mod-btn mod-btn-primary" onclick="rvOpenGenerateModal()">📋 ملء خط السير من زيارات اليوم</button>
     </div>
     ${Object.keys(byRep).length ? Object.entries(byRep).map(([repName, visits]) => `
         <div class="mod-table-wrap" style="margin-bottom:16px">
-            <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">🚗 ${repName} (${visits.length})</div>
+            <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">🚗 ${repName} (${visits.length})</div>
             <table class="mod-table"><thead><tr>
                 <th>العميل</th><th>التليفون</th><th>الحالة</th><th style="text-align:left">الوقت</th>
             </tr></thead><tbody>
@@ -86,7 +86,7 @@ function rvRenderPage(c) {
                     <td>${v.customer?.name || '—'}</td>
                     <td dir="ltr" style="text-align:right">${v.customer?.phone || '—'}</td>
                     <td>${rvStatusLabel(v.status, v.notes)}</td>
-                    <td style="text-align:left;color:#64748B">${v.checked_in_at ? new Date(v.checked_in_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                    <td style="text-align:left;color:var(--inv-muted)">${v.checked_in_at ? new Date(v.checked_in_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>`).join('') : `<div class="empty-state"><span>🗺️</span>مفيش زيارات مسجّلة فى اليوم ده</div>`}`;
@@ -110,11 +110,11 @@ function rvOpenGenerateModal() {
         <div class="mod-modal-header"><h3>📋 ملء خط السير من زيارات اليوم</h3>
             <button class="mod-modal-close" onclick="document.getElementById('rvGenModal').remove()">✕</button></div>
         <div class="mod-modal-body">
-            <div style="font-size:13px;color:#64748B;margin-bottom:12px">
+            <div style="font-size:13px;color:var(--inv-muted);margin-bottom:12px">
                 هياخد كل العملاء اللي عندهم زيارة مسجّلة بتاريخ <b>${RV_DATE}</b> (${RV_LIST.length} زيارة) ويضيفهم لخط سير اليوم اللي هتختاره — مع مندوبيهم نفسهم.
                 لو عميل موجود أصلاً فى خط سير يوم تاني، هيتضاف لليوم الجديد كمان من غير ما يتشال من القديم.
             </div>
-            <label style="font-size:13px;font-weight:700;color:#334155">ضيفهم لخط سير يوم:</label>
+            <label style="font-size:13px;font-weight:700;color:var(--inv-navy-light)">ضيفهم لخط سير يوم:</label>
             <select id="rvGenDay" class="mod-form-input">
                 ${RV_WEEKDAYS.map(([k, n]) => `<option value="${k}" ${k === defaultDay ? 'selected' : ''}>${n}</option>`).join('')}
             </select>
@@ -193,7 +193,7 @@ function rvRenderRoutesPage(c) {
     ${repsWithCustomers.length ? repsWithCustomers.map(rep => {
         const linkedCustomers = RV_REP_CUSTOMERS[rep.id] || [];
         return `<div class="mod-card" style="margin-bottom:16px">
-            <div style="font-weight:800;font-size:14px;color:#1E293B;margin-bottom:10px">🚗 ${rep.name}</div>
+            <div style="font-weight:800;font-size:14px;color:var(--inv-navy);margin-bottom:10px">🚗 ${rep.name}</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
                 ${RV_WEEKDAYS.map(([dayKey, dayName]) => {
                     const route = RV_ROUTES.find(r => r.rep_id === rep.id && r.day_of_week === dayKey);
@@ -201,8 +201,8 @@ function rvRenderRoutesPage(c) {
                     const assignedIds = new Set(assigned.map(a => a.customer_id));
                     const available = linkedCustomers.filter(cu => !assignedIds.has(cu.id));
                     return `<div style="border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px">
-                        <div style="font-weight:700;font-size:13px;color:#334155;margin-bottom:6px">${dayName} (${assigned.length})</div>
-                        ${assigned.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:#475569;padding:3px 0">
+                        <div style="font-weight:700;font-size:13px;color:var(--inv-navy-light);margin-bottom:6px">${dayName} (${assigned.length})</div>
+                        ${assigned.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--inv-text-soft);padding:3px 0">
                             <span>${a.customer?.name || '—'}</span>
                             <button onclick="rvRemoveRouteCustomer('${a.id}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:13px;padding:0 4px">✕</button>
                         </div>`).join('')}
@@ -304,24 +304,24 @@ function rvRenderGoalsPage(c) {
         <select class="mod-form-input" style="width:auto" onchange="rvOnGoalRepChange(this.value)">
             ${RV_GOAL_REPS.map(r => `<option value="${r.id}" ${r.id === rep.id ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
         </select>
-        <span style="font-size:12px;color:#64748B;margin-right:8px">الأهداف بتتظبط من "👥 المندوبين"</span>
+        <span style="font-size:12px;color:var(--inv-muted);margin-right:8px">الأهداف بتتظبط من "👥 المندوبين"</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
         <div class="mod-card">
-            <div style="font-size:13px;color:#64748B;margin-bottom:8px">🎯 هدف المبيعات اليوم</div>
-            <div style="font-size:22px;font-weight:900;color:#1E293B">${todayData.salesAmt.toLocaleString('en-US')} <small style="font-size:13px;color:#94A3B8">/ ${salesTarget.toLocaleString('en-US')}</small></div>
-            <div style="background:#F1F5F9;border-radius:8px;height:8px;margin-top:8px;overflow:hidden"><div style="width:${salesPct}%;height:100%;background:${salesPct>=100?'#059669':salesPct>=60?'#F59E0B':'#EF4444'}"></div></div>
-            <div style="font-size:12px;color:#64748B;margin-top:4px">${salesPct}%</div>
+            <div style="font-size:13px;color:var(--inv-muted);margin-bottom:8px">🎯 هدف المبيعات اليوم</div>
+            <div style="font-size:22px;font-weight:900;color:var(--inv-navy)">${todayData.salesAmt.toLocaleString('en-US')} <small style="font-size:13px;color:var(--inv-muted-light)">/ ${salesTarget.toLocaleString('en-US')}</small></div>
+            <div style="background:#F1F5F9;border-radius:8px;height:8px;margin-top:8px;overflow:hidden"><div style="width:${salesPct}%;height:100%;background:${salesPct>=100?'var(--inv-green)':salesPct>=60?'var(--inv-gold-light)':'#EF4444'}"></div></div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-top:4px">${salesPct}%</div>
         </div>
         <div class="mod-card">
-            <div style="font-size:13px;color:#64748B;margin-bottom:8px">🏪 هدف الزيارات اليوم</div>
-            <div style="font-size:22px;font-weight:900;color:#1E293B">${todayData.visitsCount} <small style="font-size:13px;color:#94A3B8">/ ${visitsTarget}</small></div>
-            <div style="background:#F1F5F9;border-radius:8px;height:8px;margin-top:8px;overflow:hidden"><div style="width:${visitsPct}%;height:100%;background:${visitsPct>=100?'#059669':visitsPct>=60?'#F59E0B':'#EF4444'}"></div></div>
-            <div style="font-size:12px;color:#64748B;margin-top:4px">${visitsPct}%</div>
+            <div style="font-size:13px;color:var(--inv-muted);margin-bottom:8px">🏪 هدف الزيارات اليوم</div>
+            <div style="font-size:22px;font-weight:900;color:var(--inv-navy)">${todayData.visitsCount} <small style="font-size:13px;color:var(--inv-muted-light)">/ ${visitsTarget}</small></div>
+            <div style="background:#F1F5F9;border-radius:8px;height:8px;margin-top:8px;overflow:hidden"><div style="width:${visitsPct}%;height:100%;background:${visitsPct>=100?'var(--inv-green)':visitsPct>=60?'var(--inv-gold-light)':'#EF4444'}"></div></div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-top:4px">${visitsPct}%</div>
         </div>
     </div>
     <div class="mod-table-wrap">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📅 سجل آخر ${RV_GOAL_DAYS} يوم — للمقارنة</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📅 سجل آخر ${RV_GOAL_DAYS} يوم — للمقارنة</div>
         <table class="mod-table"><thead><tr>
             <th>التاريخ</th><th>مبيعات</th><th>هدف المبيعات</th><th>نسبة</th><th>زيارات</th><th>هدف الزيارات</th><th>نسبة</th>
         </tr></thead><tbody>
@@ -332,11 +332,11 @@ function rvRenderGoalsPage(c) {
                 return `<tr>
                     <td>${new Date(date).toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' })}</td>
                     <td>${d.salesAmt.toLocaleString('en-US')}</td>
-                    <td style="color:#94A3B8">${salesTarget.toLocaleString('en-US')}</td>
-                    <td style="font-weight:700;color:${sp>=100?'#059669':sp>=60?'#B45309':'#DC2626'}">${sp}%</td>
+                    <td style="color:var(--inv-muted-light)">${salesTarget.toLocaleString('en-US')}</td>
+                    <td style="font-weight:700;color:${sp>=100?'var(--inv-green)':sp>=60?'#B45309':'var(--inv-red)'}">${sp}%</td>
                     <td>${d.visitsCount}</td>
-                    <td style="color:#94A3B8">${visitsTarget}</td>
-                    <td style="font-weight:700;color:${vp>=100?'#059669':vp>=60?'#B45309':'#DC2626'}">${vp}%</td>
+                    <td style="color:var(--inv-muted-light)">${visitsTarget}</td>
+                    <td style="font-weight:700;color:${vp>=100?'var(--inv-green)':vp>=60?'#B45309':'var(--inv-red)'}">${vp}%</td>
                 </tr>`;
             }).join('')}
         </tbody></table>

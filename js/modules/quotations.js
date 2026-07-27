@@ -30,7 +30,7 @@ async function renderQuotations(c) {
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">📋 عروض الأسعار</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إنشاء عرض سعر، وتحويله لفاتورة بيع فعلية عند موافقة العميل</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إنشاء عرض سعر، وتحويله لفاتورة بيع فعلية عند موافقة العميل</p></div>
             <button class="mod-btn mod-btn-primary" onclick="qtOpenAdd()">+ عرض سعر جديد</button>
         </div>
 
@@ -45,8 +45,8 @@ async function renderQuotations(c) {
                     <td style="text-align:left;font-weight:700">${qtFmt(q.total)}</td>
                     <td>${QT_STATUS_LABELS[q.status]||q.status}</td>
                     <td>
-                        ${q.status==='pending' ? `<button class="cc-edit" style="background:#D1FAE5;color:#059669" onclick="qtConvertToSale('${q.id}')">🔄 تحويل لفاتورة</button>
-                        <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="qtCancel('${q.id}')">🚫</button>` : ''}
+                        ${q.status==='pending' ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="qtConvertToSale('${q.id}')">🔄 تحويل لفاتورة</button>
+                        <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="qtCancel('${q.id}')">🚫</button>` : ''}
                     </td>
                 </tr>`).join('') : '<tr><td colspan="6" class="empty-state"><span>📋</span>لا توجد عروض أسعار بعد</td></tr>'}
             </tbody></table>
@@ -98,13 +98,13 @@ window.qtOpenAdd = async function() {
                 <table class="dash-table" style="margin:0"><thead><tr>
                     <th>الصنف</th><th style="width:80px">الكمية</th><th style="width:90px">السعر</th><th style="width:90px">الإجمالي</th><th></th>
                 </tr></thead><tbody id="qtItemsBody">
-                    <tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:16px">لم تُضف أصناف بعد</td></tr>
+                    <tr><td colspan="5" style="text-align:center;color:var(--inv-muted-light);padding:16px">لم تُضف أصناف بعد</td></tr>
                 </tbody></table>
 
                 <div style="text-align left;margin-top:14px;font-size:16px;font-weight:800" id="qtTotal">الإجمالي: 0.00 ج.م</div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('qtModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('qtModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="qtSave()">💾 حفظ عرض السعر</button>
             </div>
         </div>`;
@@ -124,7 +124,7 @@ window.qtAddItem = function() {
 
 function qtRenderItems() {
     const tbody = document.getElementById('qtItemsBody');
-    if (!_qtItems.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:16px">لم تُضف أصناف بعد</td></tr>'; qtUpdateTotal(); return; }
+    if (!_qtItems.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--inv-muted-light);padding:16px">لم تُضف أصناف بعد</td></tr>'; qtUpdateTotal(); return; }
     tbody.innerHTML = _qtItems.map((it, idx) => `<tr>
         <td>${it.name}</td>
         <td><input type="number" value="${it.qty}" min="0.001" step="0.001" style="width:70px;padding:5px" oninput="qtItems[${idx}].qty=parseFloat(this.value)||0;qtUpdateTotal()"></td>

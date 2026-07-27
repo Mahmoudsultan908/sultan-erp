@@ -28,7 +28,7 @@ async function renderPurchaseOrders(c) {
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">📋 أوامر الشراء</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">تسجيل ما تم طلبه من المورد قبل وصول البضاعة فعلياً</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تسجيل ما تم طلبه من المورد قبل وصول البضاعة فعلياً</p></div>
             <button class="mod-btn mod-btn-primary" onclick="poOpenAdd()">+ أمر شراء جديد</button>
         </div>
 
@@ -43,8 +43,8 @@ async function renderPurchaseOrders(c) {
                     <td style="text-align:left;font-weight:700">${poFmt(o.total)}</td>
                     <td>${PO_STATUS_LABELS[o.status]||o.status}</td>
                     <td>
-                        ${o.status==='pending' ? `<button class="cc-edit" style="background:#D1FAE5;color:#059669" onclick="poConvertToPurchase('${o.id}')">🔄 تحويل لفاتورة</button>
-                        <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="poCancel('${o.id}')">🚫</button>` : ''}
+                        ${o.status==='pending' ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="poConvertToPurchase('${o.id}')">🔄 تحويل لفاتورة</button>
+                        <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="poCancel('${o.id}')">🚫</button>` : ''}
                     </td>
                 </tr>`).join('') : '<tr><td colspan="6" class="empty-state"><span>📋</span>لا توجد أوامر شراء بعد</td></tr>'}
             </tbody></table>
@@ -95,13 +95,13 @@ window.poOpenAdd = async function() {
                 <table class="dash-table" style="margin:0"><thead><tr>
                     <th>الصنف</th><th style="width:80px">الكمية</th><th style="width:90px">سعر الشراء</th><th style="width:90px">الإجمالي</th><th></th>
                 </tr></thead><tbody id="poItemsBody">
-                    <tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:16px">لم تُضف أصناف بعد</td></tr>
+                    <tr><td colspan="5" style="text-align:center;color:var(--inv-muted-light);padding:16px">لم تُضف أصناف بعد</td></tr>
                 </tbody></table>
 
                 <div style="text-align:left;margin-top:14px;font-size:16px;font-weight:800" id="poTotal">الإجمالي: 0.00 ج.م</div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('poModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('poModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="poSave()">💾 حفظ أمر الشراء</button>
             </div>
         </div>`;
@@ -121,7 +121,7 @@ window.poAddItem = function() {
 
 function poRenderItems() {
     const tbody = document.getElementById('poItemsBody');
-    if (!_poItems.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:16px">لم تُضف أصناف بعد</td></tr>'; poUpdateTotal(); return; }
+    if (!_poItems.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--inv-muted-light);padding:16px">لم تُضف أصناف بعد</td></tr>'; poUpdateTotal(); return; }
     tbody.innerHTML = _poItems.map((it, idx) => `<tr>
         <td>${it.name}</td>
         <td><input type="number" value="${it.qty}" min="0.001" step="0.001" style="width:70px;padding:5px" oninput="poItems[${idx}].qty=parseFloat(this.value)||0;poUpdateTotal()"></td>

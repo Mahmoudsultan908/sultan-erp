@@ -78,7 +78,7 @@ function psgRenderScreen(c) {
     c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">💡 اقتراح أمر شراء</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">اقتراح تلقائي حسب الأصناف الأكثر مبيعاً والأكثر شراءً لكل شركة، بمقارنة الرصيد الحالي باحتياج الفترة القادمة</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">اقتراح تلقائي حسب الأصناف الأكثر مبيعاً والأكثر شراءً لكل شركة، بمقارنة الرصيد الحالي باحتياج الفترة القادمة</p></div>
     </div>
 
     <div class="mod-card" style="margin-bottom:16px">
@@ -220,8 +220,8 @@ function psgRowHTML(r) {
     const qty = sel ?? r.qty;
     return `<tr data-pid="${r.pid}">
         <td><input type="checkbox" ${checked ? 'checked' : ''} onchange="psgToggleRow('${r.pid}',this.checked)"></td>
-        <td>${r.name} <small style="color:#94A3B8">${r.code || ''}</small>${r.belowReorder ? ' <span style="color:#DC2626;font-size:11px">⚠️ تحت حد الطلب</span>' : ''}</td>
-        <td style="text-align:center;font-size:12px;color:#64748B">${r.unit || '—'}</td>
+        <td>${r.name} <small style="color:var(--inv-muted-light)">${r.code || ''}</small>${r.belowReorder ? ' <span style="color:var(--inv-red);font-size:11px">⚠️ تحت حد الطلب</span>' : ''}</td>
+        <td style="text-align:center;font-size:12px;color:var(--inv-muted)">${r.unit || '—'}</td>
         <td>${psgFmt(r.stock)}</td>
         <td>${psgFmt(r.sold)}</td>
         <td>${psgFmt(r.avgPurchase)}</td>

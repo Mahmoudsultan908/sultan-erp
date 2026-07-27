@@ -117,7 +117,7 @@ function apRenderMatrix(c, denyMap, tableMissing) {
     </div>` : ''}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">🔐 الصلاحيات المتقدمة</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">حدّد الصفحات المسموح بها لكل دور — كل تغيير بيتحفظ فوراً</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">حدّد الصفحات المسموح بها لكل دور — كل تغيير بيتحفظ فوراً</p></div>
     </div>
     <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:16px">
         👑 <strong>مدير النظام</strong> له صلاحية الوصول لكل الصفحات دائماً ولا يظهر في الجدول ده.
@@ -129,7 +129,7 @@ function apRenderMatrix(c, denyMap, tableMissing) {
             ${AP_ROLES.map(([, l]) => `<th style="text-align:center">${l}</th>`).join('')}
         </tr></thead><tbody>
             ${AP_PAGE_GROUPS.map(g => `
-                <tr style="background:#F8FAFC"><td colspan="${AP_ROLES.length + 1}" style="font-weight:800;font-size:12px;color:#475569;padding:8px 16px">${g.title}</td></tr>
+                <tr style="background:#F8FAFC"><td colspan="${AP_ROLES.length + 1}" style="font-weight:800;font-size:12px;color:var(--inv-text-soft);padding:8px 16px">${g.title}</td></tr>
                 ${g.pages.map(([pk, label]) => `<tr>
                     <td>${label}</td>
                     ${AP_ROLES.map(([rv]) => {
@@ -204,7 +204,7 @@ window.loadMod = async function (el, modName) {
             c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:40px 24px;border-radius:12px;text-align:center">
                 <div style="font-size:40px;margin-bottom:10px">🔒</div>
                 <div style="font-weight:800;margin-bottom:6px">لا تملك صلاحية الوصول لهذه الصفحة</div>
-                <div style="font-size:13px;color:#64748B">تواصل مع مدير النظام لو محتاج صلاحية إضافية.</div>
+                <div style="font-size:13px;color:var(--inv-muted)">تواصل مع مدير النظام لو محتاج صلاحية إضافية.</div>
             </div>`;
         }
         return;

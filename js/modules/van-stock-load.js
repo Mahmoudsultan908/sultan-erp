@@ -182,14 +182,14 @@ function vlOpenSuggestModal() {
             <button class="mod-modal-close" onclick="vlCloseSuggestModal()">✕</button></div>
         <div class="mod-modal-body">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-                <label style="font-size:12.5px;color:#475569">آخر</label>
+                <label style="font-size:12.5px;color:var(--inv-text-soft)">آخر</label>
                 <select class="mod-form-input" id="vlSuggestDays" style="width:110px" onchange="vlRunSuggest(parseInt(this.value))">
                     <option value="7">7 أيام</option>
                     <option value="14">14 يوم</option>
                     <option value="30" selected>30 يوم</option>
                     <option value="60">60 يوم</option>
                 </select>
-                <div style="flex:1;font-size:11.5px;color:#94A3B8">الترتيب حسب الأكثر مبيعاً لهذا المندوب + الأكثر تحميلاً له فى آخر 5 تحميلات سابقة.</div>
+                <div style="flex:1;font-size:11.5px;color:var(--inv-muted-light)">الترتيب حسب الأكثر مبيعاً لهذا المندوب + الأكثر تحميلاً له فى آخر 5 تحميلات سابقة.</div>
             </div>
             <div id="vlSuggestList" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto">
                 <div class="empty-state"><span>⏳</span>جاري الحساب...</div>
@@ -276,7 +276,7 @@ function vlRenderSuggestList(usedFallback) {
     const box = document.getElementById('vlSuggestList');
     if (!box) return;
     if (!_vlSuggestRows.length) {
-        box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد بيانات مبيعات أو تحميلات سابقة كافية لهذا المندوب فى هذه الفترة (أو الأصناف المرشّحة رصيدها فى المخزن صفر).</div>';
+        box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--inv-muted-light)">لا توجد بيانات مبيعات أو تحميلات سابقة كافية لهذا المندوب فى هذه الفترة (أو الأصناف المرشّحة رصيدها فى المخزن صفر).</div>';
         return;
     }
     const note = usedFallback
@@ -290,10 +290,10 @@ function vlRenderSuggestList(usedFallback) {
         const qty = sel ?? r.qty;
         return `<label class="inv-multi-row" data-pid="${r.pid}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
             <input type="checkbox" ${checked ? 'checked' : ''} onchange="vlMultiToggle('${r.pid}',this.checked)">
-            <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code || ''} · ${p.unit || ''}</small>
-                <div style="font-size:10.5px;color:#94A3B8">مبيعات ${_vlSuggestDays} يوم: ${vlFmt(r.sold)} · متوسط تحميل سابق: ${vlFmt(r.avgLoad)}</div>
+            <span style="flex:1">${p.name} <small style="color:var(--inv-muted-light)">${p.code || ''} · ${p.unit || ''}</small>
+                <div style="font-size:10.5px;color:var(--inv-muted-light)">مبيعات ${_vlSuggestDays} يوم: ${vlFmt(r.sold)} · متوسط تحميل سابق: ${vlFmt(r.avgLoad)}</div>
             </span>
-            <span style="font-size:11px;color:#94A3B8">مخزون: ${vlFmt(r.stock)}</span>
+            <span style="font-size:11px;color:var(--inv-muted-light)">مخزون: ${vlFmt(r.stock)}</span>
             <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="0.001" style="width:76px;padding:6px 8px"
                 onclick="event.stopPropagation()" oninput="vlMultiSetQty('${r.pid}',this.value)">
         </label>`;
@@ -321,7 +321,7 @@ function vlOpenMultiPick() {
             <button class="mod-modal-close" onclick="vlCloseMultiPick()">✕</button></div>
         <div class="mod-modal-body">
             <input type="text" class="mod-form-input" id="vlMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="vlRenderMultiPickList(this.value)">
-            <label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:#475569;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:var(--inv-text-soft);cursor:pointer">
                 <input type="checkbox" id="vlMultiHideZero" ${_vlMultiHideZero ? 'checked' : ''} onchange="vlMultiToggleHideZero(this.checked)">
                 إخفاء الأصناف بدون رصيد بالمخزن
             </label>
@@ -350,7 +350,7 @@ function vlRenderMultiPickList(val) {
     if (!box) return;
     let list = flexSearch(VL_DB.products, val, ['name','code']);
     if (_vlMultiHideZero) list = list.filter(p => vlGetStock(p.id) > 0);
-    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
+    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--inv-muted-light)">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _vlMultiSelected[p.id];
         const checked = sel != null;
@@ -358,8 +358,8 @@ function vlRenderMultiPickList(val) {
         const stock = vlGetStock(p.id);
         return `<label class="inv-multi-row" data-pid="${p.id}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
             <input type="checkbox" ${checked ? 'checked' : ''} onchange="vlMultiToggle('${p.id}',this.checked)">
-            <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code || ''} · ${p.unit || ''}</small></span>
-            <span style="font-size:11px;color:#94A3B8">مخزون: ${vlFmt(stock)}</span>
+            <span style="flex:1">${p.name} <small style="color:var(--inv-muted-light)">${p.code || ''} · ${p.unit || ''}</small></span>
+            <span style="font-size:11px;color:var(--inv-muted-light)">مخزون: ${vlFmt(stock)}</span>
             <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="0.001" style="width:76px;padding:6px 8px"
                 onclick="event.stopPropagation()" oninput="vlMultiSetQty('${p.id}',this.value)">
         </label>`;
@@ -454,7 +454,7 @@ function vlRecentListHTML() {
     const list = VL_DB.list || [];
     return `
     <div class="mod-table-wrap" style="margin-top:16px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر التحميلات</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📋 آخر التحميلات</div>
         <table class="mod-table"><thead><tr>
             <th>رقم التحميل</th><th>التاريخ</th><th>من مخزن</th><th>عربية المندوب</th><th>رقم اليوم</th><th>عدد الأصناف</th><th style="text-align:left">إجمالي الكمية</th><th>ملاحظات</th><th></th>
         </tr></thead>
@@ -470,7 +470,7 @@ function vlRecentListHTML() {
                     <td>${t.load_sequence || 1}</td>
                     <td>${items.length}</td>
                     <td style="text-align:left;font-weight:700">${vlFmt(totalQty)}</td>
-                    <td style="color:#64748B">${t.notes || '—'}</td>
+                    <td style="color:var(--inv-muted)">${t.notes || '—'}</td>
                     <td><button class="cc-edit" onclick="vlReprint(${i})">🖨️</button></td>
                 </tr>`;
             }).join('') : `<tr><td colspan="9" class="empty-state"><span>🚗</span>لا توجد تحميلات حتى الآن.</td></tr>`}

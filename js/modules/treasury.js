@@ -35,26 +35,26 @@ async function renderTreasury(c) {
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <div><h2 style="font-size:22px;font-weight:800">🏦 الخزن</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة الخزن وأرصدتها والتحويل بينها</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إدارة الخزن وأرصدتها والتحويل بينها</p></div>
             <button class="mod-btn mod-btn-primary" onclick="tsyOpenAddModal()">+ إضافة خزنة</button>
         </div>
 
         <div class="mod-grid">
             ${_tsyList.map(t => `<div class="mod-card">
-                <div class="mod-card-icon" style="background:${t.is_default?'#FFFBEB':'#F1F5F9'};color:${t.is_default?'#D97706':'#475569'}">🏦</div>
+                <div class="mod-card-icon" style="background:${t.is_default?'#FFFBEB':'#F1F5F9'};color:${t.is_default?'var(--inv-gold)':'var(--inv-text-soft)'}">🏦</div>
                 <div class="mod-card-val">${tsyFmt(t.balance)}</div>
-                <div class="mod-card-lbl">${t.treasury_name} ${t.is_default ? '<span style="background:#FFFBEB;color:#D97706;font-size:10px;padding:2px 6px;border-radius:5px;margin-right:4px">افتراضية</span>' : ''}</div>
+                <div class="mod-card-lbl">${t.treasury_name} ${t.is_default ? '<span style="background:#FFFBEB;color:var(--inv-gold);font-size:10px;padding:2px 6px;border-radius:5px;margin-right:4px">افتراضية</span>' : ''}</div>
                 <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-                    <button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="tsyShowStatement('${t.treasury_id}')">📄 كشف حساب</button>
+                    <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="tsyShowStatement('${t.treasury_id}')">📄 كشف حساب</button>
                     <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="tsyOpenEditModal('${t.treasury_id}','${(t.treasury_name||'').replace(/'/g,"\\'")}')">✏️ تعديل الاسم</button>
-                    ${!t.is_default ? `<button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="tsyToggleActive('${t.treasury_id}', true)">تعطيل الخزنة</button>` : ''}
+                    ${!t.is_default ? `<button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="tsyToggleActive('${t.treasury_id}', true)">تعطيل الخزنة</button>` : ''}
                 </div>
             </div>`).join('')}
         </div>
 
         <div class="mod-card" style="margin-top:16px;max-width:600px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-                <div class="mod-card-icon" style="background:#F0FDF4;color:#059669;width:40px;height:40px;font-size:18px">🔀</div>
+                <div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green);width:40px;height:40px;font-size:18px">🔀</div>
                 <div style="font-size:15px;font-weight:800">تحويل بين الخزن</div>
             </div>
             <div class="mod-form-group"><label>من خزنة *</label>
@@ -115,7 +115,7 @@ window.tsyOpenAddModal = function() {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="tsyCloseModal()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="tsyCloseModal()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="tsySaveNew()">💾 حفظ</button>
             </div>
         </div>`;
@@ -153,7 +153,7 @@ window.tsyOpenEditModal = function(treasuryId, currentName) {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="tsyCloseEditModal()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="tsyCloseEditModal()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="tsySaveEdit('${treasuryId}')">💾 حفظ</button>
             </div>
         </div>`;

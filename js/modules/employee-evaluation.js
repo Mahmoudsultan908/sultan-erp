@@ -25,11 +25,11 @@ function eevTotal(x) {
 }
 
 function eevRatingInfo(avg) {
-    if (avg >= 9) return { label: 'ممتاز', color: '#059669', bg: '#F0FDF4' };
+    if (avg >= 9) return { label: 'ممتاز', color: 'var(--inv-green)', bg: '#F0FDF4' };
     if (avg >= 7) return { label: 'جيد جدًا', color: '#2563EB', bg: '#EFF6FF' };
-    if (avg >= 5) return { label: 'جيد', color: '#D97706', bg: '#FFFBEB' };
+    if (avg >= 5) return { label: 'جيد', color: 'var(--inv-gold)', bg: '#FFFBEB' };
     if (avg >= 3) return { label: 'مقبول', color: '#EA580C', bg: '#FFF7ED' };
-    return { label: 'ضعيف', color: '#DC2626', bg: '#FEF2F2' };
+    return { label: 'ضعيف', color: 'var(--inv-red)', bg: '#FEF2F2' };
 }
 
 // ════════════════════════════════════════════════════════════
@@ -71,7 +71,7 @@ function eevRenderPage(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
             <div><h2 style="font-size:22px;font-weight:800">⭐ تقييم الموظفين</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">تقييم دوري لأداء الموظفين حسب معايير ثابتة</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تقييم دوري لأداء الموظفين حسب معايير ثابتة</p></div>
             <button class="mod-btn mod-btn-primary" onclick="eevOpenAdd()">+ تسجيل تقييم</button>
         </div>
 
@@ -80,8 +80,8 @@ function eevRenderPage(c) {
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📋</div><div class="mod-card-val">${totalCount}</div><div class="mod-card-lbl">عدد التقييمات المسجلة</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">⭐</div><div class="mod-card-val">${totalCount ? overallAvg.toFixed(1) : '—'}</div><div class="mod-card-lbl">متوسط التقييم العام (من 10)</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">👥</div><div class="mod-card-val">${evaluatedEmpCount}</div><div class="mod-card-lbl">عدد الموظفين المُقيَّمين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">⭐</div><div class="mod-card-val">${totalCount ? overallAvg.toFixed(1) : '—'}</div><div class="mod-card-lbl">متوسط التقييم العام (من 10)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">👥</div><div class="mod-card-val">${evaluatedEmpCount}</div><div class="mod-card-lbl">عدد الموظفين المُقيَّمين</div></div>
         </div>
 
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
@@ -91,7 +91,7 @@ function eevRenderPage(c) {
                     ${_eevEmployees.map(e => `<option value="${e.id}" ${_eevFilterEmp === e.id ? 'selected' : ''}>${e.name}</option>`).join('')}
                 </select>
             </div>
-            ${_eevFilterEmp && filtered.length ? `<div style="font-size:13px;color:#64748B">متوسط تقييم هذا الموظف: <b style="color:${eevRatingInfo(filterAvg).color}">${filterAvg.toFixed(1)} / 10 — ${eevRatingInfo(filterAvg).label}</b></div>` : ''}
+            ${_eevFilterEmp && filtered.length ? `<div style="font-size:13px;color:var(--inv-muted)">متوسط تقييم هذا الموظف: <b style="color:${eevRatingInfo(filterAvg).color}">${filterAvg.toFixed(1)} / 10 — ${eevRatingInfo(filterAvg).label}</b></div>` : ''}
         </div>
 
         <div class="mod-table-wrap">
@@ -116,8 +116,8 @@ function eevRenderPage(c) {
                         <td style="text-align:center;font-weight:600">${Number(x.initiative_score) || 0}</td>
                         <td style="text-align:center;font-weight:600">${Number(x.compliance_score) || 0}</td>
                         <td style="text-align:center"><span style="background:${info.bg};color:${info.color};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${avg.toFixed(1)} — ${info.label}</span></td>
-                        <td style="color:#64748B;max-width:200px">${x.notes || '—'}</td>
-                        <td style="text-align:center"><button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="eevDelete('${x.id}')">🗑️</button></td>
+                        <td style="color:var(--inv-muted);max-width:200px">${x.notes || '—'}</td>
+                        <td style="text-align:center"><button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="eevDelete('${x.id}')">🗑️</button></td>
                     </tr>`;
                 }).join('')}
             </tbody></table>
@@ -168,7 +168,7 @@ window.eevOpenAdd = async function (presetEmployeeId = null) {
                         <input type="date" id="eevDate" class="mod-form-input" value="${new Date().toISOString().slice(0, 10)}"></div>
                 </div>
                 <div style="background:#F8FAFC;border-radius:10px;padding:12px;margin:6px 0">
-                    <div style="font-size:12px;color:#64748B;margin-bottom:8px">المعايير (من 1 إلى 10)</div>
+                    <div style="font-size:12px;color:var(--inv-muted);margin-bottom:8px">المعايير (من 1 إلى 10)</div>
                     ${EEV_CRITERIA.map(([key, label]) => `
                         <div class="mod-form-group" style="margin-bottom:8px">
                             <label>${label}</label>
@@ -179,7 +179,7 @@ window.eevOpenAdd = async function (presetEmployeeId = null) {
                     <textarea id="eevNotes" class="mod-form-input" rows="3" placeholder="اختياري"></textarea></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('eevModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('eevModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="eevSave()">💾 حفظ التقييم</button>
             </div>
         </div>`;

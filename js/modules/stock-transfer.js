@@ -183,7 +183,7 @@ function stRecentListHTML() {
     const list = ST_DB.list || [];
     return `
     <div class="mod-table-wrap" style="margin-top:16px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">📋 آخر التحويلات</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📋 آخر التحويلات</div>
         <table class="mod-table"><thead><tr>
             <th>رقم التحويل</th><th>التاريخ</th><th>من</th><th>إلى</th><th>عدد الأصناف</th><th style="text-align:left">إجمالي الكمية</th><th>ملاحظات</th>
         </tr></thead>
@@ -198,7 +198,7 @@ function stRecentListHTML() {
                     <td>${t.to_wh?.name || '—'}</td>
                     <td>${items.length}</td>
                     <td style="text-align:left;font-weight:700">${stFmt(totalQty)}</td>
-                    <td style="color:#64748B">${t.notes || '—'}</td>
+                    <td style="color:var(--inv-muted)">${t.notes || '—'}</td>
                 </tr>`;
             }).join('') : `<tr><td colspan="7" class="empty-state"><span>📦</span>لا توجد تحويلات حتى الآن.</td></tr>`}
         </tbody></table>

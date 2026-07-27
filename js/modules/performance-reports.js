@@ -44,7 +44,7 @@ function perfDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).pa
 function perfDefaultFrom() { const d = new Date(); return perfDateStr(new Date(d.getFullYear(), d.getMonth(), 1)); }
 function perfToday() { return perfDateStr(new Date()); }
 function perfPctBadge(pct) {
-    const color = pct > 0 ? '#059669' : pct < 0 ? '#DC2626' : '#64748B';
+    const color = pct > 0 ? 'var(--inv-green)' : pct < 0 ? 'var(--inv-red)' : 'var(--inv-muted)';
     const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '—';
     return `<span style="color:${color};font-weight:700">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
 }
@@ -96,7 +96,7 @@ function prfRenderPage(c) {
     c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">📈 تقارير الأداء المتقدمة</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">مبيعات حسب الصنف / العميل / المندوب، ومقارنة بين فترتين</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">مبيعات حسب الصنف / العميل / المندوب، ومقارنة بين فترتين</p></div>
     </div>
     <div class="ob-tabs">
         ${PRF_TABS.map(t => `<button class="ob-tab ${_perfTab === t.id ? 'active' : ''}" onclick="prfSwitchTab('${t.id}')">${t.label}</button>`).join('')}
@@ -147,7 +147,7 @@ window.prfLoadByProduct = async function () {
     const from = document.getElementById('prfPFrom')?.value || perfDefaultFrom();
     const to = document.getElementById('prfPTo')?.value || perfToday();
     const resultEl = document.getElementById('prf-result');
-    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
         const { data: items, error } = await prfFetchAllRows(
@@ -201,9 +201,9 @@ window.prfLoadByProduct = async function () {
         resultEl.innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📦</div><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">عدد الأصناف المباعة</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">🔢</div><div class="mod-card-val">${perfFmt(totalQty)}</div><div class="mod-card-lbl">إجمالي الكمية</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">🔢</div><div class="mod-card-val">${perfFmt(totalQty)}</div><div class="mod-card-lbl">إجمالي الكمية</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">💰</div><div class="mod-card-val">${perfFmt(totalRevenue)}</div><div class="mod-card-lbl">إجمالي الإيراد</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">📈</div><div class="mod-card-val">${perfFmt(totalProfit)}</div><div class="mod-card-lbl">إجمالي الربح</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📈</div><div class="mod-card-val">${perfFmt(totalProfit)}</div><div class="mod-card-lbl">إجمالي الربح</div></div>
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
@@ -211,12 +211,12 @@ window.prfLoadByProduct = async function () {
                 <th style="text-align:left">الإيراد</th><th style="text-align:left">الربح</th><th style="text-align:center">هامش الربح</th><th style="text-align:center">مؤجل مخصوم</th>
             </tr></thead><tbody>
                 ${rows.length ? rows.map(r => `<tr>
-                    <td><strong>${r.name}</strong>${r.code ? `<div style="font-size:11px;color:#94A3B8">${r.code}</div>` : ''}</td>
+                    <td><strong>${r.name}</strong>${r.code ? `<div style="font-size:11px;color:var(--inv-muted-light)">${r.code}</div>` : ''}</td>
                     <td style="text-align:center">${perfFmt(r.qty)} ${r.unit || ''}</td>
                     <td style="text-align:left;font-weight:700">${perfFmt(r.revenue)}</td>
-                    <td style="text-align:left;font-weight:700;color:${r.profit >= 0 ? '#059669' : '#DC2626'}">${perfFmt(r.profit)}</td>
+                    <td style="text-align:left;font-weight:700;color:${r.profit >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${perfFmt(r.profit)}</td>
                     <td style="text-align:center">${r.marginPct.toFixed(1)}%</td>
-                    <td style="text-align:center;color:#94A3B8;font-size:12px">${r.deferredRate > 0 ? perfFmt(r.deferredRate) + '/وحدة' : '—'}</td>
+                    <td style="text-align:center;color:var(--inv-muted-light);font-size:12px">${r.deferredRate > 0 ? perfFmt(r.deferredRate) + '/وحدة' : '—'}</td>
                 </tr>`).join('') : `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد مبيعات في هذه الفترة</td></tr>`}
             </tbody></table>
         </div>${PRF_ACTIONS_HTML}`;
@@ -242,7 +242,7 @@ window.prfLoadByCustomer = async function () {
     const from = document.getElementById('prfCFrom')?.value || perfDefaultFrom();
     const to = document.getElementById('prfCTo')?.value || perfToday();
     const resultEl = document.getElementById('prf-result');
-    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
         const { data: sales, error } = await sb.from('sales')
@@ -269,8 +269,8 @@ window.prfLoadByCustomer = async function () {
         resultEl.innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">عدد العملاء (بمن فيهم نقدي)</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">🧾</div><div class="mod-card-val">${totalInvoices}</div><div class="mod-card-lbl">عدد الفواتير</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💰</div><div class="mod-card-val">${perfFmt(totalRevenue)}</div><div class="mod-card-lbl">إجمالي المبيعات</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">🧾</div><div class="mod-card-val">${totalInvoices}</div><div class="mod-card-lbl">عدد الفواتير</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💰</div><div class="mod-card-val">${perfFmt(totalRevenue)}</div><div class="mod-card-lbl">إجمالي المبيعات</div></div>
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
@@ -307,7 +307,7 @@ window.prfLoadByRep = async function () {
     const from = document.getElementById('prfRFrom')?.value || perfDefaultFrom();
     const to = document.getElementById('prfRTo')?.value || perfToday();
     const resultEl = document.getElementById('prf-result');
-    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
         // ★ مرتجعات المبيعات لازم تتخصم من إجمالي مبيعات المندوب (وإلا العمولة
@@ -356,8 +356,8 @@ window.prfLoadByRep = async function () {
         </div>` : ''}
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">🚗</div><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">مندوبون لهم مبيعات</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💰</div><div class="mod-card-val">${perfFmt(attributedTotal)}</div><div class="mod-card-lbl">صافي مبيعات مرتبطة بمندوب (بعد خصم المرتجعات)</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">📊</div><div class="mod-card-val">${coverage.toFixed(0)}%</div><div class="mod-card-lbl">نسبة التغطية (من ${perfFmt(netGrandTotal)} صافي إجمالي)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💰</div><div class="mod-card-val">${perfFmt(attributedTotal)}</div><div class="mod-card-lbl">صافي مبيعات مرتبطة بمندوب (بعد خصم المرتجعات)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">📊</div><div class="mod-card-val">${coverage.toFixed(0)}%</div><div class="mod-card-lbl">نسبة التغطية (من ${perfFmt(netGrandTotal)} صافي إجمالي)</div></div>
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
@@ -368,9 +368,9 @@ window.prfLoadByRep = async function () {
                 ${rows.length ? rows.map(r => `<tr>
                     <td><strong>${r.name}</strong></td>
                     <td style="text-align:center">${r.count}</td>
-                    <td style="text-align:left;color:${r.returns > 0 ? '#DC2626' : '#94A3B8'}">${r.returns > 0 ? '-' + perfFmt(r.returns) : '—'}</td>
+                    <td style="text-align:left;color:${r.returns > 0 ? 'var(--inv-red)' : 'var(--inv-muted-light)'}">${r.returns > 0 ? '-' + perfFmt(r.returns) : '—'}</td>
                     <td style="text-align:left;font-weight:700">${perfFmt(r.total)}</td>
-                    <td style="text-align:left;font-weight:700;color:#059669">${perfFmt(r.commission)}</td>
+                    <td style="text-align:left;font-weight:700;color:var(--inv-green)">${perfFmt(r.commission)}</td>
                 </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مبيعات مرتبطة بمندوب في هذه الفترة</td></tr>`}
             </tbody></table>
         </div>${PRF_ACTIONS_HTML}`;
@@ -404,7 +404,7 @@ function prfRenderCompareForm() {
                 </div>
             </div>
             <div>
-                <div style="font-size:12px;font-weight:800;color:#D97706;margin-bottom:6px">الفترة ب (المقارَن بها)</div>
+                <div style="font-size:12px;font-weight:800;color:var(--inv-gold);margin-bottom:6px">الفترة ب (المقارَن بها)</div>
                 <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
                     <div><label class="ob-label">من</label><input type="date" id="prfCmpFromB" class="ob-input" style="margin:0" value="${lastMonthFrom}"></div>
                     <div><label class="ob-label">إلى</label><input type="date" id="prfCmpToB" class="ob-input" style="margin:0" value="${lastMonthTo}"></div>
@@ -448,7 +448,7 @@ window.prfLoadCompare = async function () {
     if (!fromA || !toA || !fromB || !toB) { alert('حدّد الفترتين كاملتين'); return; }
 
     const resultEl = document.getElementById('prf-result');
-    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري المقارنة...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري المقارنة...</div>';
 
     try {
         const [A, B] = await Promise.all([prfLoadPeriodTotals(fromA, toA), prfLoadPeriodTotals(fromB, toB)]);
@@ -464,12 +464,12 @@ window.prfLoadCompare = async function () {
 
         const kpi = (label, valA, valB, isMoney = true) => `
             <div class="mod-card">
-                <div style="font-size:12px;color:#64748B;margin-bottom:6px">${label}</div>
+                <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">${label}</div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline">
                     <span style="font-size:18px;font-weight:800;color:#2563EB">${isMoney ? perfFmt(valB) : valB}</span>
                     ${perfPctBadge(pct(valA, valB))}
                 </div>
-                <div style="font-size:11px;color:#94A3B8;margin-top:4px">مقابل ${isMoney ? perfFmt(valA) : valA} في الفترة ب</div>
+                <div style="font-size:11px;color:var(--inv-muted-light);margin-top:4px">مقابل ${isMoney ? perfFmt(valA) : valA} في الفترة ب</div>
             </div>`;
 
         resultEl.innerHTML = `
@@ -480,7 +480,7 @@ window.prfLoadCompare = async function () {
             ${kpi('متوسط الفاتورة', B.count ? B.total / B.count : 0, A.count ? A.total / A.count : 0)}
         </div>
         <div class="mod-table-wrap">
-            <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">🔀 أكبر 10 تغيّرات في مبيعات الأصناف (أ مقابل ب)</div>
+            <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">🔀 أكبر 10 تغيّرات في مبيعات الأصناف (أ مقابل ب)</div>
             <table class="mod-table"><thead><tr>
                 <th>الصنف</th><th style="text-align:left">الفترة أ</th><th style="text-align:left">الفترة ب</th><th style="text-align:center">التغيّر</th>
             </tr></thead><tbody>
@@ -523,7 +523,7 @@ window.prfLoadPayments = async function () {
     const from = document.getElementById('prfPayFrom')?.value || perfDefaultFrom();
     const to = document.getElementById('prfPayTo')?.value || perfToday();
     const resultEl = document.getElementById('prf-result');
-    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
         const [{ data: collections, error: e1 }, { data: payouts, error: e2 }] = await Promise.all([
@@ -577,34 +577,34 @@ function prfRenderPaymentsResult(rows) {
 
     resultEl.innerHTML = `
     <div class="mod-grid" style="margin-bottom:16px">
-        <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">📥</div><div class="mod-card-val">${perfFmt(totalCollect)}</div><div class="mod-card-lbl">إجمالي التحصيل من العملاء</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">📤</div><div class="mod-card-val">${perfFmt(totalPay)}</div><div class="mod-card-lbl">إجمالي الدفع للموردين</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📥</div><div class="mod-card-val">${perfFmt(totalCollect)}</div><div class="mod-card-lbl">إجمالي التحصيل من العملاء</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📤</div><div class="mod-card-val">${perfFmt(totalPay)}</div><div class="mod-card-lbl">إجمالي الدفع للموردين</div></div>
         <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">⚖️</div><div class="mod-card-val">${perfFmt(totalCollect - totalPay)}</div><div class="mod-card-lbl">صافي الحركة النقدية</div></div>
     </div>
     <div class="mod-table-wrap" style="margin-bottom:20px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">حسب الخزنة</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">حسب الخزنة</div>
         <table class="mod-table"><thead><tr>
             <th>الخزنة</th><th style="text-align:left">تحصيل من عملاء</th><th style="text-align:left">دفع لموردين</th><th style="text-align:left">الصافي</th>
         </tr></thead><tbody>
             ${treasuryRows.length ? treasuryRows.map(t => `<tr>
                 <td><strong>${t.name}</strong></td>
-                <td style="text-align:left;color:#059669">${perfFmt(t.collect)}</td>
-                <td style="text-align:left;color:#DC2626">${perfFmt(t.pay)}</td>
+                <td style="text-align:left;color:var(--inv-green)">${perfFmt(t.collect)}</td>
+                <td style="text-align:left;color:var(--inv-red)">${perfFmt(t.pay)}</td>
                 <td style="text-align:left;font-weight:700">${perfFmt(t.collect - t.pay)}</td>
             </tr>`).join('') : `<tr><td colspan="4" class="empty-state"><span>📭</span>لا توجد حركات فى هذه الفترة</td></tr>`}
         </tbody></table>
     </div>
     <div class="mod-table-wrap">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">كل الحركات</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">كل الحركات</div>
         <table class="mod-table"><thead><tr>
             <th>النوع</th><th>الاسم</th><th>الخزنة</th><th style="text-align:left">المبلغ</th><th>التاريخ</th>
         </tr></thead><tbody>
             ${rows.length ? rows.map(r => `<tr>
-                <td>${r.kind === 'collect' ? '<span style="color:#059669">📥 تحصيل</span>' : '<span style="color:#DC2626">📤 دفع</span>'}</td>
+                <td>${r.kind === 'collect' ? '<span style="color:var(--inv-green)">📥 تحصيل</span>' : '<span style="color:var(--inv-red)">📤 دفع</span>'}</td>
                 <td>${r.name}</td>
-                <td style="color:#64748B">${_perfTreasuries.find(t => t.id === r.treasury_id)?.name || '—'}</td>
+                <td style="color:var(--inv-muted)">${_perfTreasuries.find(t => t.id === r.treasury_id)?.name || '—'}</td>
                 <td style="text-align:left;font-weight:700">${perfFmt(r.amount)}</td>
-                <td style="font-size:12px;color:#94A3B8">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
+                <td style="font-size:12px;color:var(--inv-muted-light)">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
             </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات مطابقة</td></tr>`}
         </tbody></table>
     </div>${PRF_ACTIONS_HTML}`;
@@ -631,7 +631,7 @@ window.prfLoadReturns = async function () {
     const from = document.getElementById('prfRetFrom')?.value || perfDefaultFrom();
     const to = document.getElementById('prfRetTo')?.value || perfToday();
     const resultEl = document.getElementById('prf-result');
-    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري التجميع...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
         const [{ data: salesRet, error: e1 }, { data: purRet, error: e2 }] = await Promise.all([
@@ -685,13 +685,13 @@ function prfRenderReturnsResult(rows) {
 
     resultEl.innerHTML = `
     <div class="mod-grid" style="margin-bottom:16px">
-        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">↩️</div><div class="mod-card-val">${perfFmt(salesTotal)}</div><div class="mod-card-lbl">إجمالي مرتجعات البيع</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">↩️</div><div class="mod-card-val">${perfFmt(salesTotal)}</div><div class="mod-card-lbl">إجمالي مرتجعات البيع</div></div>
         <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">↩️</div><div class="mod-card-val">${perfFmt(purchaseTotal)}</div><div class="mod-card-lbl">إجمالي مرتجعات الشراء</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#F1F5F9;color:#475569">Σ</div><div class="mod-card-val">${perfFmt(salesTotal + purchaseTotal)}</div><div class="mod-card-lbl">إجمالي المرتجعات</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#F1F5F9;color:var(--inv-text-soft)">Σ</div><div class="mod-card-val">${perfFmt(salesTotal + purchaseTotal)}</div><div class="mod-card-lbl">إجمالي المرتجعات</div></div>
     </div>
     ${repRows.length ? `
     <div class="mod-table-wrap" style="margin-bottom:20px">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">مرتجعات البيع حسب المندوب</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">مرتجعات البيع حسب المندوب</div>
         <table class="mod-table"><thead><tr>
             <th>المندوب</th><th style="text-align:center">عدد المرتجعات</th><th style="text-align:left">الإجمالي</th>
         </tr></thead><tbody>
@@ -703,16 +703,16 @@ function prfRenderReturnsResult(rows) {
         </tbody></table>
     </div>` : ''}
     <div class="mod-table-wrap">
-        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:#1E293B">كل المرتجعات</div>
+        <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">كل المرتجعات</div>
         <table class="mod-table"><thead><tr>
             <th>النوع</th><th>رقم المرتجع</th><th>الاسم</th><th style="text-align:left">المبلغ</th><th>التاريخ</th>
         </tr></thead><tbody>
             ${rows.length ? rows.map(r => `<tr>
-                <td>${r.kind === 'sale' ? '<span style="color:#D97706">🛒 مرتجع بيع</span>' : '<span style="color:#2563EB">📥 مرتجع شراء</span>'}</td>
+                <td>${r.kind === 'sale' ? '<span style="color:var(--inv-gold)">🛒 مرتجع بيع</span>' : '<span style="color:#2563EB">📥 مرتجع شراء</span>'}</td>
                 <td style="font-family:monospace;font-size:12px">${r.no || '—'}</td>
                 <td>${r.name}</td>
                 <td style="text-align:left;font-weight:700">${perfFmt(r.amount)}</td>
-                <td style="font-size:12px;color:#94A3B8">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
+                <td style="font-size:12px;color:var(--inv-muted-light)">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
             </tr>`).join('') : `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد مرتجعات مطابقة</td></tr>`}
         </tbody></table>
     </div>${PRF_ACTIONS_HTML}`;

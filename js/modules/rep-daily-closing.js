@@ -123,9 +123,9 @@ function rdcCashCheck(b) { return b.salesCash + b.collections - b.expenses - b.d
 // لسه محدش قفل يوم المندوب ده.
 function rdcClosingBadge(repId) {
     const cl = RDC_CLOSINGS[repId];
-    if (!cl) return `<span style="font-size:11px;color:#94A3B8">⏳ مفتوح</span> <button class="cc-edit" style="padding:2px 8px;font-size:11px" onclick="rdcOpenCloseModal('${repId}')">🌙 إغلاق</button>`;
+    if (!cl) return `<span style="font-size:11px;color:var(--inv-muted-light)">⏳ مفتوح</span> <button class="cc-edit" style="padding:2px 8px;font-size:11px" onclick="rdcOpenCloseModal('${repId}')">🌙 إغلاق</button>`;
     const diffOk = Math.abs(Number(cl.diff) || 0) < 0.01;
-    return `<span style="font-size:11px;font-weight:700;color:${diffOk ? '#059669' : '#DC2626'}">🌙 مقفول${diffOk ? '' : ' (فرق ' + rdcFmt(cl.diff) + ')'}</span>`;
+    return `<span style="font-size:11px;font-weight:700;color:${diffOk ? 'var(--inv-green)' : 'var(--inv-red)'}">🌙 مقفول${diffOk ? '' : ' (فرق ' + rdcFmt(cl.diff) + ')'}</span>`;
 }
 
 // إغلاق اليوم يدويًا من الأدمن — نفس فكرة زرار إغلاق اليوم اللي عند
@@ -146,11 +146,11 @@ window.rdcOpenCloseModal = function (repId) {
         <div class="mod-modal-header"><h3>🌙 إغلاق يوم ${rep.name} — ${RDC_DATE}</h3>
             <button class="mod-modal-close" onclick="document.getElementById('rdcCloseModal').remove()">✕</button></div>
         <div class="mod-modal-body">
-            <div style="font-size:13px;color:#64748B;margin-bottom:12px">الكاش المتوقع من حركة اليوم (نقدي + تحصيل − مصروفات − توريد):</div>
+            <div style="font-size:13px;color:var(--inv-muted);margin-bottom:12px">الكاش المتوقع من حركة اليوم (نقدي + تحصيل − مصروفات − توريد):</div>
             <div style="font-size:20px;font-weight:800;margin-bottom:14px">${rdcFmt(expected)}</div>
-            <label style="font-size:13px;font-weight:700;color:#334155">الكاش الفعلي اللي المندوب سلّمه</label>
+            <label style="font-size:13px;font-weight:700;color:var(--inv-navy-light)">الكاش الفعلي اللي المندوب سلّمه</label>
             <input type="number" id="rdcCloseActual" class="mod-form-input" value="${expected.toFixed(2)}" oninput="rdcUpdateCloseDiff(${expected})">
-            <div id="rdcCloseDiff" style="font-size:13px;font-weight:700;margin-top:8px;color:#059669">الفرق: 0.00</div>
+            <div id="rdcCloseDiff" style="font-size:13px;font-weight:700;margin-top:8px;color:var(--inv-green)">الفرق: 0.00</div>
         </div>
         <div class="mod-modal-footer">
             <button class="inv-btn inv-btn-print" onclick="document.getElementById('rdcCloseModal').remove()">إلغاء</button>
@@ -164,7 +164,7 @@ window.rdcUpdateCloseDiff = function (expected) {
     const actual = parseFloat(document.getElementById('rdcCloseActual')?.value) || 0;
     const diff = actual - expected;
     const el = document.getElementById('rdcCloseDiff');
-    if (el) { el.textContent = `الفرق: ${rdcFmt(diff)}`; el.style.color = Math.abs(diff) < 0.01 ? '#059669' : '#DC2626'; }
+    if (el) { el.textContent = `الفرق: ${rdcFmt(diff)}`; el.style.color = Math.abs(diff) < 0.01 ? 'var(--inv-green)' : 'var(--inv-red)'; }
 };
 
 window.rdcConfirmClose = async function (repId, expected) {
@@ -221,16 +221,16 @@ function rdcRenderSummary(c) {
             ${RDC_REPS.map(r => {
                 const b = RDC_AGG[r.id];
                 const check = rdcCashCheck(b);
-                const checkColor = Math.abs(check) < 0.01 ? '#059669' : Math.abs(check) < 100 ? '#D97706' : '#DC2626';
+                const checkColor = Math.abs(check) < 0.01 ? 'var(--inv-green)' : Math.abs(check) < 100 ? 'var(--inv-gold)' : 'var(--inv-red)';
                 const visitsTxt = `${b.visitsDone}✅ ${b.visitsSkipped}❌ ${b.visitsPlanned}⏳`;
                 return `<tr>
                     <td><strong>🚗 ${r.name}</strong></td>
                     <td style="text-align:left">${rdcFmt(b.salesCash)}</td>
                     <td style="text-align:left">${rdcFmt(b.salesCredit)}</td>
                     <td style="text-align:center">${b.salesCount}</td>
-                    <td style="text-align:left;color:#059669">${rdcFmt(b.collections)}</td>
-                    <td style="text-align:left;color:#DC2626">${rdcFmt(b.expenses)}</td>
-                    <td style="text-align:left;color:#D97706">${rdcFmt(b.returns)}</td>
+                    <td style="text-align:left;color:var(--inv-green)">${rdcFmt(b.collections)}</td>
+                    <td style="text-align:left;color:var(--inv-red)">${rdcFmt(b.expenses)}</td>
+                    <td style="text-align:left;color:var(--inv-gold)">${rdcFmt(b.returns)}</td>
                     <td style="text-align:left">${rdcFmt(b.deposits)}</td>
                     <td style="text-align:left;font-weight:700;color:${checkColor}">${rdcFmt(check)}</td>
                     <td style="text-align:center;font-size:11.5px;white-space:nowrap">${visitsTxt}</td>
@@ -241,7 +241,7 @@ function rdcRenderSummary(c) {
             }).join('')}
         </tbody></table>
     </div>
-    <div style="font-size:11.5px;color:#94A3B8;margin-top:10px;line-height:1.7">
+    <div style="font-size:11.5px;color:var(--inv-muted-light);margin-top:10px;line-height:1.7">
         ⚠️ "مطابقة الكاش" = مبيعات نقدي + تحصيل − مصروفات − توريد لنشاط اليوم ده بس (مش رصيد الخزنة التراكمي) — القيمة المفروض تقرب من صفر لو المندوب ورّد كل كاش النهاردة.
         "مخزون العربية" هو الرصيد الحالي لحظة فتح التقرير، مش صورة تاريخية ليوم معيّن (مفيش سجل حركة مخزون تاريخي متاح).
     </div>`;
@@ -267,20 +267,20 @@ function rdcRenderDetail(c) {
     if (!rep) { RDC_SELECTED_REP = null; rdcRenderSummary(c); return; }
     const b = RDC_AGG[rep.id];
     const check = rdcCashCheck(b);
-    const checkColor = Math.abs(check) < 0.01 ? '#059669' : Math.abs(check) < 100 ? '#D97706' : '#DC2626';
+    const checkColor = Math.abs(check) < 0.01 ? 'var(--inv-green)' : Math.abs(check) < 100 ? 'var(--inv-gold)' : 'var(--inv-red)';
     const treasuryBal = rep.treasury_id != null ? RDC_TREASURY_BAL[rep.treasury_id] : null;
 
     const closing = RDC_CLOSINGS[rep.id];
     const closingCard = closing ? `
         <div class="mod-card" style="border:1.5px solid ${Math.abs(Number(closing.diff)||0) < 0.01 ? '#A7F3D0' : '#FECACA'}">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">🌙 إغلاق اليوم (من تليفون المندوب)</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">🌙 إغلاق اليوم (من تليفون المندوب)</div>
             <div style="font-size:15px;font-weight:800">الكاش المتوقع ${rdcFmt(closing.expected_cash)} — الفعلي ${rdcFmt(closing.actual_cash)}</div>
-            <div style="font-size:13px;font-weight:700;color:${Math.abs(Number(closing.diff)||0) < 0.01 ? '#059669' : '#DC2626'}">الفرق: ${rdcFmt(closing.diff)}</div>
-            <div style="font-size:11px;color:#94A3B8;margin-top:4px">اتقفل الساعة ${new Date(closing.closed_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div style="font-size:13px;font-weight:700;color:${Math.abs(Number(closing.diff)||0) < 0.01 ? 'var(--inv-green)' : 'var(--inv-red)'}">الفرق: ${rdcFmt(closing.diff)}</div>
+            <div style="font-size:11px;color:var(--inv-muted-light);margin-top:4px">اتقفل الساعة ${new Date(closing.closed_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
         </div>` : `
         <div class="mod-card" style="border:1.5px solid #E2E8F0">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">🌙 إغلاق اليوم</div>
-            <div style="font-size:14px;font-weight:700;color:#94A3B8;margin-bottom:8px">⏳ لسه ما قفلش يومه</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">🌙 إغلاق اليوم</div>
+            <div style="font-size:14px;font-weight:700;color:var(--inv-muted-light);margin-bottom:8px">⏳ لسه ما قفلش يومه</div>
             <button class="mod-btn mod-btn-primary" style="padding:6px 14px;font-size:12.5px" onclick="rdcOpenCloseModal('${rep.id}')">🌙 إغلاق اليوم من هنا</button>
         </div>`;
 
@@ -291,16 +291,16 @@ function rdcRenderDetail(c) {
 
     const listCard = (title, rows, emptyTxt) => `
         <div class="mod-card" style="margin-bottom:14px">
-            <div style="font-weight:800;font-size:13.5px;color:#1E293B;margin-bottom:8px">${title}</div>
-            ${rows.length ? rows.join('') : `<p style="font-size:12px;color:#94A3B8;margin:0">${emptyTxt}</p>`}
+            <div style="font-weight:800;font-size:13.5px;color:var(--inv-navy);margin-bottom:8px">${title}</div>
+            ${rows.length ? rows.join('') : `<p style="font-size:12px;color:var(--inv-muted-light);margin:0">${emptyTxt}</p>`}
         </div>`;
     const row = (label, amt, color) => `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px solid #F1F5F9">
-        <span style="color:#475569">${label}</span><span style="font-weight:700;color:${color||'#0F172A'}">${rdcFmt(amt)}</span>
+        <span style="color:var(--inv-text-soft)">${label}</span><span style="font-weight:700;color:${color||'#0F172A'}">${rdcFmt(amt)}</span>
     </div>`;
 
     c.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-        <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="rdcBackToSummary()">→ رجوع للملخص</button>
+        <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="rdcBackToSummary()">→ رجوع للملخص</button>
         <h2 style="font-size:20px;font-weight:800;margin:0">🚗 ${rep.name} — ${RDC_DATE}</h2>
         <select class="mod-form-input" style="width:auto;margin:0" onchange="rdcOnDetailRepChange(this.value)">
             ${RDC_REPS.map(r => `<option value="${r.id}" ${r.id === rep.id ? 'selected' : ''}>🚗 ${r.name}</option>`).join('')}
@@ -310,47 +310,47 @@ function rdcRenderDetail(c) {
 
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:16px">
         <div class="mod-card">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">💰 مبيعات نقدي / آجل</div>
-            <div style="font-size:18px;font-weight:800">${rdcFmt(b.salesCash)} <small style="color:#94A3B8;font-size:12px">/ ${rdcFmt(b.salesCredit)}</small></div>
-            <div style="font-size:11px;color:#94A3B8">${b.salesCount} فاتورة</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">💰 مبيعات نقدي / آجل</div>
+            <div style="font-size:18px;font-weight:800">${rdcFmt(b.salesCash)} <small style="color:var(--inv-muted-light);font-size:12px">/ ${rdcFmt(b.salesCredit)}</small></div>
+            <div style="font-size:11px;color:var(--inv-muted-light)">${b.salesCount} فاتورة</div>
         </div>
         <div class="mod-card">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">💵 تحصيل من عملاء</div>
-            <div style="font-size:18px;font-weight:800;color:#059669">${rdcFmt(b.collections)}</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">💵 تحصيل من عملاء</div>
+            <div style="font-size:18px;font-weight:800;color:var(--inv-green)">${rdcFmt(b.collections)}</div>
         </div>
         <div class="mod-card">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">💸 مصروفات</div>
-            <div style="font-size:18px;font-weight:800;color:#DC2626">${rdcFmt(b.expenses)}</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">💸 مصروفات</div>
+            <div style="font-size:18px;font-weight:800;color:var(--inv-red)">${rdcFmt(b.expenses)}</div>
         </div>
         <div class="mod-card">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">↩️ مرتجعات</div>
-            <div style="font-size:18px;font-weight:800;color:#D97706">${rdcFmt(b.returns)}</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">↩️ مرتجعات</div>
+            <div style="font-size:18px;font-weight:800;color:var(--inv-gold)">${rdcFmt(b.returns)}</div>
         </div>
         <div class="mod-card">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">🏦 توريد للخزنة الرئيسية</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">🏦 توريد للخزنة الرئيسية</div>
             <div style="font-size:18px;font-weight:800">${rdcFmt(b.deposits)}</div>
         </div>
         <div class="mod-card">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">✅ مطابقة الكاش (نشاط اليوم)</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">✅ مطابقة الكاش (نشاط اليوم)</div>
             <div style="font-size:18px;font-weight:800;color:${checkColor}">${rdcFmt(check)}</div>
-            ${treasuryBal != null ? `<div style="font-size:11px;color:#94A3B8">رصيد خزنته الحالي: ${rdcFmt(treasuryBal)}</div>` : ''}
+            ${treasuryBal != null ? `<div style="font-size:11px;color:var(--inv-muted-light)">رصيد خزنته الحالي: ${rdcFmt(treasuryBal)}</div>` : ''}
         </div>
         <div class="mod-card">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">🗺️ الزيارات</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">🗺️ الزيارات</div>
             <div style="font-size:15px;font-weight:800">✅ ${b.visitsDone} &nbsp; ❌ ${b.visitsSkipped} &nbsp; ⏳ ${b.visitsPlanned}</div>
         </div>
         <div class="mod-card">
-            <div style="font-size:12px;color:#64748B;margin-bottom:6px">📦 مخزون العربية الحالي</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-bottom:6px">📦 مخزون العربية الحالي</div>
             <div style="font-size:18px;font-weight:800">${rdcFmt(b.vanStockValue)}</div>
         </div>
         ${closingCard}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        ${listCard('🧾 فواتير اليوم', daySales.map(s => row(`${s.invoice_no} — ${s.customers?.name || 'نقدي'}`, s.total, s.payment_type === 'cash' ? '#059669' : '#D97706')), 'مفيش فواتير')}
-        ${listCard('💵 تحصيلات اليوم', dayPayments.map(p => row(`${p.ref || '—'} — ${p.customers?.name || '—'}`, p.amount, '#059669')), 'مفيش تحصيلات')}
-        ${listCard('💸 مصروفات اليوم', dayExpenses.map(e => row(`${e.expense_categories?.name || '—'} — ${e.description || ''}`, e.amount, '#DC2626')), 'مفيش مصروفات')}
-        ${listCard('↩️ مرتجعات اليوم', dayReturns.map(r => row(`${r.return_no} — ${r.customers?.name || '—'}`, r.total, '#D97706')), 'مفيش مرتجعات')}
+        ${listCard('🧾 فواتير اليوم', daySales.map(s => row(`${s.invoice_no} — ${s.customers?.name || 'نقدي'}`, s.total, s.payment_type === 'cash' ? 'var(--inv-green)' : 'var(--inv-gold)')), 'مفيش فواتير')}
+        ${listCard('💵 تحصيلات اليوم', dayPayments.map(p => row(`${p.ref || '—'} — ${p.customers?.name || '—'}`, p.amount, 'var(--inv-green)')), 'مفيش تحصيلات')}
+        ${listCard('💸 مصروفات اليوم', dayExpenses.map(e => row(`${e.expense_categories?.name || '—'} — ${e.description || ''}`, e.amount, 'var(--inv-red)')), 'مفيش مصروفات')}
+        ${listCard('↩️ مرتجعات اليوم', dayReturns.map(r => row(`${r.return_no} — ${r.customers?.name || '—'}`, r.total, 'var(--inv-gold)')), 'مفيش مرتجعات')}
     </div>`;
 }
 

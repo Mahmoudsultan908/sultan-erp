@@ -43,7 +43,7 @@ async function renderGeneralLedger(c) {
 function glRenderPage(c) {
     c.innerHTML = `
         <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">📖 الأستاذ العام</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">كل حركات أي حساب بالترتيب الزمني مع الرصيد المتحرك</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">كل حركات أي حساب بالترتيب الزمني مع الرصيد المتحرك</p></div>
 
         <div class="dash-card" style="padding:16px;margin-bottom:16px">
             <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
@@ -61,7 +61,7 @@ function glRenderPage(c) {
         </div>
 
         <div id="glResult">
-            <div style="text-align:center;padding:50px;color:#94A3B8">
+            <div style="text-align:center;padding:50px;color:var(--inv-muted-light)">
                 <div style="font-size:32px;margin-bottom:8px">📖</div>
                 اختر حساباً من القائمة أعلاه لعرض حركاته بالتفصيل
             </div>
@@ -71,7 +71,7 @@ function glRenderPage(c) {
 window.glOnAccountChange = function(code) {
     _glSelectedCode = code;
     if (code) glLoadAccount(code, '', '');
-    else document.getElementById('glResult').innerHTML = `<div style="text-align:center;padding:50px;color:#94A3B8">اختر حساباً لعرض حركاته</div>`;
+    else document.getElementById('glResult').innerHTML = `<div style="text-align:center;padding:50px;color:var(--inv-muted-light)">اختر حساباً لعرض حركاته</div>`;
 };
 
 window.glApplyFilter = function() {
@@ -83,7 +83,7 @@ window.glApplyFilter = function() {
 
 async function glLoadAccount(code, from, to) {
     const result = document.getElementById('glResult');
-    result.innerHTML = '<div style="text-align:center;padding:40px;color:#64748B">⏳ جاري التحميل...</div>';
+    result.innerHTML = '<div style="text-align:center;padding:40px;color:var(--inv-muted)">⏳ جاري التحميل...</div>';
 
     try {
         const account = _glAccounts.find(a => a.code === code);
@@ -115,9 +115,9 @@ async function glLoadAccount(code, from, to) {
         result.innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📋</div><div class="mod-card-val">${account?.code} — ${account?.name}</div><div class="mod-card-lbl">الحساب المحدد</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">📊</div><div class="mod-card-val">${glFmt(totalDr)}</div><div class="mod-card-lbl">إجمالي مدين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">📊</div><div class="mod-card-val">${glFmt(totalCr)}</div><div class="mod-card-lbl">إجمالي دائن</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F5F3FF;color:#7C3AED">${running>=0?'📈':'📉'}</div><div class="mod-card-val" style="color:${running>=0?'#059669':'#DC2626'}">${glFmt(Math.abs(running))}</div><div class="mod-card-lbl">الرصيد الحالي</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">📊</div><div class="mod-card-val">${glFmt(totalDr)}</div><div class="mod-card-lbl">إجمالي مدين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📊</div><div class="mod-card-val">${glFmt(totalCr)}</div><div class="mod-card-lbl">إجمالي دائن</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F5F3FF;color:#7C3AED">${running>=0?'📈':'📉'}</div><div class="mod-card-val" style="color:${running>=0?'var(--inv-green)':'var(--inv-red)'}">${glFmt(Math.abs(running))}</div><div class="mod-card-lbl">الرصيد الحالي</div></div>
         </div>
 
         <div class="mod-table-wrap">
@@ -131,15 +131,15 @@ async function glLoadAccount(code, from, to) {
                     <td><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace;direction:ltr;display:inline-block">${r.ref}</span></td>
                     <td>${r.description}</td>
                     <td style="text-align:left;color:#2563EB;font-weight:700">${r.dr>0?glFmt(r.dr):'—'}</td>
-                    <td style="text-align:left;color:#DC2626;font-weight:700">${r.cr>0?glFmt(r.cr):'—'}</td>
-                    <td style="text-align:left;font-weight:800;color:${r.running>=0?'#059669':'#DC2626'}">${glFmt(r.running)}</td>
+                    <td style="text-align:left;color:var(--inv-red);font-weight:700">${r.cr>0?glFmt(r.cr):'—'}</td>
+                    <td style="text-align:left;font-weight:800;color:${r.running>=0?'var(--inv-green)':'var(--inv-red)'}">${glFmt(r.running)}</td>
                 </tr>`).join('') : '<tr><td colspan="6" class="empty-state"><span>📖</span>لا توجد حركات لهذا الحساب في هذه الفترة</td></tr>'}
             </tbody>
             <tfoot><tr style="background:#F8FAFC;font-weight:700">
                 <td colspan="3" style="padding:12px">الإجمالي</td>
                 <td style="text-align:left;color:#2563EB;padding:12px">${glFmt(totalDr)}</td>
-                <td style="text-align:left;color:#DC2626;padding:12px">${glFmt(totalCr)}</td>
-                <td style="text-align:left;padding:12px;color:${running>=0?'#059669':'#DC2626'}">${glFmt(running)}</td>
+                <td style="text-align:left;color:var(--inv-red);padding:12px">${glFmt(totalCr)}</td>
+                <td style="text-align:left;padding:12px;color:${running>=0?'var(--inv-green)':'var(--inv-red)'}">${glFmt(running)}</td>
             </tr></tfoot>
             </table>
         </div>`;

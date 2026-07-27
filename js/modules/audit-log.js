@@ -17,7 +17,7 @@ const AL_REF_LABELS = {
     customer_payment: 'تحصيل عميل',
 };
 const AL_EVENT_LABELS = { create: 'إنشاء', update: 'تعديل', cancel: 'إلغاء', approve: 'اعتماد' };
-const AL_EVENT_COLORS = { create: '#059669', update: '#D97706', cancel: '#DC2626', approve: '#2563EB' };
+const AL_EVENT_COLORS = { create: 'var(--inv-green)', update: 'var(--inv-gold)', cancel: 'var(--inv-red)', approve: '#2563EB' };
 const AL_EVENT_ICONS  = { create: '➕', update: '✏️', cancel: '🚫', approve: '✅' };
 
 function alFmtDate(d) { return new Date(d).toLocaleString('ar-EG', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
@@ -143,7 +143,7 @@ async function alLoadData(c) {
 
         const rows = (events||[]).map(ev => {
             const userName = ev.profiles?.full_name || ev.profiles?.name || ev.profiles?.email || 'النظام';
-            const eventColor = AL_EVENT_COLORS[ev.event_type] || '#64748B';
+            const eventColor = AL_EVENT_COLORS[ev.event_type] || 'var(--inv-muted)';
             const eventIcon = AL_EVENT_ICONS[ev.event_type] || '📋';
             const refLabel = AL_REF_LABELS[ev.ref_type] || ev.ref_type;
             return `<tr>
@@ -158,12 +158,12 @@ async function alLoadData(c) {
 
         c.innerHTML = `
         <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">🔐 سجل التدقيق</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">كل عملية مالية تُسجَّل هنا تلقائياً — من قام بها ومتى وماذا تغيّر</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">كل عملية مالية تُسجَّل هنا تلقائياً — من قام بها ومتى وماذا تغيّر</p></div>
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:#059669">➕</div><div class="mod-card-val">${totalCreate}</div><div class="mod-card-lbl">عمليات إنشاء</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">✏️</div><div class="mod-card-val">${totalUpdate}</div><div class="mod-card-lbl">عمليات تعديل</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">🚫</div><div class="mod-card-val">${totalCancel}</div><div class="mod-card-lbl">عمليات إلغاء</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">➕</div><div class="mod-card-val">${totalCreate}</div><div class="mod-card-lbl">عمليات إنشاء</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">✏️</div><div class="mod-card-val">${totalUpdate}</div><div class="mod-card-lbl">عمليات تعديل</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">🚫</div><div class="mod-card-val">${totalCancel}</div><div class="mod-card-lbl">عمليات إلغاء</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📋</div><div class="mod-card-val">${(events||[]).length}</div><div class="mod-card-lbl">إجمالي (آخر 300)</div></div>
         </div>
 
@@ -186,7 +186,7 @@ async function alLoadData(c) {
                     </select>
                 </div>
                 <button class="ob-add-btn" onclick="alApplyFilter()">🔍 تطبيق</button>
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="alResetFilter()">إعادة تعيين</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="alResetFilter()">إعادة تعيين</button>
             </div>
         </div>
 
@@ -226,13 +226,13 @@ window.alViewDetails = async function(eventId) {
             <div class="mod-modal-header"><h3>👁️ تفاصيل الحدث</h3>
                 <button class="mod-modal-close" onclick="document.getElementById('alDetailsModal').remove()">&times;</button></div>
             <div class="mod-modal-body">
-                <p style="font-size:13px;color:#64748B;margin-bottom:14px">${alTranslateDescription(ev.description)}</p>
+                <p style="font-size:13px;color:var(--inv-muted);margin-bottom:14px">${alTranslateDescription(ev.description)}</p>
                 ${ev.old_data ? `<div style="margin-bottom:14px">
-                    <div style="font-weight:800;font-size:12.5px;color:#DC2626;margin-bottom:6px">قبل التعديل</div>
+                    <div style="font-weight:800;font-size:12.5px;color:var(--inv-red);margin-bottom:6px">قبل التعديل</div>
                     <pre style="background:#FEF2F2;padding:12px;border-radius:8px;font-size:11px;direction:ltr;text-align:left;overflow-x:auto;max-height:200px">${JSON.stringify(ev.old_data, null, 2)}</pre>
                 </div>` : ''}
                 ${ev.new_data ? `<div>
-                    <div style="font-weight:800;font-size:12.5px;color:#059669;margin-bottom:6px">${ev.old_data ? 'بعد التعديل' : 'البيانات'}</div>
+                    <div style="font-weight:800;font-size:12.5px;color:var(--inv-green);margin-bottom:6px">${ev.old_data ? 'بعد التعديل' : 'البيانات'}</div>
                     <pre style="background:#F0FDF4;padding:12px;border-radius:8px;font-size:11px;direction:ltr;text-align:left;overflow-x:auto;max-height:200px">${JSON.stringify(ev.new_data, null, 2)}</pre>
                 </div>` : ''}
             </div>

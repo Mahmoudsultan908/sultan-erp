@@ -8,9 +8,9 @@ function csRenderPage(c, icon, title, description) {
     c.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;text-align:center">
         <div style="font-size:56px;margin-bottom:16px;opacity:0.7">${icon}</div>
-        <h2 style="font-size:22px;font-weight:800;color:#1E293B;margin-bottom:10px">${title}</h2>
-        <p style="font-size:14px;color:#64748B;max-width:420px;line-height:1.8;margin-bottom:20px">${description}</p>
-        <span style="background:#FFFBEB;color:#D97706;padding:8px 20px;border-radius:20px;font-size:13px;font-weight:700">🔜 ستُضاف قريباً</span>
+        <h2 style="font-size:22px;font-weight:800;color:var(--inv-navy);margin-bottom:10px">${title}</h2>
+        <p style="font-size:14px;color:var(--inv-muted);max-width:420px;line-height:1.8;margin-bottom:20px">${description}</p>
+        <span style="background:#FFFBEB;color:var(--inv-gold);padding:8px 20px;border-radius:20px;font-size:13px;font-weight:700">🔜 ستُضاف قريباً</span>
     </div>`;
 }
 

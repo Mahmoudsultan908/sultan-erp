@@ -11,7 +11,7 @@ let vscReps = [];
 let vscRows = []; // { product_id, name, code, unit, system_qty }
 
 async function renderVanStockCount(root) {
-    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل المندوبين...</div>`;
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل المندوبين...</div>`;
     try {
         if (!vscReps.length) {
             const { data } = await sb.from('sales_reps').select('id,name').eq('is_active', true).order('name');
@@ -29,7 +29,7 @@ async function renderVanStockCount(root) {
 }
 
 async function vscLoadRep(root, repId) {
-    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
     try {
         const [{ data: products }, { data: stock }] = await Promise.all([
             sb.from('products').select('id,name,code,unit').eq('is_active', true).order('name'),
@@ -61,7 +61,7 @@ function vscRenderTable(root, repId, search) {
             ${vscReps.map(r => `<option value="${r.id}" ${r.id === repId ? 'selected' : ''}>${r.name}</option>`).join('')}
         </select>
         <input type="text" id="vsc-search" placeholder="🔍 بحث باسم أو كود..." value="${search || ''}" style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-family:Cairo,sans-serif;font-size:13px">
-        <span id="vsc-counted-badge" style="font-size:12px;color:#64748B;font-weight:700"></span>
+        <span id="vsc-counted-badge" style="font-size:12px;color:var(--inv-muted);font-weight:700"></span>
     </div>
     <div class="dash-card" style="padding:0;overflow:hidden">
         <table class="dash-table" style="margin:0">
@@ -74,7 +74,7 @@ function vscRenderTable(root, repId, search) {
                     <td class="dash-muted">${r.system_qty} <small>${r.unit}</small></td>
                     <td><input type="number" step="any" class="vsc-count-input" data-pid="${r.product_id}" style="width:100px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:Cairo,sans-serif" oninput="vscUpdateDiff(this)"></td>
                     <td class="vsc-diff-cell" data-pid-diff="${r.product_id}">—</td>
-                </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:30px;color:#94A3B8">لا توجد نتائج</td></tr>`}
+                </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--inv-muted-light)">لا توجد نتائج</td></tr>`}
             </tbody>
         </table>
     </div>
@@ -102,7 +102,7 @@ function vscUpdateDiff(inputEl) {
     if (inputEl.value === '') { diffCell.textContent = '—'; diffCell.style.color = ''; vscUpdateBadge(); return; }
     const diff = Number(inputEl.value) - row.system_qty;
     diffCell.textContent = (diff > 0 ? '+' : '') + diff;
-    diffCell.style.color = diff > 0 ? '#059669' : diff < 0 ? '#DC2626' : '#94A3B8';
+    diffCell.style.color = diff > 0 ? 'var(--inv-green)' : diff < 0 ? 'var(--inv-red)' : 'var(--inv-muted-light)';
     vscUpdateBadge();
 }
 

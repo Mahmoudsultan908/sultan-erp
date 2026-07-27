@@ -17,7 +17,7 @@ let _attEditingId = null;
 function attToday() { return new Date().toISOString().slice(0, 10); }
 function attTimeFmt(iso) { return iso ? new Date(iso).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—'; }
 const ATT_STATUS_LABEL = { present: '✅ حاضر', late: '⚠️ متأخر', absent: '❌ غايب', leave: '🏖️ إجازة' };
-const ATT_STATUS_COLOR = { present: '#059669', late: '#D97706', absent: '#DC2626', leave: '#7C3AED' };
+const ATT_STATUS_COLOR = { present: 'var(--inv-green)', late: 'var(--inv-gold)', absent: 'var(--inv-red)', leave: '#7C3AED' };
 
 async function renderAttendance(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل بيانات الحضور...</div>';
@@ -35,7 +35,7 @@ async function renderAttendance(c) {
 
         c.innerHTML = `
             <div style="margin-bottom:20px"><h2 style="font-size:22px;font-weight:800">🕐 الحضور والانصراف</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">تسجيل حضور وانصراف الموظفين يوميًا — تسجيل يدوي بواسطة المشرف</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تسجيل حضور وانصراف الموظفين يوميًا — تسجيل يدوي بواسطة المشرف</p></div>
 
             <h3 style="font-size:15px;font-weight:800;margin-bottom:10px">📅 حضور اليوم — ${new Date(today).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
             <div class="mod-table-wrap" style="margin-bottom:26px">
@@ -72,13 +72,13 @@ function attTodayRowsHtml() {
     if (!_attEmployees.length) return `<tr><td colspan="6" class="empty-state"><span>👥</span>لا يوجد موظفين نشطين — أضف موظف من "👥 الموظفون والرواتب"</td></tr>`;
     return _attEmployees.map(emp => {
         const r = _attTodayMap[emp.id];
-        const statusChip = r ? `<span style="color:${ATT_STATUS_COLOR[r.status] || '#64748B'};font-weight:700">${ATT_STATUS_LABEL[r.status] || r.status}</span>` : '<span style="color:#94A3B8">لم يُسجَّل</span>';
+        const statusChip = r ? `<span style="color:${ATT_STATUS_COLOR[r.status] || 'var(--inv-muted)'};font-weight:700">${ATT_STATUS_LABEL[r.status] || r.status}</span>` : '<span style="color:var(--inv-muted-light)">لم يُسجَّل</span>';
         let action;
         if (!r) {
             action = `<div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap">
-                <button class="cc-edit" style="background:#D1FAE5;color:#059669" onclick="attCheckIn('${emp.id}','present')">✅ حاضر</button>
-                <button class="cc-edit" style="background:#FEF3C7;color:#D97706" onclick="attCheckIn('${emp.id}','late')">⚠️ متأخر</button>
-                <button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="attCheckIn('${emp.id}','absent')">❌ غايب</button>
+                <button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="attCheckIn('${emp.id}','present')">✅ حاضر</button>
+                <button class="cc-edit" style="background:#FEF3C7;color:var(--inv-gold)" onclick="attCheckIn('${emp.id}','late')">⚠️ متأخر</button>
+                <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="attCheckIn('${emp.id}','absent')">❌ غايب</button>
                 <button class="cc-edit" style="background:#EDE9FE;color:#7C3AED" onclick="attCheckIn('${emp.id}','leave')">🏖️ إجازة</button>
             </div>`;
         } else if (r.check_in_time && !r.check_out_time && r.status !== 'absent' && r.status !== 'leave') {
@@ -88,7 +88,7 @@ function attTodayRowsHtml() {
         }
         return `<tr>
             <td><strong>${emp.name}</strong></td>
-            <td style="color:#64748B">${emp.job_title || '—'}</td>
+            <td style="color:var(--inv-muted)">${emp.job_title || '—'}</td>
             <td>${attTimeFmt(r?.check_in_time)}</td>
             <td>${attTimeFmt(r?.check_out_time)}</td>
             <td>${statusChip}</td>
@@ -125,7 +125,7 @@ window.attLoadHistory = async function() {
     const empId = document.getElementById('attEmpFilter')?.value || '';
     _attHistFrom = from; _attHistTo = to;
     const tbody = document.getElementById('attHistBody');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#64748B">⏳ جاري التحميل...</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--inv-muted)">⏳ جاري التحميل...</td></tr>`;
     try {
         let q = sb.from('attendance_records').select('*, employees(name)').gte('record_date', from).lte('record_date', to).order('record_date', { ascending: false });
         if (empId) q = q.eq('employee_id', empId);
@@ -147,8 +147,8 @@ function attRenderHistory() {
         <td><strong>${r.employees?.name || '—'}</strong></td>
         <td>${attTimeFmt(r.check_in_time)}</td>
         <td>${attTimeFmt(r.check_out_time)}</td>
-        <td style="color:${ATT_STATUS_COLOR[r.status] || '#64748B'};font-weight:700">${ATT_STATUS_LABEL[r.status] || r.status || '—'}</td>
-        <td style="color:#64748B;font-size:12px">${r.notes || '—'}</td>
+        <td style="color:${ATT_STATUS_COLOR[r.status] || 'var(--inv-muted)'};font-weight:700">${ATT_STATUS_LABEL[r.status] || r.status || '—'}</td>
+        <td style="color:var(--inv-muted);font-size:12px">${r.notes || '—'}</td>
         <td style="text-align:center"><button class="cc-edit" onclick="attOpenEdit('${r.id}')">✏️</button></td>
     </tr>`).join('');
 }
@@ -180,7 +180,7 @@ window.attOpenEdit = function(recordId) {
                     <input type="text" id="attEditNotes" class="mod-form-input" value="${r.notes || ''}"></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('attEditModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('attEditModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="attSaveEdit()">💾 حفظ</button>
             </div>
         </div>`;

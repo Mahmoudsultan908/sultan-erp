@@ -59,7 +59,7 @@ async function renderPayments(c) {
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <div><h2 style="font-size:22px;font-weight:800">💸 دفع الموردين (سندات صرف)</h2>
-            <p style="font-size:13px;color:#64748B;margin-top:4px">تسجيل المدفوعات للموردين — مرتبطة بالخزنة ورصيد المورد</p></div>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تسجيل المدفوعات للموردين — مرتبطة بالخزنة ورصيد المورد</p></div>
             <button class="mod-btn mod-btn-primary" onclick="payOpenAdd()">+ صرف دفعة جديدة</button>
         </div>
 
@@ -68,9 +68,9 @@ async function renderPayments(c) {
         </div>` : ''}
 
         <div class="mod-grid">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💵</div><div class="mod-card-val">${payFmt(totalPaid)}</div><div class="mod-card-lbl">إجمالي المدفوع</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#D97706">📋</div><div class="mod-card-val">${payments.length}</div><div class="mod-card-lbl">سند صرف</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:#DC2626">⚠️</div><div class="mod-card-val">${payFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين (${debtSuppliers.length})</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${payFmt(totalPaid)}</div><div class="mod-card-lbl">إجمالي المدفوع</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold)">📋</div><div class="mod-card-val">${payments.length}</div><div class="mod-card-lbl">سند صرف</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${payFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين (${debtSuppliers.length})</div></div>
         </div>
 
         ${paySuppliersDebtListHTML(debtSuppliers)}
@@ -89,11 +89,11 @@ async function renderPayments(c) {
                     <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
                     <td><strong>${p.suppliers?.name || '—'}</strong></td>
                     <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
-                    <td style="text-align:left;font-weight:700;color:#059669">${payFmt(p.amount)}</td>
+                    <td style="text-align:left;font-weight:700;color:var(--inv-green)">${payFmt(p.amount)}</td>
                     <td>${p._queue
-                        ? (p.status === 'failed' ? '<span style="color:#DC2626;font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:#D97706;font-weight:600">⏳ غير مُزامن</span>')
-                        : (p.status==='confirmed'?'<span style="color:#059669;font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:#94A3B8;font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:#D97706">${p.status}</span>`)}</td>
-                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:#FEE2E2;color:#DC2626" onclick="payReverseSupplierPayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
+                        ? (p.status === 'failed' ? '<span style="color:var(--inv-red);font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:var(--inv-gold);font-weight:600">⏳ غير مُزامن</span>')
+                        : (p.status==='confirmed'?'<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:var(--inv-muted-light);font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:var(--inv-gold)">${p.status}</span>`)}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="payReverseSupplierPayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
@@ -127,8 +127,8 @@ function paySuppliersDebtListHTML(debtSuppliers) {
     return `
     <div class="mod-card" style="margin-top:16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-            <div class="mod-card-icon" style="background:#FEF3C7;color:#D97706;width:40px;height:40px;font-size:18px">⚠️</div>
-            <div><div style="font-size:14px;font-weight:800">موردون لهم مستحقات (مديونيات)</div><div style="font-size:11px;color:#64748B">اضغط "صرف دفعة" بجوار أي مورد لدفعه فوراً</div></div>
+            <div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold);width:40px;height:40px;font-size:18px">⚠️</div>
+            <div><div style="font-size:14px;font-weight:800">موردون لهم مستحقات (مديونيات)</div><div style="font-size:11px;color:var(--inv-muted)">اضغط "صرف دفعة" بجوار أي مورد لدفعه فوراً</div></div>
         </div>
         ${debtSuppliers.slice(0,8).map(s => `<div class="cat-card">
             <div class="cc-ic">🏭</div>
@@ -137,10 +137,10 @@ function paySuppliersDebtListHTML(debtSuppliers) {
                 <div class="cc-sub">${s.phone||''} ${s.code?'· '+s.code:''}</div>
             </div>
             <div class="cc-amt">
-                <div class="used" style="color:#DC2626">${payFmt(s.balance)}</div>
+                <div class="used" style="color:var(--inv-red)">${payFmt(s.balance)}</div>
                 <div class="lim">مستحق</div>
             </div>
-            <button class="cc-edit" style="background:#D1FAE5;color:#059669" onclick="payQuickPay('${s.id}')">💸 دفع</button>
+            <button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="payQuickPay('${s.id}')">💸 دفع</button>
         </div>`).join('')}
     </div>`;
 }
@@ -184,7 +184,7 @@ window.payOpenAdd = function(presetSupplierId = null) {
                 <div id="payBalancePreview"></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="payCloseModal('payModal')">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="payCloseModal('payModal')">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="paySave()">💾 صرف الدفعة</button>
             </div>
         </div>`;
@@ -218,13 +218,13 @@ window.paySuppSearchInput = function(mode) {
     // أول ما تدوس على الخانة (مش لازم تكتب حاجة الأول)
     const list = flexSearch(_paySuppliers, term, ['name','phone','code'], 20);
     if (!list.length) {
-        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:#94A3B8">لا يوجد نتائج مطابقة</div>`;
+        ac.innerHTML = `<div class="inv-ac-item" style="cursor:default;color:var(--inv-muted-light)">لا يوجد نتائج مطابقة</div>`;
         ac.classList.add('show');
         return;
     }
     ac.innerHTML = list.map((s,i) => `<div class="inv-ac-item" data-i="${i}" data-id="${s.id}" onmousedown="event.preventDefault();payPickSupp('${s.id}','${mode}')" onmouseenter="paySuppACHover(${i},'${mode}')">
         <div><div class="an">${s.name}</div><div class="as">${s.phone||''}${s.code?' · '+s.code:''}</div></div>
-        <div class="ap"><div class="pr" style="${s.balance>0?'color:#DC2626':''}">${s.balance>0?payFmt(s.balance):''}</div><div class="as">${s.balance>0?'مستحق':''}</div></div>
+        <div class="ap"><div class="pr" style="${s.balance>0?'color:var(--inv-red)':''}">${s.balance>0?payFmt(s.balance):''}</div><div class="as">${s.balance>0?'مستحق':''}</div></div>
     </div>`).join('');
     ac.classList.add('show');
 };
@@ -272,10 +272,10 @@ window.payPreview = function() {
     const bal = Number(s.balance) || 0;
     const after = bal - amount;
     area.innerHTML = `
-        <div class="limit-box" style="border-color:#D1FAE5;background:#ECFDF5">
-            <div class="limit-row"><span class="lr-label">المستحق للمورد:</span><span class="lr-val" style="color:#DC2626">${payFmt(bal)} ج.م</span></div>
-            <div class="limit-row"><span class="lr-label">هذه الدفعة:</span><span class="lr-val" style="color:#059669">${payFmt(amount)} ج.م</span></div>
-            <div class="limit-row"><span class="lr-label">المستحق بعد الدفع:</span><span class="lr-val" style="color:${after>0?'#D97706':'#059669'}">${payFmt(after)} ج.م</span></div>
+        <div class="limit-box" style="border-color:var(--inv-green-light);background:#ECFDF5">
+            <div class="limit-row"><span class="lr-label">المستحق للمورد:</span><span class="lr-val" style="color:var(--inv-red)">${payFmt(bal)} ج.م</span></div>
+            <div class="limit-row"><span class="lr-label">هذه الدفعة:</span><span class="lr-val" style="color:var(--inv-green)">${payFmt(amount)} ج.م</span></div>
+            <div class="limit-row"><span class="lr-label">المستحق بعد الدفع:</span><span class="lr-val" style="color:${after>0?'var(--inv-gold)':'var(--inv-green)'}">${payFmt(after)} ج.م</span></div>
         </div>`;
 };
 
@@ -423,7 +423,7 @@ window.payOpenEditModal = function(id) {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="payCloseModal('payEditModal')">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="payCloseModal('payEditModal')">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="paySaveEdit()">💾 حفظ التعديل</button>
             </div>
         </div>`;

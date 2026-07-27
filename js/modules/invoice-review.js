@@ -97,7 +97,7 @@ async function revRenderBody(presetNo) {
                 <div><label class="ob-label">من تاريخ</label><input id="rev-from" type="date" class="ob-input" style="margin:0"></div>
                 <div><label class="ob-label">إلى تاريخ</label><input id="rev-to" type="date" class="ob-input" style="margin:0"></div>
                 <button class="ob-add-btn" onclick="revSearch()">🔍 بحث</button>
-                <button class="ob-add-btn" style="background:#F1F5F9;color:#475569" onclick="revClearSearch()">✕ مسح</button>
+                <button class="ob-add-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="revClearSearch()">✕ مسح</button>
             </div>
         </div>
         <div id="rev-results"></div>
@@ -113,7 +113,7 @@ window.revClearSearch = function () {
 window.revSearch = async function () {
     const cfg = revCfg();
     const resEl = document.getElementById('rev-results');
-    resEl.innerHTML = '<div style="text-align:center;padding:30px;color:#64748B">⏳ جاري البحث...</div>';
+    resEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري البحث...</div>';
 
     const no = document.getElementById('rev-no')?.value.trim();
     const name = document.getElementById('rev-name')?.value.trim();
@@ -155,17 +155,17 @@ function revRenderTable(rows) {
                     <td>${r.customers?.name || r.suppliers?.name || 'نقدي'}</td>
                     <td>${cfg.hasPaymentType
                         ? (r.payment_type==='credit' ? '📋 آجل' : '💵 نقدي')
-                        : (r.sale_id || r.purchase_id ? '<span style="color:#2563EB">🔗 نعم</span>' : '<span style="color:#94A3B8">مستقل</span>')}</td>
+                        : (r.sale_id || r.purchase_id ? '<span style="color:#2563EB">🔗 نعم</span>' : '<span style="color:var(--inv-muted-light)">مستقل</span>')}</td>
                     <td class="dash-muted">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
-                    <td style="text-align:left;font-weight:700${revIsReturn() ? ';color:#DC2626' : ''}">${revFmt(r.total)}</td>
-                    <td>${r.status==='confirmed' ? '<span style="color:#059669;font-weight:600">✅ مؤكدة</span>' : r.status==='cancelled' ? '<span style="color:#94A3B8">🚫 ملغاة (معدّلة)</span>' : `<span style="color:#D97706">${r.status}</span>`}</td>
+                    <td style="text-align:left;font-weight:700${revIsReturn() ? ';color:var(--inv-red)' : ''}">${revFmt(r.total)}</td>
+                    <td>${r.status==='confirmed' ? '<span style="color:var(--inv-green);font-weight:600">✅ مؤكدة</span>' : r.status==='cancelled' ? '<span style="color:var(--inv-muted-light)">🚫 ملغاة (معدّلة)</span>' : `<span style="color:var(--inv-gold)">${r.status}</span>`}</td>
                     <td style="white-space:nowrap">
                         <button class="cc-edit" onclick="revViewDetails('${r.id}')">👁️ عرض</button>
-                        ${cfg.canPrint ? `<button class="cc-edit" style="background:#ECFDF5;color:#059669" onclick="revPrintInvoice('${r.id}')">🖨️ طباعة</button>` : ''}
-                        ${r.status==='confirmed' && cfg.canEdit ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="revEditInvoice('${r.id}')">✏️ تعديل</button>` : ''}
-                        ${r.status==='confirmed' && cfg.canCancel ? `<button class="cc-edit" style="background:#FEF2F2;color:#DC2626" onclick="revCancelReturn('${r.id}')">🚫 إلغاء</button>` : ''}
+                        ${cfg.canPrint ? `<button class="cc-edit" style="background:#ECFDF5;color:var(--inv-green)" onclick="revPrintInvoice('${r.id}')">🖨️ طباعة</button>` : ''}
+                        ${r.status==='confirmed' && cfg.canEdit ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="revEditInvoice('${r.id}')">✏️ تعديل</button>` : ''}
+                        ${r.status==='confirmed' && cfg.canCancel ? `<button class="cc-edit" style="background:#FEF2F2;color:var(--inv-red)" onclick="revCancelReturn('${r.id}')">🚫 إلغاء</button>` : ''}
                     </td>
-                </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:24px;color:#94A3B8">لا توجد نتائج</td></tr>`}
+                </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--inv-muted-light)">لا توجد نتائج</td></tr>`}
             </tbody>
         </table>
     </div>`;
@@ -192,11 +192,11 @@ window.revViewDetails = async function (id) {
         <div class="mod-modal-header"><h3>${cfg.icon} ${cfg.label} ${data[cfg.noField]}</h3>
             <button class="mod-modal-close" onclick="document.getElementById('revModal').remove()">✕</button></div>
         <div class="mod-modal-body">
-            <div style="display:flex;justify-content:space-between;margin-bottom:14px;font-size:13px;color:#475569">
+            <div style="display:flex;justify-content:space-between;margin-bottom:14px;font-size:13px;color:var(--inv-text-soft)">
                 <span>${cfg.entityLabel}: <strong>${entity?.name || 'نقدي'}</strong></span>
                 <span>${new Date(data.created_at).toLocaleString('ar-EG')}</span>
             </div>
-            ${revIsReturn() && data.reason ? `<div style="background:#F8FAFC;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:#475569">📝 السبب: ${data.reason}</div>` : ''}
+            ${revIsReturn() && data.reason ? `<div style="background:#F8FAFC;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--inv-text-soft)">📝 السبب: ${data.reason}</div>` : ''}
             <table class="dash-table">
                 <thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th style="text-align:left">الإجمالي</th></tr></thead>
                 <tbody>
@@ -214,10 +214,10 @@ window.revViewDetails = async function (id) {
             </table>
         </div>
         <div class="mod-modal-footer">
-            <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('revModal').remove()">إغلاق</button>
-            ${cfg.canPrint ? `<button class="mod-btn" style="background:#ECFDF5;color:#059669" onclick="revPrintInvoice('${data.id}')">🖨️ طباعة</button>` : ''}
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('revModal').remove()">إغلاق</button>
+            ${cfg.canPrint ? `<button class="mod-btn" style="background:#ECFDF5;color:var(--inv-green)" onclick="revPrintInvoice('${data.id}')">🖨️ طباعة</button>` : ''}
             ${data.status==='confirmed' && cfg.canEdit ? `<button class="mod-btn mod-btn-primary" onclick="document.getElementById('revModal').remove();revEditInvoice('${data.id}')">✏️ تعديل ${revIsReturn() ? 'هذا المرتجع' : 'هذه الفاتورة'}</button>` : ''}
-            ${data.status==='confirmed' && cfg.canCancel ? `<button class="mod-btn" style="background:#FEF2F2;color:#DC2626" onclick="document.getElementById('revModal').remove();revCancelReturn('${data.id}')">🚫 إلغاء هذا المرتجع</button>` : ''}
+            ${data.status==='confirmed' && cfg.canCancel ? `<button class="mod-btn" style="background:#FEF2F2;color:var(--inv-red)" onclick="document.getElementById('revModal').remove();revCancelReturn('${data.id}')">🚫 إلغاء هذا المرتجع</button>` : ''}
         </div>
     </div>`;
     document.body.appendChild(modal);

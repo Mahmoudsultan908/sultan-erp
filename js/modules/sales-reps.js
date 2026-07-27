@@ -120,14 +120,14 @@ function repRenderPage(c) {
     </div>` : ''}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div><h2 style="font-size:22px;font-weight:800">🚗 المندوبون</h2>
-        <p style="font-size:13px;color:#64748B;margin-top:4px">إدارة مندوبي المبيعات ومتابعة أداء وعمولة كل مندوب</p></div>
+        <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إدارة مندوبي المبيعات ومتابعة أداء وعمولة كل مندوب</p></div>
         <button class="mod-btn mod-btn-primary" onclick="repOpenAdd()">+ مندوب جديد</button>
     </div>
 
     <div class="mod-grid">
         <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">🚗</div><div class="mod-card-val">${activeReps.length}</div><div class="mod-card-lbl">مندوبون نشطون</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:#D97706">🏆</div><div class="mod-card-val" style="font-size:16px">${top.rep ? top.rep.name : '—'}</div><div class="mod-card-lbl">مندوب الشهر (${repFmt(top.total)} ج.م)</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#D1FAE5;color:#059669">💰</div><div class="mod-card-val">${repFmt(totalSalesAll)}</div><div class="mod-card-lbl">إجمالي مبيعات المندوبين (كل الوقت)</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">🏆</div><div class="mod-card-val" style="font-size:16px">${top.rep ? top.rep.name : '—'}</div><div class="mod-card-lbl">مندوب الشهر (${repFmt(top.total)} ج.م)</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💰</div><div class="mod-card-val">${repFmt(totalSalesAll)}</div><div class="mod-card-lbl">إجمالي مبيعات المندوبين (كل الوقت)</div></div>
     </div>
 
     <div class="mod-card" style="margin:16px 0">
@@ -161,17 +161,17 @@ function repRenderRows() {
         const levelName = _repPriceLevels.find(l => l.id === r.price_level_id)?.name || '—';
         return `<tr>
             <td><strong>${r.name}</strong></td>
-            <td dir="ltr" style="text-align:right;color:#64748B">${r.phone || '—'}</td>
+            <td dir="ltr" style="text-align:right;color:var(--inv-muted)">${r.phone || '—'}</td>
             <td style="text-align:center">${Number(r.commission_pct) || 0}%</td>
             <td>💰 ${levelName}</td>
             <td style="text-align:center">${count}</td>
             <td style="text-align:left;font-weight:700">${repFmt(total)}</td>
-            <td style="text-align:left;font-weight:700;color:#059669">${repFmt(commission)}</td>
-            <td><span style="font-size:11px;padding:3px 10px;border-radius:50px;background:${active ? '#D1FAE5' : '#FEE2E2'};color:${active ? '#065F46' : '#991B1B'}">${active ? 'نشط' : 'معطّل'}</span></td>
+            <td style="text-align:left;font-weight:700;color:var(--inv-green)">${repFmt(commission)}</td>
+            <td><span style="font-size:11px;padding:3px 10px;border-radius:50px;background:${active ? 'var(--inv-green-light)' : '#FEE2E2'};color:${active ? '#065F46' : '#991B1B'}">${active ? 'نشط' : 'معطّل'}</span></td>
             <td style="text-align:center;white-space:nowrap">
                 <button class="cc-edit" onclick="repShowStatement('${r.id}')" title="كشف مبيعات">📄</button>
                 <button class="cc-edit" onclick="repOpenEdit('${r.id}')" title="تعديل">✏️</button>
-                <button class="cc-edit" style="background:${active ? '#FEE2E2' : '#D1FAE5'};color:${active ? '#DC2626' : '#059669'}" onclick="repToggleActive('${r.id}', ${!active})" title="${active ? 'تعطيل' : 'تفعيل'}">${active ? '🚫' : '✅'}</button>
+                <button class="cc-edit" style="background:${active ? '#FEE2E2' : 'var(--inv-green-light)'};color:${active ? 'var(--inv-red)' : 'var(--inv-green)'}" onclick="repToggleActive('${r.id}', ${!active})" title="${active ? 'تعطيل' : 'تفعيل'}">${active ? '🚫' : '✅'}</button>
             </td>
         </tr>`;
     }).join('');
@@ -202,26 +202,26 @@ function repOpenModal(x) {
                     <div class="mod-form-group"><label>نسبة العمولة %</label>
                         <input type="number" id="repCommission" class="mod-form-input" value="${x?.commission_pct || 0}" min="0" max="100" step="0.1"></div>
                 </div>
-                <div class="mod-form-group"><label>مستوى السعر اللي يبيع بيه <small style="color:#94A3B8;font-weight:400">(بتتحكم فيه أنت، مش سعر جملة ثابت)</small></label>
+                <div class="mod-form-group"><label>مستوى السعر اللي يبيع بيه <small style="color:var(--inv-muted-light);font-weight:400">(بتتحكم فيه أنت، مش سعر جملة ثابت)</small></label>
                     <select id="repPriceLevel" class="mod-form-input">
                         <option value="">بدون تحديد (افتراضي النظام)</option>
                         ${_repPriceLevels.map(l => `<option value="${l.id}" ${x?.price_level_id===l.id?'selected':''}>💰 ${l.name}</option>`).join('')}
                     </select></div>
                 ${x?.treasury_id ? `<div class="mod-form-group"><label>خزنة المندوب</label>
-                    <div style="padding:10px 14px;background:#F1F5F9;border-radius:8px;font-size:13px;color:#475569">🏦 ${_repTreasuries.find(t=>t.id===x.treasury_id)?.name || '—'} <small>(بتتعمل تلقائياً، منفصلة عن الخزنة الرئيسية)</small></div></div>` : ''}
+                    <div style="padding:10px 14px;background:#F1F5F9;border-radius:8px;font-size:13px;color:var(--inv-text-soft)">🏦 ${_repTreasuries.find(t=>t.id===x.treasury_id)?.name || '—'} <small>(بتتعمل تلقائياً، منفصلة عن الخزنة الرئيسية)</small></div></div>` : ''}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>🎯 هدف المبيعات اليومي (ج)</label>
                         <input type="number" id="repDailyTarget" class="mod-form-input" value="${x?.daily_sales_target || 0}" min="0" step="1"></div>
                     <div class="mod-form-group"><label>🏪 هدف الزيارات اليومي</label>
                         <input type="number" id="repVisitsTarget" class="mod-form-input" value="${x?.daily_visits_target || 0}" min="0" step="1"></div>
                 </div>
-                <div class="mod-form-group"><label>🔒 PIN تحميل العربية <small style="color:#94A3B8;font-weight:400">(تأكيد إضافي قبل ما المندوب يحمّل عربيته بنفسه من تطبيقه — سيبه فاضي لو مش عايزه يقدر يحمّل نفسه)</small></label>
+                <div class="mod-form-group"><label>🔒 PIN تحميل العربية <small style="color:var(--inv-muted-light);font-weight:400">(تأكيد إضافي قبل ما المندوب يحمّل عربيته بنفسه من تطبيقه — سيبه فاضي لو مش عايزه يقدر يحمّل نفسه)</small></label>
                     <input type="text" id="repVanLoadPin" class="mod-form-input" value="${x?.van_load_pin || ''}" placeholder="مثال: 1234" dir="ltr" maxlength="8"></div>
                 <div class="mod-form-group"><label>ملاحظات</label>
                     <input type="text" id="repNotes" class="mod-form-input" value="${x?.notes || ''}" placeholder="اختياري"></div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('repModal').remove()">إلغاء</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('repModal').remove()">إلغاء</button>
                 <button class="mod-btn mod-btn-primary" onclick="repSave()">💾 ${x ? 'حفظ التعديلات' : 'إضافة المندوب'}</button>
             </div>
         </div>`;
@@ -316,16 +316,16 @@ window.repShowStatement = async function (repId) {
         document.getElementById('repStmtBody').innerHTML = `
             <div class="mod-grid" style="margin-bottom:16px">
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">عدد الفواتير</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">عدد الفواتير</div>
                     <div style="font-size:22px;font-weight:800">${rows.length}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">صافي المبيعات (بعد ${repFmt(returnsTotal)} مرتجعات)</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">صافي المبيعات (بعد ${repFmt(returnsTotal)} مرتجعات)</div>
                     <div style="font-size:22px;font-weight:800;color:#0F172A">${repFmt(total)}</div>
                 </div>
                 <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:#64748B;margin-bottom:4px">العمولة المستحقة (${Number(rep.commission_pct) || 0}%)</div>
-                    <div style="font-size:22px;font-weight:800;color:#059669">${repFmt(commission)}</div>
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">العمولة المستحقة (${Number(rep.commission_pct) || 0}%)</div>
+                    <div style="font-size:22px;font-weight:800;color:var(--inv-green)">${repFmt(commission)}</div>
                 </div>
             </div>
             <div class="mod-table-wrap">
@@ -346,7 +346,7 @@ window.repShowStatement = async function (repId) {
                         <td>${r.customers?.name || 'نقدي'}</td>
                         <td>↩️ مرتجع</td>
                         <td style="font-size:12px">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
-                        <td style="text-align:left;font-weight:700;color:#DC2626">-${repFmt(r.total)}</td>
+                        <td style="text-align:left;font-weight:700;color:var(--inv-red)">-${repFmt(r.total)}</td>
                     </tr>`).join('')}
                 </tbody></table>
             </div>`;

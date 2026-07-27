@@ -60,17 +60,17 @@ async function opRenderTab() {
 }
 
 async function opRenderQueue(body) {
-    body.innerHTML = '<div style="text-align:center;padding:20px;color:#64748B">⏳ جاري التحميل...</div>';
+    body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--inv-muted)">⏳ جاري التحميل...</div>';
     const items = (await getQueue()).sort((a, b) => b.createdAt - a.createdAt);
     const statusLabel = { pending: '⏳ بانتظار الاتصال', syncing: '🔄 جاري المزامنة...', failed: '❌ فشلت آخر محاولة' };
     const kindLabel = { collection: 'تحصيل عميل', payment: 'دفع مورد', expense: 'مصروف', sale: 'فاتورة مبيعات', sale_return: 'مرتجع مبيعات' };
     body.innerHTML = `
-        <div style="margin-bottom:10px;font-size:12px;color:#64748B">${items.length ? `${items.length} عملية في الطابور` : 'مفيش عمليات معلّقة'}</div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--inv-muted)">${items.length ? `${items.length} عملية في الطابور` : 'مفيش عمليات معلّقة'}</div>
         ${items.length ? items.map(it => `
             <div style="display:flex;justify-content:space-between;align-items:center;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:10px 14px;margin-bottom:8px">
                 <div>
-                    <div style="font-weight:700;font-size:13px">${kindLabel[it.kind] || it.kind} ${it.tempRef ? `<span style="direction:ltr;color:#94A3B8;font-size:11px">(${it.tempRef})</span>` : ''}</div>
-                    <div style="font-size:11px;color:#64748B">${opTimeAgo(it.createdAt)}${it.error ? ' — ' + it.error : ''}</div>
+                    <div style="font-weight:700;font-size:13px">${kindLabel[it.kind] || it.kind} ${it.tempRef ? `<span style="direction:ltr;color:var(--inv-muted-light);font-size:11px">(${it.tempRef})</span>` : ''}</div>
+                    <div style="font-size:11px;color:var(--inv-muted)">${opTimeAgo(it.createdAt)}${it.error ? ' — ' + it.error : ''}</div>
                 </div>
                 <span style="font-size:12px;font-weight:700">${statusLabel[it.status] || it.status}</span>
             </div>`).join('') : `<div class="empty-state"><span>✅</span>مفيش عمليات معلّقة حالياً</div>`}
@@ -78,7 +78,7 @@ async function opRenderQueue(body) {
 }
 
 async function opRenderReconciliation(body) {
-    body.innerHTML = '<div style="text-align:center;padding:20px;color:#64748B">⏳ جاري التحميل...</div>';
+    body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--inv-muted)">⏳ جاري التحميل...</div>';
     const items = (await getReconciliation()).sort((a, b) => b.at - a.at);
     body.innerHTML = `
         ${items.length ? items.map(it => `
@@ -87,7 +87,7 @@ async function opRenderReconciliation(body) {
                     <div>
                         <div style="font-weight:700;font-size:13px">${it.summary}</div>
                         <div style="font-size:11px;color:#92400E;margin-top:4px">${(it.flags || []).join(' — ')}</div>
-                        <div style="font-size:11.5px;color:#94A3B8;margin-top:2px">${opTimeAgo(it.at)}</div>
+                        <div style="font-size:11.5px;color:var(--inv-muted-light);margin-top:2px">${opTimeAgo(it.at)}</div>
                     </div>
                     ${!it.resolved ? `<button class="cc-edit" onclick="resolveReconciliation(${it.id}).then(()=>opRenderTab())">✅ تمت المراجعة</button>` : ''}
                 </div>
@@ -114,10 +114,10 @@ window.opRunLookup = async function (q) {
 
     const oldestCache = [products, customers, suppliers].filter(Boolean).map(c => c.updatedAt).sort((a, b) => a - b)[0];
     resultsEl.innerHTML = `
-        ${oldestCache ? `<div style="font-size:11px;color:#94A3B8;margin-bottom:8px">📴 آخر تحديث للبيانات المحفوظة: ${new Date(oldestCache).toLocaleString('ar-EG')}</div>` : `<div class="empty-state"><span>📭</span>لسه مفيش بيانات محفوظة — افتح صفحات المبيعات/التحصيل/الدفع/المصروفات وانت أونلاين مرة الأول عشان تتخزن</div>`}
+        ${oldestCache ? `<div style="font-size:11px;color:var(--inv-muted-light);margin-bottom:8px">📴 آخر تحديث للبيانات المحفوظة: ${new Date(oldestCache).toLocaleString('ar-EG')}</div>` : `<div class="empty-state"><span>📭</span>لسه مفيش بيانات محفوظة — افتح صفحات المبيعات/التحصيل/الدفع/المصروفات وانت أونلاين مرة الأول عشان تتخزن</div>`}
         ${rows.slice(0, 50).map(r => `
             <div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #F1F5F9;font-size:13px">
-                <div><span style="color:#94A3B8;font-size:11px">${r.type}</span> <strong>${r.name}</strong> ${r.sub ? `<span style="color:#94A3B8;font-size:11px">(${r.sub})</span>` : ''}</div>
+                <div><span style="color:var(--inv-muted-light);font-size:11px">${r.type}</span> <strong>${r.name}</strong> ${r.sub ? `<span style="color:var(--inv-muted-light);font-size:11px">(${r.sub})</span>` : ''}</div>
                 <div style="font-weight:700">${r.val}</div>
             </div>`).join('')}
         ${query && !rows.length ? `<div class="empty-state"><span>🔍</span>مفيش نتائج</div>` : ''}

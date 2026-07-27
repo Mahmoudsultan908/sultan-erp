@@ -589,7 +589,7 @@ function invTotalsCardHTML() {
         <div class="inv-net-box">
             <div class="nlbl">الصافي المستحق</div>
             <div class="nval" id="invNet">0.00</div>
-            <div id="invNetWords" style="font-size:11px;color:#94A3B8;margin-top:4px;line-height:1.4"></div>
+            <div id="invNetWords" style="font-size:11px;color:var(--inv-muted-light);margin-top:4px;line-height:1.4"></div>
         </div>
     </div>`;
 }
@@ -984,7 +984,7 @@ function invOpenMultiPick() {
             <button class="mod-modal-close" onclick="invCloseMultiPick()">✕</button></div>
         <div class="mod-modal-body">
             <input type="text" class="mod-form-input" id="invMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="invRenderMultiPickList(this.value)">
-            <label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:#475569;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:var(--inv-text-soft);cursor:pointer">
                 <input type="checkbox" id="invMultiHideZero" ${_invMultiHideZero ? 'checked' : ''} onchange="invMultiToggleHideZero(this.checked)">
                 إخفاء الأصناف بدون رصيد
             </label>
@@ -1013,15 +1013,15 @@ function invRenderMultiPickList(val) {
     if (!box) return;
     let list = flexSearch(INV_DB.products, val, ['name','code']);
     if (_invMultiHideZero) list = list.filter(p => invGetStock(p.id) > 0);
-    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8">لا توجد نتائج</div>'; return; }
+    if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--inv-muted-light)">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _invMultiSelected[p.id];
         const checked = sel != null;
         const qty = sel ?? 1;
         return `<label class="inv-multi-row" data-pid="${p.id}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer">
             <input type="checkbox" ${checked?'checked':''} onchange="invMultiToggle('${p.id}',this.checked)">
-            <span style="flex:1">${p.name} <small style="color:#94A3B8">${p.code||''} · ${p.unit||''}</small></span>
-            <span style="font-size:11px;color:#94A3B8">مخزون: ${invGetStock(p.id)}</span>
+            <span style="flex:1">${p.name} <small style="color:var(--inv-muted-light)">${p.code||''} · ${p.unit||''}</small></span>
+            <span style="font-size:11px;color:var(--inv-muted-light)">مخزون: ${invGetStock(p.id)}</span>
             <span style="font-size:12px;color:#0F172A;font-weight:600">${invFmt(invGetSellPrice(p))}</span>
             <input type="number" class="mod-form-input" value="${qty}" min="0.001" step="1" style="width:76px;padding:6px 8px"
                 onclick="event.stopPropagation()" oninput="invMultiSetQty('${p.id}',this.value)">
@@ -1829,7 +1829,7 @@ function invShowShortcuts() {
             <div class="mod-modal-header"><h3>⌨️ اختصارات لوحة المفاتيح</h3>
                 <button class="mod-modal-close" onclick="invCloseShortcuts()">✕</button></div>
             <div class="mod-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;font-size:13px">
-                ${invShortcutList().map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #F1F5F9"><span style="color:#475569">${s.d}</span><kbd style="background:#0F172A;color:#FBBF24;border-radius:5px;padding:2px 8px;font-size:11px;font-family:inherit">${s.k}</kbd></div>`).join('')}
+                ${invShortcutList().map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #F1F5F9"><span style="color:var(--inv-text-soft)">${s.d}</span><kbd style="background:#0F172A;color:var(--inv-gold-soft);border-radius:5px;padding:2px 8px;font-size:11px;font-family:inherit">${s.k}</kbd></div>`).join('')}
             </div></div>`;
         document.body.appendChild(m);
     }

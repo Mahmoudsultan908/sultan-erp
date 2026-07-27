@@ -9,7 +9,7 @@
    ════════════════════════════════════════════════════════════ */
 
 async function renderVanStockView(root) {
-    root.innerHTML = `<div style="text-align:center;padding:40px;color:#64748B"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل مخزون العربيات...</div>`;
+    root.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل مخزون العربيات...</div>`;
     try {
         const [{ data: stock }, { data: reps }] = await Promise.all([
             sb.from('van_stock')
@@ -52,7 +52,7 @@ async function renderVanStockView(root) {
                 const statusLabel = { ok: '✅ جيد', low: '⚠️ منخفض', zero: '🔴 فارغ' }[status];
                 const statusClass = { ok: 'inv-st-ok', low: 'inv-st-low', zero: 'inv-st-zero' }[status];
                 return `<tr>
-                    <td><strong>${s.products?.name || '—'}</strong><div style="font-size:11px;color:#94A3B8">${s.products?.product_categories?.name || ''}</div></td>
+                    <td><strong>${s.products?.name || '—'}</strong><div style="font-size:11px;color:var(--inv-muted-light)">${s.products?.product_categories?.name || ''}</div></td>
                     <td style="direction:ltr;text-align:center">${s.products?.code || '—'}</td>
                     <td>🚗 ${repMap[s.rep_id] || '—'}</td>
                     <td class="inv-qty-cell"><span class="inv-qty ${status === 'zero' ? 'inv-qty-zero' : status === 'low' ? 'inv-qty-low' : ''}">${fmt(qty)}</span> <small>${s.products?.unit || 'وحدة'}</small></td>
@@ -60,7 +60,7 @@ async function renderVanStockView(root) {
                     <td><span class="${statusClass}">${statusLabel}</span></td>
                     <td class="inv-val-cell">${fmt(val)} ج.م</td>
                 </tr>`;
-            }).join('') : `<tr><td colspan="7" style="text-align:center;padding:30px;color:#94A3B8">لا توجد نتائج</td></tr>`;
+            }).join('') : `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--inv-muted-light)">لا توجد نتائج</td></tr>`;
 
             document.getElementById('vrv-total-val').textContent = fmt(totalVal) + ' ج.م';
             document.getElementById('vrv-low-count').textContent = lowCount;
@@ -120,7 +120,7 @@ async function renderVanStockView(root) {
             <div class="dash-card" style="padding:0;overflow:hidden">
                 <table class="dash-table" style="margin:0">
                     <thead><tr><th>الصنف</th><th>الكود</th><th>المندوب</th><th>الكمية</th><th>حد الطلب</th><th>الحالة</th><th>القيمة</th></tr></thead>
-                    <tbody id="vrv-tbody"><tr><td colspan="7" style="text-align:center;padding:30px;color:#94A3B8">جاري التحميل...</td></tr></tbody>
+                    <tbody id="vrv-tbody"><tr><td colspan="7" style="text-align:center;padding:30px;color:var(--inv-muted-light)">جاري التحميل...</td></tr></tbody>
                 </table>
             </div>`;
 
