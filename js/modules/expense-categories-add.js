@@ -13,22 +13,31 @@ window.renderExpenses = async function(c) {
 };
 
 function ecInjectAddButton() {
-    // ندور على عنوان لوحة البنود ونضيف الزرار جنبه، لو لسه مش مضاف
-    const header = Array.from(document.querySelectorAll('.mod-table-wrap > div'))
-        .find(d => d.textContent.includes('دليل بنود المصروفات'));
-    if (!header || document.getElementById('ecAddBtn')) return;
+    if (document.getElementById('ecAddBtn')) return;
+    // ★ عنوان لوحة البنود اتغيّر بعد "بند 11" (فلتر الفترة الاختيارية) من
+    //   "دليل بنود المصروفات" لـ "كشف حساب المصروفات حسب البند..." — ده
+    //   كان بيكسر البحث ده بصمت (الزرار يختفي من غير أي error) لأن العنصر
+    //   مبقاش موجود. بندوّر على عنصر الورقة (leaf، من غير أولاد) اللي
+    //   نصه الحالي، مش على أي div في .mod-table-wrap عمومًا، عشان منلمسش
+    //   صفوف الفلتر/البحث اللي جنبه.
+    const titleDiv = Array.from(document.querySelectorAll('.mod-table-wrap div'))
+        .find(d => d.children.length === 0 && d.textContent.includes('كشف حساب المصروفات حسب البند'));
+    if (!titleDiv) return;
 
-    header.style.display = 'flex';
-    header.style.justifyContent = 'space-between';
-    header.style.alignItems = 'center';
+    titleDiv.style.display = 'flex';
+    titleDiv.style.justifyContent = 'space-between';
+    titleDiv.style.alignItems = 'center';
+    titleDiv.style.gap = '10px';
 
     const btn = document.createElement('button');
     btn.id = 'ecAddBtn';
     btn.className = 'mod-btn mod-btn-primary';
     btn.style.whiteSpace = 'nowrap';
+    btn.style.fontSize = '12px';
+    btn.style.padding = '6px 12px';
     btn.textContent = '+ بند جديد';
     btn.onclick = ecOpenAdd;
-    header.appendChild(btn);
+    titleDiv.appendChild(btn);
 }
 
 // ════════════════════════════════════════════════════════════
