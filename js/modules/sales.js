@@ -1346,6 +1346,19 @@ async function invSave(andNew) {
                     metadata: { customer_name: c.name, credit_limit: limit, balance_before: Number(c.balance) || 0, invoice_net: net, over_by: Number(over), reason: reason.trim() },
                 });
             } catch {}
+            // إشعار لكل الأدمنز — activity_logs مش شاشة حد بيفتحها يوميًا،
+            // لازم تنبيه ظاهر في جرس الإشعارات عشان محدش يفوّته
+            try {
+                const { data: admins } = await sb.from('profiles').select('id').eq('role', 'admin');
+                if (admins?.length) {
+                    await sb.from('notifications').insert(admins.map(a => ({
+                        user_id: a.id, type: 'credit_limit_override',
+                        title: `⚠️ تجاوز حد ائتماني — ${c.name}`,
+                        body: `الحد: ${invFmt(limit)} ج.م — الفاتورة: ${invFmt(net)} ج.م — التجاوز: ${over} ج.م\nالسبب: ${reason.trim()}`,
+                        related_id: invCustId,
+                    })));
+                }
+            } catch {}
         }
     }
 

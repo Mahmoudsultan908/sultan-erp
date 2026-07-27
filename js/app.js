@@ -127,6 +127,9 @@ function buildLayout() {
           </div>
           <div class="topbar-actions">
             <button class="sidebar-toggle" onclick="searchOpenPalette()" title="بحث سريع (Ctrl+K)">🔍</button>
+            <button class="sidebar-toggle" id="notifBell" onclick="notifOpenPanel()" title="الإشعارات" style="position:relative">
+                🔔<span id="notifBadge" style="display:none;position:absolute;top:2px;left:2px;background:#DC2626;color:#fff;border-radius:10px;min-width:16px;height:16px;line-height:16px;font-size:10px;font-weight:700;text-align:center;padding:0 3px">0</span>
+            </button>
             <div class="badge-offline" id="topbarOffline" onclick="offlineOpenPanel()" title="حالة الاتصال والمزامنة">🟢 متصل</div>
             <div class="badge-cash" id="topbarCash">جاري التحميل...</div>
             <div class="user-profile">
@@ -304,6 +307,12 @@ async function setupApp() {
     //   CRM فوق، بيجري فى الخلفية من غير ما يأخر تحميل الصفحة
     if (typeof repLinkRefreshBadge === 'function') repLinkRefreshBadge();
 
+    // ★ جرس الإشعارات الشخصية (notifications) — نفس نمط corLinkStartPolling:
+    //   فحصة فورية + كل 90 ثانية. كل مستخدم يشوف إشعاراته هو بس (RLS بالفعل
+    //   مقيّدة على user_id = auth.uid()). أول استخدام حقيقي: تنبيه الأدمن
+    //   لما حد يتجاوز الحد الائتماني (راجع sales.js).
+    notifStartPolling();
+
     // ★ إشعار "طلب/عميل جديد" جنب تبويب "🔗 طلبات العملاء" — بند 8،
     //   تقرير 2026-07-21. بعكس repLinkRefreshBadge (فحصة واحدة بس عند
     //   الدخول)، ده بيعمل poll دوري كل 90 ثانية + صوت/إشعار متصفح لو
@@ -315,6 +324,68 @@ async function setupApp() {
 
     loadMod(document.querySelector('[data-mod="dashboard"]'), 'dashboard');
 }
+
+// ════════════════════════════════════════════════════════════
+// جرس الإشعارات — جدول notifications كان موجود من قبل بس مش مستخدم في
+// أي شاشة، فكل التخزين والقراءة هنا لأول مرة. عام (مش مخصوص بنوع معين)
+// عشان أي ميزة تانية تقدر تكتب فيه من غير ما تحتاج UI جديد.
+// ════════════════════════════════════════════════════════════
+async function notifRefreshBadge() {
+    try {
+        const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true })
+            .eq('user_id', currentUser.id).eq('read', false);
+        const el = document.getElementById('notifBadge');
+        if (el) {
+            if (count > 0) { el.textContent = count > 99 ? '99+' : count; el.style.display = 'block'; }
+            else el.style.display = 'none';
+        }
+    } catch (err) { /* بهدوء — إشعار جانبي، مش لازم يوقف التطبيق */ }
+}
+
+function notifStartPolling() {
+    notifRefreshBadge();
+    setInterval(notifRefreshBadge, 90000);
+}
+
+window.notifOpenPanel = async function () {
+    let modal = document.getElementById('notifPanelModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.className = 'mod-modal-bg';
+        modal.id = 'notifPanelModal';
+        document.body.appendChild(modal);
+    }
+    modal.classList.add('active');
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:480px">
+            <div class="mod-modal-header"><h3>🔔 الإشعارات</h3>
+                <button class="mod-modal-close" onclick="document.getElementById('notifPanelModal').classList.remove('active')">&times;</button></div>
+            <div class="mod-modal-body" id="notifPanelBody" style="max-height:60vh;overflow-y:auto;padding:0">
+                <div class="empty-state"><span>⏳</span>جاري التحميل...</div>
+            </div>
+        </div>`;
+
+    const { data, error } = await sb.from('notifications').select('*')
+        .eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
+    const body = document.getElementById('notifPanelBody');
+    if (error) { body.innerHTML = `<div style="padding:20px;color:#991B1B">تعذّر تحميل الإشعارات: ${error.message}</div>`; return; }
+    if (!data || !data.length) { body.innerHTML = `<div class="empty-state"><span>🔔</span>لا توجد إشعارات</div>`; return; }
+
+    body.innerHTML = data.map(n => `
+        <div style="padding:14px 20px;border-bottom:1px solid #F1F5F9;${n.read ? '' : 'background:#FFFBEB'}">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
+                <div style="font-weight:700;font-size:13.5px">${n.read ? '' : '🔴 '}${n.title || 'إشعار'}</div>
+                <div style="font-size:11px;color:#94A3B8;white-space:nowrap">${new Date(n.created_at).toLocaleString('ar-EG')}</div>
+            </div>
+            ${n.body ? `<div style="font-size:12.5px;color:#475569;margin-top:4px;white-space:pre-line">${n.body}</div>` : ''}
+        </div>`).join('');
+
+    // تعليم الكل مقروء لحظة الفتح — المستخدم شافهم دلوقتي
+    const unreadIds = data.filter(n => !n.read).map(n => n.id);
+    if (unreadIds.length) {
+        sb.from('notifications').update({ read: true }).in('id', unreadIds).then(() => notifRefreshBadge());
+    }
+};
 
 const titles = {
         'dashboard': 'لوحة التحكم',
