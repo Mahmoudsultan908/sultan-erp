@@ -127,6 +127,7 @@ function buildLayout() {
           </div>
           <div class="topbar-actions">
             <button class="sidebar-toggle" onclick="searchOpenPalette()" title="بحث سريع (Ctrl+K)">🔍</button>
+            <button class="sidebar-toggle" id="themeToggleBtn" onclick="themeToggle()" title="تبديل الوضع الليلي/النهاري"></button>
             <button class="sidebar-toggle" id="notifBell" onclick="notifOpenPanel()" title="الإشعارات" style="position:relative">
                 🔔<span id="notifBadge" style="display:none;position:absolute;top:2px;left:2px;background:#DC2626;color:#fff;border-radius:10px;min-width:16px;height:16px;line-height:16px;font-size:10px;font-weight:700;text-align:center;padding:0 3px">0</span>
             </button>
@@ -157,7 +158,30 @@ function buildLayout() {
     window._basePaneEl.className = 'content tab-pane';
     window._basePaneEl.id = 'app-content';
     document.getElementById('appContentHost').appendChild(window._basePaneEl);
+    themeUpdateIcon();
 }
+
+// ════════════════════════════════════════════════════════════
+// تبديل الوضع الليلي/النهاري يدويًا — بيكتب data-theme على <html>
+// (بيكسب على تفضيل نظام التشغيل، راجع :root[data-theme] في index.html)
+// ويحفظه في localStorage. التطبيق الفوري وقت التحميل (قبل ما الصفحة
+// تترسم أصلًا) موجود في <script> صغير في <head> نفسه، مش هنا.
+// ════════════════════════════════════════════════════════════
+function themeEffective() {
+    const saved = localStorage.getItem('sultan_theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function themeUpdateIcon() {
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = themeEffective() === 'dark' ? '☀️' : '🌙';
+}
+window.themeToggle = function () {
+    const next = themeEffective() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('sultan_theme', next);
+    themeUpdateIcon();
+};
 
 // أي شاشة عندها تايمر/اشتراك خلفية لازم يتوقف لما تبويبها يتقفل، وإلا
 // هيفضل شغال في الخلفية من غير داعي. راجع invStopAutoSave/purStopAutoSave

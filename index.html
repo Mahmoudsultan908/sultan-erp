@@ -8,12 +8,17 @@
 <meta name="theme-color" content="#0F172A">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script>
+// تطبيق فوري لتفضيل الوضع الليلي/النهاري المحفوظ — قبل أي رسم للصفحة،
+// عشان مايبانش "ومضة" لون غلط لحظة التحميل (راجع themeToggle في app.js)
+(function(){ try { var t = localStorage.getItem('sultan_theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch(e) {} })();
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Cairo', sans-serif; background: var(--inv-bg); color: var(--inv-text); overflow: hidden; }
 .login-wrapper { display: flex; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); }
-.login-card { background: #fff; padding: 40px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); width: 100%; max-width: 400px; text-align: center; animation: popIn 0.4s ease; }
+.login-card { background: #fff; color: #0F172A; padding: 40px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); width: 100%; max-width: 400px; text-align: center; animation: popIn 0.4s ease; }
 @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
 .login-logo { width: 64px; height: 64px; background: linear-gradient(135deg, var(--inv-gold), var(--inv-gold-light)); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 20px; box-shadow: 0 10px 25px rgba(217,119,6,0.4); }
 .login-input { width: 100%; padding: 14px 16px; margin-bottom: 14px; border: 1.5px solid #E2E8F0; border-radius: 12px; font-size: 14px; font-family: inherit; outline: none; text-align: left; direction: ltr; transition: border-color 0.2s; }
@@ -71,10 +76,10 @@ body { font-family: 'Cairo', sans-serif; background: var(--inv-bg); color: var(-
 #railFlyout .nav-group-items { display: block; }
 #railFlyout .nav-item { margin: 2px 4px; color: #CBD5E1; }
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.topbar { background: #fff; border-bottom: 1px solid #E2E8F0; padding: 0 28px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+.topbar { background: var(--inv-card); border-bottom: 1px solid var(--inv-border); padding: 0 28px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
 .topbar-title { font-size: 15px; font-weight: 700; }
-.sidebar-toggle { background: #F1F5F9; border: 1px solid #E2E8F0; color: #475569; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: 0.15s; flex-shrink: 0; }
-.sidebar-toggle:hover { background: #E2E8F0; color: #0F172A; }
+.sidebar-toggle { background: var(--inv-divider); border: 1px solid var(--inv-border); color: var(--inv-text-soft); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: 0.15s; flex-shrink: 0; }
+.sidebar-toggle:hover { background: var(--inv-border); color: var(--inv-text); }
 .topbar-actions { display: flex; align-items: center; gap: 16px; }
 .badge-cash { background: linear-gradient(135deg, #D1FAE5, #A7F3D0); color: #065F46; border: 1px solid #6EE7B7; padding: 6px 16px; border-radius: 50px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .badge-cash::before { content: '💰'; }
@@ -85,10 +90,10 @@ body { font-family: 'Cairo', sans-serif; background: var(--inv-bg); color: var(-
 .offline-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .offline-toast.success { background: #059669; }
 .offline-toast.error { background: #DC2626; }
-.user-profile { display: flex; align-items: center; gap: 10px; padding: 4px 12px 4px 4px; background: #F8FAFC; border-radius: 50px; border: 1px solid #E2E8F0; }
+.user-profile { display: flex; align-items: center; gap: 10px; padding: 4px 12px 4px 4px; background: var(--inv-divider); border-radius: 50px; border: 1px solid var(--inv-border); }
 .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--inv-gold); color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
-.user-info { font-size: 12px; line-height: 1.3; }
-.user-info span { display: block; color: #64748B; font-size: 11px; }
+.user-info { font-size: 12px; line-height: 1.3; color: var(--inv-text); }
+.user-info span { display: block; color: var(--inv-muted); font-size: 11px; }
 .btn-logout { background: none; border: 1px solid #FCA5A5; color: #DC2626; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; }
 .btn-logout:hover { background: #FEF2F2; }
 .content-host { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
@@ -166,10 +171,10 @@ body.inv-fullscreen .content { padding: 12px !important; }
 /* ════════════════════════════════════════════════════════════
    المصروفات — نظام الحد الأقصى الشهري (مأخوذ من وحدة الرواتب)
    ════════════════════════════════════════════════════════════ */
-.limit-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+.limit-box { background: var(--inv-divider); border: 1px solid var(--inv-border); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
 .limit-row { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 4px; }
-.limit-row .lr-label { color: #64748B; min-width: 110px; }
-.limit-row .lr-val { font-weight: 700; color: #0F172A; margin-right: auto; direction: ltr; }
+.limit-row .lr-label { color: var(--inv-muted); min-width: 110px; }
+.limit-row .lr-val { font-weight: 700; color: var(--inv-text); margin-right: auto; direction: ltr; }
 .limit-bar { background: #E5E7EB; border-radius: 50px; height: 8px; overflow: hidden; margin: 6px 0; }
 .limit-fill { height: 100%; border-radius: 50px; transition: width 0.3s ease; }
 .limit-fill.safe { background: linear-gradient(90deg, #10B981, #34D399); }
@@ -186,21 +191,21 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .limit-over-box textarea { width: 100%; border: 1.5px solid #FED7AA; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; outline: none; resize: vertical; min-height: 50px; }
 .limit-over-box textarea:focus { border-color: #C2410C; }
 
-.cat-card { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #E2E8F0; border-radius: 10px; margin-bottom: 8px; transition: 0.15s; }
-.cat-card:hover { border-color: #94A3B8; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.cat-card .cc-ic { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; background: #F1F5F9; flex-shrink: 0; }
+.cat-card { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--inv-border); border-radius: 10px; margin-bottom: 8px; transition: 0.15s; }
+.cat-card:hover { border-color: var(--inv-muted-light); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.cat-card .cc-ic { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; background: var(--inv-divider); flex-shrink: 0; }
 .cat-card .cc-info { flex: 1; min-width: 0; }
-.cat-card .cc-name { font-size: 13px; font-weight: 700; color: #0F172A; }
-.cat-card .cc-sub { font-size: 11px; color: #64748B; }
+.cat-card .cc-name { font-size: 13px; font-weight: 700; color: var(--inv-text); }
+.cat-card .cc-sub { font-size: 11px; color: var(--inv-muted); }
 .cat-card .cc-bar-wrap { width: 100px; flex-shrink: 0; }
 .cat-card .cc-amt { text-align: center; min-width: 75px; flex-shrink: 0; }
-.cat-card .cc-amt .used { font-size: 13px; font-weight: 800; color: #0F172A; direction: ltr; }
-.cat-card .cc-amt .lim { font-size: 11px; color: #94A3B8; direction: ltr; }
+.cat-card .cc-amt .used { font-size: 13px; font-weight: 800; color: var(--inv-text); direction: ltr; }
+.cat-card .cc-amt .lim { font-size: 11px; color: var(--inv-muted-light); direction: ltr; }
 .cat-card .cc-edit { background: #FFFBEB; color: var(--inv-gold); border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; flex-shrink: 0; }
 .cat-card .cc-edit:hover { background: #FEF3C7; }
-.exp-tabs { display: flex; gap: 4px; background: #F1F5F9; border-radius: 10px; padding: 4px; margin-bottom: 16px; width: fit-content; }
-.exp-tab { border: none; background: transparent; padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; color: #64748B; cursor: pointer; font-family: inherit; transition: 0.15s; }
-.exp-tab.active { background: #fff; color: #0F172A; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.exp-tabs { display: flex; gap: 4px; background: var(--inv-divider); border-radius: 10px; padding: 4px; margin-bottom: 16px; width: fit-content; }
+.exp-tab { border: none; background: transparent; padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--inv-muted); cursor: pointer; font-family: inherit; transition: 0.15s; }
+.exp-tab.active { background: var(--inv-card); color: var(--inv-text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
 /* ════════════════════════════════════════════════════════════
    فاتورة المبيعات — نظام كحلي/ذهبي ثنائي الأعمدة
@@ -226,58 +231,41 @@ body.inv-fullscreen .content { padding: 12px !important; }
 }
 
 /* ════════════════════════════════════════════════════════════
-   الوضع الليلي — أول محاولة (27 يوليو 2026). بيحترم تفضيل نظام
-   التشغيل بس (prefers-color-scheme)، مفيش زرار تبديل يدوي لسه.
-   إعادة تعريف الـ16 توكن بس — بما إن أغلب الموديولات (55 من أصل 64،
-   بعد هجرة الألوان لنفس اليوم) بقت بتستخدم var(--inv-x) بدل قيم
-   ثابتة، التغيير ده بيترشح تلقائي لمعظم الواجهة من غير أي لمس تاني.
-   الاستثناءات المعروفة (مش مغطاة): ألوان الخلفيات الفاتحة الصغيرة
-   للتنبيهات/الشارات (badge-cash، حالات limit-status, dash-badge-*،
-   إلخ) لسه قيمها ثابتة ومش هتتلون — قرار واعي بدل تتبع كل لون فردي،
-   ومقبول بصريًا لأنه مجرد شارة صغيرة ملوّنة فوق خلفية غامقة، مش عنصر
+   الوضع الليلي — بيحترم تفضيل نظام التشغيل تلقائيًا، وفيه كمان
+   زرار تبديل يدوي (🌙/☀️ في الشريط العلوي، راجع themeToggle في
+   app.js) بيكتب data-theme على <html> وبيحفظه في localStorage —
+   لو موجود بيكسب على تفضيل النظام في أي اتجاه.
+   إعادة تعريف الـ16 توكن هي الأساس — الأغلبية الساحقة من الموديولات
+   (55 من 64) بقت بتستخدم var(--inv-x) بدل قيم ثابتة (هجرة 27 يوليو
+   2026)، فالتغيير بيترشح تلقائيًا لمعظم الواجهة من غير أي لمس تاني.
+   الاستثناءات المتبقية (مكتوبة مرة واحدة بس تحت، مش لكل توكن): ألوان
+   بانرات التنبيه، وتحذير/رصيد الأرصدة الافتتاحية، وخانات الإدخال
+   البيضاء الافتراضية — مالهاش نظير توكن جاهز فاحتاجوا قيم مخصوصة.
+   استثناء واعي متبقي: شارات صغيرة ملوّنة فاتحة (badge-cash، حالات
+   limit-status، dash-badge-*) لسه ثابتة — مقبول بصريًا، مش عنصر
    أساسي في القراءة. ═══════════════════════════════════════════ */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --inv-navy: #7FA5D1;
-    --inv-navy-deep: #0B1622;
-    --inv-navy-light: #9FB4D1;
-    --inv-gold: #D6A75C;
-    --inv-gold-light: #E8B768;
-    --inv-gold-soft: #F0C987;
-    --inv-green: #4FBE8B;
-    --inv-green-light: #123024;
-    --inv-red: #E2726B;
-    --inv-bg: #0F1520;
-    --inv-card: #171F2B;
-    --inv-border: #28324A;
-    --inv-text: #E9ECF2;
-    --inv-muted: #8A93A3;
-    --inv-muted-light: #6E7889;
-    --inv-text-soft: #A7B0C0;
-    --inv-divider: #131A26;
-  }
-  .topbar { background: var(--inv-card); border-bottom-color: var(--inv-border); }
-  .sidebar-toggle { background: var(--inv-divider); border-color: var(--inv-border); color: var(--inv-text-soft); }
-  .sidebar-toggle:hover { background: var(--inv-border); color: var(--inv-text); }
-  .user-profile { background: var(--inv-divider); border-color: var(--inv-border); }
-  .user-info span { color: var(--inv-muted); }
+  :root { --inv-navy: #7FA5D1; --inv-navy-deep: #0B1622; --inv-navy-light: #9FB4D1; --inv-gold: #D6A75C; --inv-gold-light: #E8B768; --inv-gold-soft: #F0C987; --inv-green: #4FBE8B; --inv-green-light: #123024; --inv-red: #E2726B; --inv-bg: #0F1520; --inv-card: #171F2B; --inv-border: #28324A; --inv-text: #E9ECF2; --inv-muted: #8A93A3; --inv-muted-light: #6E7889; --inv-text-soft: #A7B0C0; --inv-divider: #131A26; }
   .mod-form-input { background: var(--inv-card); color: var(--inv-text); }
   .mod-alert-banner, .mod-alert-banner.warning { background: #2E2410; color: #E8B768; border-color: #5C4416; }
   .mod-alert-banner.info { background: #16233A; color: #7FA5D1; border-color: #28324A; }
   .mod-alert-banner.danger { background: #331917; color: #E58479; border-color: #6B3230; }
-  .exp-tabs { background: var(--inv-divider); }
-  .exp-tab { color: var(--inv-muted); }
-  .exp-tab.active { background: var(--inv-card); color: var(--inv-text); }
-  .limit-box { background: var(--inv-divider); border-color: var(--inv-border); }
-  .limit-row .lr-label { color: var(--inv-muted); }
-  .limit-row .lr-val { color: var(--inv-text); }
-  .cat-card { border-color: var(--inv-border); }
-  .cat-card .cc-ic { background: var(--inv-divider); }
-  .cat-card .cc-name, .cat-card .cc-amt .used { color: var(--inv-text); }
-  .cat-card .cc-sub, .cat-card .cc-amt .lim { color: var(--inv-muted); }
   .ob-warning { background: #2E2410; color: #E8B768; border-color: #5C4416; }
   .ob-existing { background: #123024; border-color: #1F5A3F; }
+  .inv-ac-item:hover { background: var(--inv-divider); }
 }
+/* نفس القيم فوق، بس كـ attribute selector عشان تكسب على تفضيل النظام
+   في أي اتجاه (الأولوية الأعلى بتاعة [data-theme] بتكسب بغض النظر عن
+   ترتيب القواعد) — ده اللي بيخلي زرار التبديل اليدوي شغال فعليًا. */
+:root[data-theme="dark"] { --inv-navy: #7FA5D1; --inv-navy-deep: #0B1622; --inv-navy-light: #9FB4D1; --inv-gold: #D6A75C; --inv-gold-light: #E8B768; --inv-gold-soft: #F0C987; --inv-green: #4FBE8B; --inv-green-light: #123024; --inv-red: #E2726B; --inv-bg: #0F1520; --inv-card: #171F2B; --inv-border: #28324A; --inv-text: #E9ECF2; --inv-muted: #8A93A3; --inv-muted-light: #6E7889; --inv-text-soft: #A7B0C0; --inv-divider: #131A26; }
+:root[data-theme="light"] { --inv-navy: #1E293B; --inv-navy-deep: #0F172A; --inv-navy-light: #334155; --inv-gold: #D97706; --inv-gold-light: #F59E0B; --inv-gold-soft: #FBBF24; --inv-green: #059669; --inv-green-light: #D1FAE5; --inv-red: #DC2626; --inv-bg: #F7F4EF; --inv-card: #FFFFFF; --inv-border: #E8E1D3; --inv-text: #0F172A; --inv-muted: #64748B; --inv-muted-light: #94A3B8; --inv-text-soft: #475569; --inv-divider: #FBF9F4; }
+[data-theme="dark"] .mod-form-input { background: var(--inv-card); color: var(--inv-text); }
+[data-theme="dark"] .mod-alert-banner, [data-theme="dark"] .mod-alert-banner.warning { background: #2E2410; color: #E8B768; border-color: #5C4416; }
+[data-theme="dark"] .mod-alert-banner.info { background: #16233A; color: #7FA5D1; border-color: #28324A; }
+[data-theme="dark"] .mod-alert-banner.danger { background: #331917; color: #E58479; border-color: #6B3230; }
+[data-theme="dark"] .ob-warning { background: #2E2410; color: #E8B768; border-color: #5C4416; }
+[data-theme="dark"] .ob-existing { background: #123024; border-color: #1F5A3F; }
+[data-theme="dark"] .inv-ac-item:hover { background: var(--inv-divider); }
 
 .inv-root { display: flex; flex-direction: column; height: 100%; gap: 14px; min-height: 0; }
 
@@ -347,6 +335,7 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .inv-searchbar { background: linear-gradient(135deg, var(--inv-navy) 0%, #283548 100%); padding: 12px 16px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
 .inv-search-wrap { position: relative; flex: 1; }
 .inv-search-input { width: 100%; background: rgba(255,255,255,0.95); border: 2px solid transparent; border-radius: 10px; padding: 10px 14px 10px 38px; font-size: 14px; outline: none; font-family: inherit; transition: 0.2s; }
+.inv-search-input, .inv-search-input:focus { color: #0F172A; }
 .inv-search-input:focus { border-color: var(--inv-gold); background: #fff; box-shadow: 0 0 0 4px rgba(217,119,6,0.12); }
 .inv-search-icon { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); font-size: 15px; opacity: 0.5; }
 .inv-search-hint { color: #94A3B8; font-size: 11px; white-space: nowrap; }
@@ -409,7 +398,7 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .inv-sum-row .val { font-weight: 700; color: var(--inv-text); }
 .inv-sum-row.disc .val { color: var(--inv-red); }
 .inv-sum-row.vat .lbl, .inv-sum-row.vat .val { color: #7C3AED; }
-.inv-sum-disc-in { width: 80px !important; padding: 4px 8px !important; border: 1.5px solid var(--inv-border) !important; border-radius: 6px !important; font-size: 12px !important; text-align: center !important; background: #fff !important; font-family: inherit; }
+.inv-sum-disc-in { width: 80px !important; padding: 4px 8px !important; border: 1.5px solid var(--inv-border) !important; border-radius: 6px !important; font-size: 12px !important; text-align: center !important; background: var(--inv-card) !important; color: var(--inv-text); font-family: inherit; }
 .inv-sum-disc-in:focus { border-color: var(--inv-gold) !important; outline: none; }
 .inv-sum-divider { height: 1px; background: var(--inv-border); margin: 6px 0; }
 .inv-net-box { background: linear-gradient(135deg, var(--inv-navy) 0%, var(--inv-navy-deep) 100%); border-radius: 12px; padding: 12px 14px; margin-top: 4px; }
@@ -418,7 +407,7 @@ body.inv-fullscreen .content { padding: 12px !important; }
 
 /* نوع الدفع */
 .inv-pay-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.inv-pay-opt { border: 1.5px solid var(--inv-border); background: #fff; border-radius: 9px; padding: 9px; cursor: pointer; font-size: 12.5px; font-weight: 700; text-align: center; transition: 0.15s; font-family: inherit; color: var(--inv-muted); }
+.inv-pay-opt { border: 1.5px solid var(--inv-border); background: var(--inv-card); border-radius: 9px; padding: 9px; cursor: pointer; font-size: 12.5px; font-weight: 700; text-align: center; transition: 0.15s; font-family: inherit; color: var(--inv-muted); }
 .inv-pay-opt:hover { border-color: var(--inv-navy-light); }
 .inv-pay-opt.active { background: var(--inv-navy); color: #fff; border-color: var(--inv-navy); }
 .inv-pay-opt.credit.active { background: var(--inv-red); border-color: var(--inv-red); }
@@ -427,7 +416,7 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .inv-cash-panel { display: none; }
 .inv-cash-panel.show { display: block; }
 .inv-cash-in { display: flex; gap: 6px; margin-bottom: 8px; }
-.inv-cash-field { flex: 1; border: 2px solid var(--inv-green); border-radius: 9px; padding: 9px 11px; font-size: 15px; font-weight: 800; outline: none; text-align: center; direction: ltr; font-family: inherit; background: #fff; }
+.inv-cash-field { flex: 1; border: 2px solid var(--inv-green); border-radius: 9px; padding: 9px 11px; font-size: 15px; font-weight: 800; outline: none; text-align: center; direction: ltr; font-family: inherit; background: var(--inv-card); color: var(--inv-text); }
 .inv-cash-field:focus { box-shadow: 0 0 0 3px rgba(5,150,105,0.12); }
 .inv-cash-exact { background: var(--inv-green); color: #fff; border: none; border-radius: 9px; padding: 0 12px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
 .inv-cash-quick { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -449,7 +438,7 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .inv-btn kbd { background: rgba(255,255,255,0.25); border-radius: 5px; padding: 1px 6px; font-size: 11px; font-family: inherit; }
 .inv-btn-save { background: linear-gradient(135deg, var(--inv-gold), var(--inv-gold-light)); color: #fff; box-shadow: 0 4px 14px rgba(217,119,6,0.35); }
 .inv-btn-new { background: var(--inv-green); color: #fff; }
-.inv-btn-print { background: #fff; color: var(--inv-navy); border: 1.5px solid var(--inv-border); }
+.inv-btn-print { background: var(--inv-card); color: var(--inv-navy); border: 1.5px solid var(--inv-border); }
 .inv-btn-draft { background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; }
 .inv-btn-draft:hover { background: #FDE68A; }
 
@@ -458,7 +447,7 @@ body.inv-fullscreen .content { padding: 12px !important; }
 .inv-notes:focus { border-color: var(--inv-gold); }
 
 /* قائمة الـ autocomplete */
-.inv-ac { position: absolute; top: 100%; right: 0; left: 0; background: #fff; border: 1px solid var(--inv-border); border-radius: 0 0 10px 10px; box-shadow: 0 12px 28px rgba(15,23,42,0.18); z-index: 500; display: none; max-height: 240px; overflow-y: auto; }
+.inv-ac { position: absolute; top: 100%; right: 0; left: 0; background: var(--inv-card); border: 1px solid var(--inv-border); border-radius: 0 0 10px 10px; box-shadow: 0 12px 28px rgba(15,23,42,0.18); z-index: 500; display: none; max-height: 240px; overflow-y: auto; }
 .inv-ac.show { display: block; }
 .inv-ac-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--inv-bg); transition: 0.1s; }
 .inv-ac-item:last-child { border-bottom: none; }
