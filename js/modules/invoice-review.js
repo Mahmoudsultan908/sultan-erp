@@ -40,12 +40,14 @@ const REV_CONFIG = {
         noField: 'return_no', noPlaceholder: 'RS-0001', label: 'مرتجع مبيعات', icon: '↩️',
         entityLabel: 'العميل', hasPaymentType: false, canPrint: true, canEdit: true,
         editMod: 'returns', pendingFlag: '_pendingReturnEdit', showRepBadge: true,
+        canCancel: true, cancelRpc: 'fn_reverse_sales_return_for_edit',
     },
     purchase_return: {
         table: 'purchase_returns', itemsTable: 'purchase_return_items', entityJoin: 'suppliers(name,phone)',
         noField: 'return_no', noPlaceholder: 'RP-0001', label: 'مرتجع مشتريات', icon: '↩️',
         entityLabel: 'المورد', hasPaymentType: false, canPrint: false, canEdit: true,
         editMod: 'returns', pendingFlag: '_pendingReturnEdit',
+        canCancel: true, cancelRpc: 'fn_reverse_purchase_return_for_edit',
     },
 };
 const REV_TYPES = ['sales', 'purchase', 'sales_return', 'purchase_return'];
@@ -161,6 +163,7 @@ function revRenderTable(rows) {
                         <button class="cc-edit" onclick="revViewDetails('${r.id}')">👁️ عرض</button>
                         ${cfg.canPrint ? `<button class="cc-edit" style="background:#ECFDF5;color:#059669" onclick="revPrintInvoice('${r.id}')">🖨️ طباعة</button>` : ''}
                         ${r.status==='confirmed' && cfg.canEdit ? `<button class="cc-edit" style="background:#FFFBEB;color:#D97706" onclick="revEditInvoice('${r.id}')">✏️ تعديل</button>` : ''}
+                        ${r.status==='confirmed' && cfg.canCancel ? `<button class="cc-edit" style="background:#FEF2F2;color:#DC2626" onclick="revCancelReturn('${r.id}')">🚫 إلغاء</button>` : ''}
                     </td>
                 </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:24px;color:#94A3B8">لا توجد نتائج</td></tr>`}
             </tbody>
@@ -214,6 +217,7 @@ window.revViewDetails = async function (id) {
             <button class="mod-btn" style="background:#F1F5F9;color:#475569" onclick="document.getElementById('revModal').remove()">إغلاق</button>
             ${cfg.canPrint ? `<button class="mod-btn" style="background:#ECFDF5;color:#059669" onclick="revPrintInvoice('${data.id}')">🖨️ طباعة</button>` : ''}
             ${data.status==='confirmed' && cfg.canEdit ? `<button class="mod-btn mod-btn-primary" onclick="document.getElementById('revModal').remove();revEditInvoice('${data.id}')">✏️ تعديل ${revIsReturn() ? 'هذا المرتجع' : 'هذه الفاتورة'}</button>` : ''}
+            ${data.status==='confirmed' && cfg.canCancel ? `<button class="mod-btn" style="background:#FEF2F2;color:#DC2626" onclick="document.getElementById('revModal').remove();revCancelReturn('${data.id}')">🚫 إلغاء هذا المرتجع</button>` : ''}
         </div>
     </div>`;
     document.body.appendChild(modal);
@@ -274,6 +278,32 @@ window.revEditInvoice = function (id) {
     const cfg = revCfg();
     window[cfg.pendingFlag] = revIsReturn() ? { id, type: revType } : { id };
     document.querySelector(`[data-mod="${cfg.editMod}"]`)?.click();
+};
+
+// ════════════════════════════════════════════════════════════
+// إلغاء مرتجع مؤكد بدون تسجيل نسخة بديلة (بعكس "تعديل" اللي بيلغي القديم
+// ويسجّل واحد جديد فوراً). بيستخدم نفس RPC اللي التعديل بيستخدمه داخلياً
+// (fn_reverse_sales_return_for_edit / fn_reverse_purchase_return_for_edit)
+// — عكس كامل ومتزامن للمخزون + رصيد العميل/المورد + القيد المحاسبي (وتكلفة
+// البضاعة المباعة بعد إصلاح 27 يوليو 2026) عن طريق تريجر تغيير الحالة، مش
+// حذف مباشر للسجل — الحذف المباشر كان هيسيب القيود والمخزون والرصيد من غير
+// عكس، ويكسر مطابقة الدفاتر (نفس الفلسفة في CLAUDE.md: التريجرز هي اللي
+// بتحدّث الأرقام المالية، مش الواجهة).
+// ════════════════════════════════════════════════════════════
+window.revCancelReturn = async function (id) {
+    const cfg = revCfg();
+    if (!cfg.canCancel || !cfg.cancelRpc) return;
+    if (!confirm(`متأكد إنك عايز تلغي ${cfg.label} ده؟\n\nده هيرجّع المخزون والرصيد والقيد المحاسبي زي ما كانوا قبل المرتجع تمامًا، وهيتسجّل كحركة ملغاة في السجل (مش هيتمسح). العملية دي مش قابلة للتراجع من غير تسجيل مرتجع جديد.`)) return;
+
+    try {
+        const { error } = await sb.rpc(cfg.cancelRpc, { p_return_id: id });
+        if (error) throw error;
+        alert(`✅ تم إلغاء ${cfg.label} بنجاح`);
+        document.getElementById('revModal')?.remove();
+        await revSearch();
+    } catch (err) {
+        alert('❌ تعذّر إلغاء المرتجع: ' + err.message);
+    }
 };
 
 Object.assign(window, { renderInvoiceReview });
