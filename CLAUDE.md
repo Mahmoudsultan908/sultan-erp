@@ -71,6 +71,8 @@ RTL Arabic UI (`dir="rtl" lang="ar"`, Cairo font). Two style sources:
 
 Most per-row/per-value styling is done with inline `style="..."` on generated elements rather than new CSS classes — this is the established convention, not an oversight. Reuse existing `.mod-*`/`.dash-*`/`.inv-*` classes before adding new global CSS.
 
+A `:root` token block already exists in `index.html` (`--inv-navy`, `--inv-navy-deep`, `--inv-gold`, `--inv-gold-light`, `--inv-gold-soft`, `--inv-green`, `--inv-red`, `--inv-bg`, `--inv-card`, `--inv-border`, `--inv-text`, `--inv-muted`, `--inv-text-soft`, `--inv-divider`, etc.) — but only a handful of modules (`sales.js`, `purchases.js`, `returns.js`, `stock-transfer.js`, `van-stock-*.js`) actually reference it via `var(--inv-x)`; the other ~48 modules hardcode raw hex values in their inline styles instead (audited 2026-07-27: 300+ raw occurrences of just the 5 most common token colors). This is real drift, not a deliberate second system — when writing **new** inline styles, prefer `var(--inv-navy)`/`var(--inv-gold)`/etc. over a fresh hex literal whenever the color matches an existing token, and extend the `:root` block with a new token (not a one-off hex) if you need a genuinely new semantic color used more than once. Retrofitting the existing 48 files is out of scope for any single change — don't do a drive-by mass find-and-replace across unrelated modules.
+
 ### Number/date formatting
 
 Every module defines its own tiny formatter rather than sharing one, e.g. `custFmt`, `accFmt`, `mdFmt` — all `(Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })`. Match this pattern (`<prefix>Fmt`) in new modules instead of introducing a shared util.
