@@ -11,7 +11,7 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Cairo', sans-serif; background: #F7F4EF; color: #0F172A; overflow: hidden; }
+body { font-family: 'Cairo', sans-serif; background: var(--inv-bg); color: var(--inv-text); overflow: hidden; }
 .login-wrapper { display: flex; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); }
 .login-card { background: #fff; padding: 40px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); width: 100%; max-width: 400px; text-align: center; animation: popIn 0.4s ease; }
 @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
@@ -223,6 +223,60 @@ body.inv-fullscreen .content { padding: 12px !important; }
   --inv-muted-light: #94A3B8;
   --inv-text-soft: #475569;
   --inv-divider: #FBF9F4;
+}
+
+/* ════════════════════════════════════════════════════════════
+   الوضع الليلي — أول محاولة (27 يوليو 2026). بيحترم تفضيل نظام
+   التشغيل بس (prefers-color-scheme)، مفيش زرار تبديل يدوي لسه.
+   إعادة تعريف الـ16 توكن بس — بما إن أغلب الموديولات (55 من أصل 64،
+   بعد هجرة الألوان لنفس اليوم) بقت بتستخدم var(--inv-x) بدل قيم
+   ثابتة، التغيير ده بيترشح تلقائي لمعظم الواجهة من غير أي لمس تاني.
+   الاستثناءات المعروفة (مش مغطاة): ألوان الخلفيات الفاتحة الصغيرة
+   للتنبيهات/الشارات (badge-cash، حالات limit-status, dash-badge-*،
+   إلخ) لسه قيمها ثابتة ومش هتتلون — قرار واعي بدل تتبع كل لون فردي،
+   ومقبول بصريًا لأنه مجرد شارة صغيرة ملوّنة فوق خلفية غامقة، مش عنصر
+   أساسي في القراءة. ═══════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --inv-navy: #7FA5D1;
+    --inv-navy-deep: #0B1622;
+    --inv-navy-light: #9FB4D1;
+    --inv-gold: #D6A75C;
+    --inv-gold-light: #E8B768;
+    --inv-gold-soft: #F0C987;
+    --inv-green: #4FBE8B;
+    --inv-green-light: #123024;
+    --inv-red: #E2726B;
+    --inv-bg: #0F1520;
+    --inv-card: #171F2B;
+    --inv-border: #28324A;
+    --inv-text: #E9ECF2;
+    --inv-muted: #8A93A3;
+    --inv-muted-light: #6E7889;
+    --inv-text-soft: #A7B0C0;
+    --inv-divider: #131A26;
+  }
+  .topbar { background: var(--inv-card); border-bottom-color: var(--inv-border); }
+  .sidebar-toggle { background: var(--inv-divider); border-color: var(--inv-border); color: var(--inv-text-soft); }
+  .sidebar-toggle:hover { background: var(--inv-border); color: var(--inv-text); }
+  .user-profile { background: var(--inv-divider); border-color: var(--inv-border); }
+  .user-info span { color: var(--inv-muted); }
+  .mod-form-input { background: var(--inv-card); color: var(--inv-text); }
+  .mod-alert-banner, .mod-alert-banner.warning { background: #2E2410; color: #E8B768; border-color: #5C4416; }
+  .mod-alert-banner.info { background: #16233A; color: #7FA5D1; border-color: #28324A; }
+  .mod-alert-banner.danger { background: #331917; color: #E58479; border-color: #6B3230; }
+  .exp-tabs { background: var(--inv-divider); }
+  .exp-tab { color: var(--inv-muted); }
+  .exp-tab.active { background: var(--inv-card); color: var(--inv-text); }
+  .limit-box { background: var(--inv-divider); border-color: var(--inv-border); }
+  .limit-row .lr-label { color: var(--inv-muted); }
+  .limit-row .lr-val { color: var(--inv-text); }
+  .cat-card { border-color: var(--inv-border); }
+  .cat-card .cc-ic { background: var(--inv-divider); }
+  .cat-card .cc-name, .cat-card .cc-amt .used { color: var(--inv-text); }
+  .cat-card .cc-sub, .cat-card .cc-amt .lim { color: var(--inv-muted); }
+  .ob-warning { background: #2E2410; color: #E8B768; border-color: #5C4416; }
+  .ob-existing { background: #123024; border-color: #1F5A3F; }
 }
 
 .inv-root { display: flex; flex-direction: column; height: 100%; gap: 14px; min-height: 0; }
