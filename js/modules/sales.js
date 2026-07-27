@@ -1324,13 +1324,28 @@ async function invSave(andNew) {
         }
     }
 
-    // فحص الحد الائتماني للعميل الآجل
+    // فحص الحد الائتماني للعميل الآجل — قرار عمل واضح (27 يوليو 2026): غير
+    // الأدمن ممنوع تمامًا من تجاوز الحد، الأدمن بس يقدر يتجاوز بسبب مكتوب
+    // إجباري بيتسجّل في activity_logs (مش زرار OK عادي بيعدّي بصمت).
     if (invPayType === 'credit' && invCustId) {
         const c = INV_DB.customers.find(x=>x.id===invCustId);
         const limit = Number(c?.credit_limit) || 0;
         if (limit > 0 && (Number(c?.balance)||0) + net > limit) {
             const over = ((Number(c?.balance)||0) + net - limit).toFixed(2);
-            if (!confirm(`⚠️ تجاوز الحد الائتماني!\n\nالعميل: ${c.name}\nالحد: ${invFmt(limit)} ج.م\nالرصيد الحالي: ${invFmt(c.balance)} ج.م\nالفاتورة: ${invFmt(net)} ج.م\nالتجاوز: ${over} ج.م\n\nهل تريد المتابعة؟`)) return { ok: false };
+            const isAdmin = window._currentUserRole === 'admin';
+            if (!isAdmin) {
+                alert(`🚫 تجاوز الحد الائتماني!\n\nالعميل: ${c.name}\nالحد: ${invFmt(limit)} ج.م\nالرصيد الحالي: ${invFmt(c.balance)} ج.م\nالفاتورة: ${invFmt(net)} ج.م\nالتجاوز: ${over} ج.م\n\nمينفعش تكمل الفاتورة دي — لازم تحصيل جزء من الحساب، أو ترفيع الحد، أو موافقة الأدمن.`);
+                return { ok: false };
+            }
+            const reason = prompt(`⚠️ تجاوز الحد الائتماني!\n\nالعميل: ${c.name}\nالحد: ${invFmt(limit)} ج.م\nالرصيد الحالي: ${invFmt(c.balance)} ج.م\nالفاتورة: ${invFmt(net)} ج.م\nالتجاوز: ${over} ج.م\n\nاكتب سبب الموافقة على التجاوز (إجباري):`);
+            if (!reason || !reason.trim()) { alert('لازم تكتب سبب عشان تكمل.'); return { ok: false }; }
+            try {
+                await sb.from('activity_logs').insert({
+                    user_id: currentUser?.id || null, action: 'credit_limit_override',
+                    entity_type: 'customer', entity_id: invCustId,
+                    metadata: { customer_name: c.name, credit_limit: limit, balance_before: Number(c.balance) || 0, invoice_net: net, over_by: Number(over), reason: reason.trim() },
+                });
+            } catch {}
         }
     }
 
