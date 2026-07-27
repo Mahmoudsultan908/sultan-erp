@@ -6,10 +6,20 @@
    مصادر الحركة: purchases (آجل/نقدي) + supplier_payments (دفعات)
    ════════════════════════════════════════════════════════════ */
 
-let _supStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
-let _supStmtItems = []; // تبويب الأصناف — إجمالي مشتريات من كل صنف
+let _supStmtMoves = []; // الحركات الظاهرة حاليًا (بعد فلتر الفترة لو مطبّق) — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
+let _supStmtItems = []; // تبويب الأصناف — إجمالي مشتريات من كل صنف (بعد فلتر الفترة)
 let _supStmtTab = 'moves'; // 'moves' | 'items'
 let _supStmtLegacyDiff = 0;
+// ── فلتر الفترة (من/إلى تاريخ) — نفس منطق customers.js بالظبط، راجعه
+//   للتفاصيل. الرصيد المتحرك بيتحسب مرة واحدة على كامل التاريخ، وبنفلتر
+//   بعد كده client-side من غير أي استعلام إضافي.
+let _supStmtId = null;
+let _supStmtFrom = '';
+let _supStmtTo = '';
+let _supStmtAllMoves = [];
+let _supStmtPurchaseItemRows = [];
+let _supStmtPurchaseDateOf = {};
+let _supStmtDocsHtml = '';
 
 // ════════════════════════════════════════════════════════════
 // كشف حساب مورد (مودال)
@@ -125,17 +135,10 @@ window.supShowStatement = async function(supplierId) {
         // تبويب "الأصناف" — بند 5، 2026-07-25. إجمالي المشتريات من كل صنف
         // من نفس المورد (إجمالي، بدون خصم مرتجعات — تفاصيلها فى تبويب الحركات).
         const confirmedPurchaseIds = (purchases||[]).filter(p=>p.status==='confirmed').map(p=>p.id);
+        const purchaseDateOf = {}; (purchases||[]).forEach(p=>{ purchaseDateOf[p.id] = p.created_at; });
         const { data: purchaseItemRows } = confirmedPurchaseIds.length
-            ? await sb.from('purchase_items').select('product_id, qty, line_total, products(name,unit)').in('purchase_id', confirmedPurchaseIds)
+            ? await sb.from('purchase_items').select('purchase_id, product_id, qty, line_total, products(name,unit)').in('purchase_id', confirmedPurchaseIds)
             : { data: [] };
-        const itemsMap = {};
-        (purchaseItemRows||[]).forEach(it => {
-            const key = it.product_id;
-            if (!itemsMap[key]) itemsMap[key] = { name: it.products?.name || '—', unit: it.products?.unit || '', qty: 0, total: 0 };
-            itemsMap[key].qty += Number(it.qty)||0;
-            itemsMap[key].total += Number(it.line_total)||0;
-        });
-        const itemsList = Object.values(itemsMap).sort((a,b)=>b.total-a.total);
 
         const balNow = Number(sup.balance)||0;
         const totalDebit = moves.reduce((s,m)=>s+m.debit,0);   // المدفوع للمورد
@@ -166,45 +169,121 @@ window.supShowStatement = async function(supplierId) {
         const tableDebit = displayMoves.reduce((s,m)=>s+m.debit,0);
         const tableCredit = displayMoves.reduce((s,m)=>s+m.credit,0);
 
-        _supStmtMoves = displayMoves;
-        _supStmtItems = itemsList;
+        _supStmtId = supplierId;
+        _supStmtAllMoves = displayMoves;
         _supStmtLegacyDiff = legacyDiff;
-        _supStmtTab = 'moves';
-        window._supStmtTotals = { balNow, totalDebit, totalCredit, tableDebit, tableCredit };
+        _supStmtFrom = ''; _supStmtTo = '';
+        _supStmtPurchaseItemRows = purchaseItemRows || [];
+        _supStmtPurchaseDateOf = purchaseDateOf;
+        window._supStmtSupName = sup.name;
+        window._supStmtBalNow = balNow;
 
-        document.getElementById('supStmtBody').innerHTML = `
-            <div class="mod-grid" style="margin-bottom:16px">
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">المستحق حالياً</div>
-                    <div style="font-size:22px;font-weight:800;color:${balNow>0?'var(--inv-red)':'var(--inv-green)'}">${supFmt(Math.abs(balNow))} ج.م</div>
-                    <div style="font-size:11.5px;color:var(--inv-muted-light)">${balNow>0?'مستحق عليه لنا':balNow<0?'لنا عنده (مقدم)':'مسدد'}</div>
-                </div>
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المشتريات (آجل)</div>
-                    <div style="font-size:22px;font-weight:800;color:var(--inv-text)">${supFmt(totalCredit)}</div>
-                </div>
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المدفوع</div>
-                    <div style="font-size:22px;font-weight:800;color:var(--inv-green)">${supFmt(totalDebit)}</div>
-                </div>
-            </div>
-
-            <div class="ob-tabs" style="margin-bottom:12px">
-                <button class="ob-tab ${_supStmtTab==='moves'?'active':''}" onclick="supStmtSwitchTab('moves')">📋 الحركات</button>
-                <button class="ob-tab ${_supStmtTab==='items'?'active':''}" onclick="supStmtSwitchTab('items')">📦 الأصناف</button>
-            </div>
-            <div id="supStmtTabBody">${supStmtMovesTabHtml()}</div>
-
-            <div style="margin-top:16px">
+        _supStmtDocsHtml = `<div style="margin-top:16px">
                 <div style="font-size:13px;font-weight:800;color:var(--inv-navy);margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
                 ${docs.length === 0 ? `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد مستندات مرتبطة بهذا المورد في الأرشيف.</div>` :
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
                     ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
                 </div>`}
             </div>`;
+
+        supStmtRecomputeAndRender();
     } catch (err) {
         document.getElementById('supStmtBody').innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
+};
+
+// ════════════════════════════════════════════════════════════
+// إعادة حساب الحركات/الأصناف بعد فلتر الفترة، وإعادة رسم المودال —
+// نفس منطق customers.js's custStmtRecomputeAndRender بالظبط.
+// ════════════════════════════════════════════════════════════
+function supStmtRecomputeAndRender() {
+    const from = _supStmtFrom, to = _supStmtTo;
+    let opening = 0;
+    let filtered = _supStmtAllMoves;
+    if (from) {
+        const fromTime = new Date(from).getTime();
+        const before = _supStmtAllMoves.filter(m => new Date(m.date).getTime() < fromTime);
+        opening = before.length ? before[before.length - 1].balance : 0;
+        filtered = _supStmtAllMoves.filter(m => new Date(m.date).getTime() >= fromTime);
+    }
+    if (to) {
+        const toTime = new Date(to + 'T23:59:59').getTime();
+        filtered = filtered.filter(m => new Date(m.date).getTime() <= toTime);
+    }
+    // ملحوظة: منطق المورد للمدين/الدائن معكوس بالنسبة للعميل (راجع فوق) —
+    // رصيد افتتاحي دائن هنا معناه opening موجب (مستحق عليه لنا)
+    const periodMoves = from
+        ? [{ date: from, desc: 'الرصيد الافتتاحي لبداية الفترة', debit: Math.max(-opening,0), credit: Math.max(opening,0), type: 'opening', balance: opening }, ...filtered]
+        : filtered;
+
+    const tableDebit = filtered.reduce((s,m)=>s+m.debit,0);
+    const tableCredit = filtered.reduce((s,m)=>s+m.credit,0);
+    const closingBalance = periodMoves.length ? periodMoves[periodMoves.length-1].balance : opening;
+
+    const inRange = (iso) => {
+        if (!iso) return false;
+        const t = new Date(iso).getTime();
+        if (from && t < new Date(from).getTime()) return false;
+        if (to && t > new Date(to + 'T23:59:59').getTime()) return false;
+        return true;
+    };
+    const itemsMap = {};
+    _supStmtPurchaseItemRows.forEach(it => {
+        if (!inRange(_supStmtPurchaseDateOf[it.purchase_id])) return;
+        const key = it.product_id;
+        if (!itemsMap[key]) itemsMap[key] = { name: it.products?.name || '—', unit: it.products?.unit || '', qty: 0, total: 0 };
+        itemsMap[key].qty += Number(it.qty)||0;
+        itemsMap[key].total += Number(it.line_total)||0;
+    });
+    _supStmtItems = Object.values(itemsMap).sort((a,b)=>b.total-a.total);
+
+    _supStmtMoves = periodMoves;
+    _supStmtTab = _supStmtTab || 'moves';
+    window._supStmtTotals = { balNow: window._supStmtBalNow, totalDebit: tableDebit, totalCredit: tableCredit, tableDebit, tableCredit, closingBalance, isFiltered: !!(from || to) };
+
+    const balNow = window._supStmtBalNow;
+    document.getElementById('supStmtBody').innerHTML = `
+        <div class="dash-card" style="padding:12px 14px;margin-bottom:14px">
+            <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+                <div><label class="ob-label">من تاريخ</label><input type="date" id="supStmtFrom" class="ob-input" style="margin:0" value="${_supStmtFrom}"></div>
+                <div><label class="ob-label">إلى تاريخ</label><input type="date" id="supStmtTo" class="ob-input" style="margin:0" value="${_supStmtTo}"></div>
+                <button class="ob-add-btn" onclick="supStmtApplyDateFilter()">🔍 تطبيق</button>
+                ${(_supStmtFrom || _supStmtTo) ? `<button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="supStmtClearDateFilter()">✕ كل الفترة</button>` : ''}
+            </div>
+        </div>
+
+        <div class="mod-grid" style="margin-bottom:16px">
+            <div class="mod-card" style="padding:14px">
+                <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">المستحق حالياً</div>
+                <div style="font-size:22px;font-weight:800;color:${balNow>0?'var(--inv-red)':'var(--inv-green)'}">${supFmt(Math.abs(balNow))} ج.م</div>
+                <div style="font-size:11.5px;color:var(--inv-muted-light)">${balNow>0?'مستحق عليه لنا':balNow<0?'لنا عنده (مقدم)':'مسدد'}</div>
+            </div>
+            <div class="mod-card" style="padding:14px">
+                <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">${window._supStmtTotals.isFiltered ? 'مشتريات الفترة (آجل)' : 'إجمالي المشتريات (آجل)'}</div>
+                <div style="font-size:22px;font-weight:800;color:var(--inv-text)">${supFmt(tableCredit)}</div>
+            </div>
+            <div class="mod-card" style="padding:14px">
+                <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">${window._supStmtTotals.isFiltered ? 'مدفوعات الفترة' : 'إجمالي المدفوع'}</div>
+                <div style="font-size:22px;font-weight:800;color:var(--inv-green)">${supFmt(tableDebit)}</div>
+            </div>
+        </div>
+
+        <div class="ob-tabs" style="margin-bottom:12px">
+            <button class="ob-tab ${_supStmtTab==='moves'?'active':''}" onclick="supStmtSwitchTab('moves')">📋 الحركات</button>
+            <button class="ob-tab ${_supStmtTab==='items'?'active':''}" onclick="supStmtSwitchTab('items')">📦 الأصناف</button>
+        </div>
+        <div id="supStmtTabBody">${supStmtMovesTabHtml()}</div>
+        ${_supStmtDocsHtml}`;
+}
+
+window.supStmtApplyDateFilter = function () {
+    _supStmtFrom = document.getElementById('supStmtFrom')?.value || '';
+    _supStmtTo = document.getElementById('supStmtTo')?.value || '';
+    supStmtRecomputeAndRender();
+};
+window.supStmtClearDateFilter = function () {
+    _supStmtFrom = ''; _supStmtTo = '';
+    supStmtRecomputeAndRender();
 };
 
 window.supCloseModal = function(id) { const m = document.getElementById(id); if (m) m.remove(); };
@@ -274,14 +353,14 @@ function supStmtMovesTabHtml() {
             </tr></thead>
             <tbody id="supStmtTbody">${supStmtRowsHtml(_supStmtMoves)}</tbody>
             ${_supStmtMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
-                <td colspan="2">الإجمالي</td>
+                <td colspan="2">${t.isFiltered ? 'إجمالي الفترة' : 'الإجمالي'}</td>
                 <td style="text-align:left;color:var(--inv-green)">${supFmt(t.tableDebit)}</td>
                 <td style="text-align:left;color:var(--inv-gold)">${supFmt(t.tableCredit)}</td>
-                <td style="text-align:left">${supFmt(Math.abs(t.balNow||0))}</td>
+                <td style="text-align:left">${supFmt(Math.abs(t.closingBalance||0))}</td>
             </tr></tfoot>` : ''}
             </table>
         </div>
-        ${Math.abs(_supStmtLegacyDiff) > 0.01 ? `
+        ${!t.isFiltered && Math.abs(_supStmtLegacyDiff) > 0.01 ? `
         <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:var(--inv-text-soft);padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
             🗄️ سطر "رصيد مرحّل من النظام القديم" (${supFmt(Math.abs(_supStmtLegacyDiff))}) هو الفرق بين رصيد المورد الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
             غالبًا مورد منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد المورد نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.

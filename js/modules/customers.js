@@ -6,11 +6,26 @@
    مصادر الحركة: sales (آجل/نقدي) + customer_payments (تحصيلات)
    ════════════════════════════════════════════════════════════ */
 
-let _custStmtMoves = []; // الحركات الكاملة لكشف الحساب المفتوح — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
-let _custStmtItems = []; // تبويب الأصناف — إجمالي مشتريات العميل من كل صنف
-let _custStmtProfit = []; // تبويب المكسب الشهري — آخر 12 شهر
+let _custStmtMoves = []; // الحركات الظاهرة حاليًا (بعد فلتر الفترة لو مطبّق) — عشان خانة البحث تفلتر منها من غير ما تعيد الحساب من القاعدة
+let _custStmtItems = []; // تبويب الأصناف — إجمالي مشتريات العميل من كل صنف (بعد فلتر الفترة)
+let _custStmtProfit = []; // تبويب المكسب الشهري — آخر 12 شهر (مش متأثر بفلتر الفترة، تقرير trailing-12-month بطبيعته)
 let _custStmtTab = 'moves'; // 'moves' | 'items' | 'profit'
 let _custStmtLegacyDiff = 0;
+// ── فلتر الفترة (من/إلى تاريخ) — بند 2026-07-28. بنحسب كل الحركات
+//   والرصيد المتحرك مرة واحدة على كامل التاريخ (زي ما كان)، وبنفلتر
+//   بعد كده على الجهاز نفسه من غير أي استعلام إضافي لقاعدة البيانات —
+//   الرصيد المتحرك المحسوب أصلًا بيدّينا "الرصيد الافتتاحي للفترة" مجانًا
+//   (رصيد آخر حركة قبل "من تاريخ" مباشرة).
+let _custStmtId = null;
+let _custStmtFrom = '';
+let _custStmtTo = '';
+let _custStmtAllMoves = []; // كل الحركات (بدون فلتر) بترتيب زمني ورصيد متحرك كامل
+let _custStmtSaleItemRows = [];
+let _custStmtReturnItemRows = [];
+let _custStmtSaleDateOf = {};
+let _custStmtReturnDateOf = {};
+let _custStmtDocsHtml = '';
+let _custStmtInteractionsCount = 0;
 
 // ════════════════════════════════════════════════════════════
 // كشف حساب عميل (مودال)
@@ -212,38 +227,19 @@ window.custShowStatement = async function(customerId) {
         const tableDebit = displayMoves.reduce((s,m)=>s+m.debit,0);
         const tableCredit = displayMoves.reduce((s,m)=>s+m.credit,0);
 
-        _custStmtMoves = displayMoves;
-        _custStmtItems = itemsList;
+        _custStmtId = customerId;
+        _custStmtAllMoves = displayMoves;
         _custStmtProfit = monthBuckets;
         _custStmtLegacyDiff = legacyDiff;
-        _custStmtTab = 'moves';
-        window._custStmtTotals = { balNow, totalDebit, totalCredit, tableDebit, tableCredit };
+        _custStmtFrom = ''; _custStmtTo = '';
+        _custStmtSaleItemRows = saleItemRows || [];
+        _custStmtReturnItemRows = returnItemRows || [];
+        _custStmtSaleDateOf = saleDateOf;
+        _custStmtReturnDateOf = returnDateOf;
+        window._custStmtCustName = cust.name;
+        window._custStmtBalNow = balNow;
 
-        document.getElementById('custStmtBody').innerHTML = `
-            <div class="mod-grid" style="margin-bottom:16px">
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">الرصيد الحالي</div>
-                    <div style="font-size:22px;font-weight:800;color:${balNow>0?'var(--inv-red)':balNow<0?'var(--inv-green)':'var(--inv-muted)'}">${custFmt(balNow)} ج.م</div>
-                    <div style="font-size:11.5px;color:var(--inv-muted-light)">${balNow>0?'مدين (لنا عليه)':balNow<0?'دائن (لنا عنده)':'مسدد'}</div>
-                </div>
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي المبيعات (آجل)</div>
-                    <div style="font-size:22px;font-weight:800;color:var(--inv-text)">${custFmt(totalDebit)}</div>
-                </div>
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">إجمالي التحصيلات</div>
-                    <div style="font-size:22px;font-weight:800;color:var(--inv-green)">${custFmt(totalCredit)}</div>
-                </div>
-            </div>
-
-            <div class="ob-tabs" style="margin-bottom:12px">
-                <button class="ob-tab ${_custStmtTab==='moves'?'active':''}" onclick="custStmtSwitchTab('moves')">📋 الحركات</button>
-                <button class="ob-tab ${_custStmtTab==='items'?'active':''}" onclick="custStmtSwitchTab('items')">📦 الأصناف</button>
-                <button class="ob-tab ${_custStmtTab==='profit'?'active':''}" onclick="custStmtSwitchTab('profit')">📈 المكسب الشهري</button>
-            </div>
-            <div id="custStmtTabBody">${custStmtMovesTabHtml()}</div>
-
-            <div style="margin-top:16px">
+        const docsHtml = `<div style="margin-top:16px">
                 <div style="font-size:13px;font-weight:800;color:var(--inv-navy);margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
                 ${docs.length === 0 ? `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد مستندات مرتبطة بهذا العميل في الأرشيف.</div>` :
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -258,9 +254,109 @@ window.custShowStatement = async function(customerId) {
                 </div>
                 <div id="custInteractionsWrap">${custInteractionsHTML(interactions)}</div>
             </div>`;
+        _custStmtDocsHtml = docsHtml;
+
+        custStmtRecomputeAndRender();
     } catch (err) {
         document.getElementById('custStmtBody').innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
+};
+
+// ════════════════════════════════════════════════════════════
+// إعادة حساب الحركات/الأصناف بعد فلتر الفترة، وإعادة رسم المودال كله —
+// بتتنادى أول مرة (من غير فلتر) وكل مرة يتغيّر فيها "من/إلى تاريخ".
+// الرصيد الافتتاحي للفترة = رصيد آخر حركة قبل "من تاريخ" مباشرة (مأخوذ
+// من الرصيد المتحرك المحسوب أصلًا على كامل التاريخ) — من غير أي استعلام
+// إضافي لقاعدة البيانات.
+// ════════════════════════════════════════════════════════════
+function custStmtRecomputeAndRender() {
+    const from = _custStmtFrom, to = _custStmtTo;
+    let opening = 0;
+    let filtered = _custStmtAllMoves;
+    if (from) {
+        const fromTime = new Date(from).getTime();
+        const before = _custStmtAllMoves.filter(m => new Date(m.date).getTime() < fromTime);
+        opening = before.length ? before[before.length - 1].balance : 0;
+        filtered = _custStmtAllMoves.filter(m => new Date(m.date).getTime() >= fromTime);
+    }
+    if (to) {
+        const toTime = new Date(to + 'T23:59:59').getTime();
+        filtered = filtered.filter(m => new Date(m.date).getTime() <= toTime);
+    }
+    const periodMoves = from
+        ? [{ date: from, desc: 'الرصيد الافتتاحي لبداية الفترة', debit: Math.max(opening,0), credit: Math.max(-opening,0), type: 'opening', nav: null, balance: opening }, ...filtered]
+        : filtered;
+
+    const tableDebit = filtered.reduce((s,m)=>s+m.debit,0);
+    const tableCredit = filtered.reduce((s,m)=>s+m.credit,0);
+    const closingBalance = periodMoves.length ? periodMoves[periodMoves.length-1].balance : opening;
+
+    // تبويب الأصناف — بنفس فلتر الفترة، مبني على تواريخ الفواتير/المرتجعات الأصلية
+    const inRange = (iso) => {
+        if (!iso) return false;
+        const t = new Date(iso).getTime();
+        if (from && t < new Date(from).getTime()) return false;
+        if (to && t > new Date(to + 'T23:59:59').getTime()) return false;
+        return true;
+    };
+    const itemsMap = {};
+    _custStmtSaleItemRows.forEach(it => {
+        if (!inRange(_custStmtSaleDateOf[it.sale_id])) return;
+        const key = it.product_id;
+        if (!itemsMap[key]) itemsMap[key] = { name: it.products?.name || '—', unit: it.products?.unit || '', qty: 0, total: 0 };
+        itemsMap[key].qty += Number(it.qty)||0;
+        itemsMap[key].total += Number(it.line_total)||0;
+    });
+    _custStmtItems = Object.values(itemsMap).sort((a,b)=>b.total-a.total);
+
+    _custStmtMoves = periodMoves;
+    _custStmtTab = _custStmtTab || 'moves';
+    window._custStmtTotals = { balNow: window._custStmtBalNow, totalDebit: tableDebit, totalCredit: tableCredit, tableDebit, tableCredit, closingBalance, isFiltered: !!(from || to) };
+
+    const balNow = window._custStmtBalNow;
+    document.getElementById('custStmtBody').innerHTML = `
+        <div class="dash-card" style="padding:12px 14px;margin-bottom:14px">
+            <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+                <div><label class="ob-label">من تاريخ</label><input type="date" id="custStmtFrom" class="ob-input" style="margin:0" value="${_custStmtFrom}"></div>
+                <div><label class="ob-label">إلى تاريخ</label><input type="date" id="custStmtTo" class="ob-input" style="margin:0" value="${_custStmtTo}"></div>
+                <button class="ob-add-btn" onclick="custStmtApplyDateFilter()">🔍 تطبيق</button>
+                ${(_custStmtFrom || _custStmtTo) ? `<button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="custStmtClearDateFilter()">✕ كل الفترة</button>` : ''}
+            </div>
+        </div>
+
+        <div class="mod-grid" style="margin-bottom:16px">
+            <div class="mod-card" style="padding:14px">
+                <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">الرصيد الحالي</div>
+                <div style="font-size:22px;font-weight:800;color:${balNow>0?'var(--inv-red)':balNow<0?'var(--inv-green)':'var(--inv-muted)'}">${custFmt(balNow)} ج.م</div>
+                <div style="font-size:11.5px;color:var(--inv-muted-light)">${balNow>0?'مدين (لنا عليه)':balNow<0?'دائن (لنا عنده)':'مسدد'}</div>
+            </div>
+            <div class="mod-card" style="padding:14px">
+                <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">${window._custStmtTotals.isFiltered ? 'مبيعات الفترة (آجل)' : 'إجمالي المبيعات (آجل)'}</div>
+                <div style="font-size:22px;font-weight:800;color:var(--inv-text)">${custFmt(tableDebit)}</div>
+            </div>
+            <div class="mod-card" style="padding:14px">
+                <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">${window._custStmtTotals.isFiltered ? 'تحصيلات الفترة' : 'إجمالي التحصيلات'}</div>
+                <div style="font-size:22px;font-weight:800;color:var(--inv-green)">${custFmt(tableCredit)}</div>
+            </div>
+        </div>
+
+        <div class="ob-tabs" style="margin-bottom:12px">
+            <button class="ob-tab ${_custStmtTab==='moves'?'active':''}" onclick="custStmtSwitchTab('moves')">📋 الحركات</button>
+            <button class="ob-tab ${_custStmtTab==='items'?'active':''}" onclick="custStmtSwitchTab('items')">📦 الأصناف</button>
+            <button class="ob-tab ${_custStmtTab==='profit'?'active':''}" onclick="custStmtSwitchTab('profit')">📈 المكسب الشهري</button>
+        </div>
+        <div id="custStmtTabBody">${custStmtMovesTabHtml()}</div>
+        ${_custStmtDocsHtml}`;
+}
+
+window.custStmtApplyDateFilter = function () {
+    _custStmtFrom = document.getElementById('custStmtFrom')?.value || '';
+    _custStmtTo = document.getElementById('custStmtTo')?.value || '';
+    custStmtRecomputeAndRender();
+};
+window.custStmtClearDateFilter = function () {
+    _custStmtFrom = ''; _custStmtTo = '';
+    custStmtRecomputeAndRender();
 };
 
 window.custCloseModal = function(id) { const m = document.getElementById(id); if (m) m.remove(); };
@@ -340,15 +436,15 @@ function custStmtMovesTabHtml() {
             </tr></thead>
             <tbody id="custStmtTbody">${custStmtRowsHtml(_custStmtMoves)}</tbody>
             ${_custStmtMoves.length ? `<tfoot><tr style="background:#F8FAFC;font-weight:800">
-                <td colspan="2">الإجمالي</td>
+                <td colspan="2">${t.isFiltered ? 'إجمالي الفترة' : 'الإجمالي'}</td>
                 <td style="text-align:left;color:var(--inv-red)">${custFmt(t.tableDebit)}</td>
                 <td style="text-align:left;color:var(--inv-green)">${custFmt(t.tableCredit)}</td>
-                <td style="text-align:left">${custFmt(t.balNow)}</td>
+                <td style="text-align:left">${custFmt(t.closingBalance)}</td>
                 <td></td>
             </tr></tfoot>` : ''}
             </table>
         </div>
-        ${Math.abs(_custStmtLegacyDiff) > 0.01 ? `
+        ${!t.isFiltered && Math.abs(_custStmtLegacyDiff) > 0.01 ? `
         <div style="background:#F1F5F9;border:1px solid #E2E8F0;color:var(--inv-text-soft);padding:10px 14px;border-radius:10px;margin-top:10px;font-size:12px">
             🗄️ سطر "رصيد مرحّل من النظام القديم" (${custFmt(_custStmtLegacyDiff)}) هو الفرق بين رصيد العميل الحقيقي وحركاته المسجّلة فعليًا فى سلطان —
             غالبًا عميل منقول من نظام قديم برصيد بداية من غير تفاصيل مستندات. رصيد العميل نفسه صحيح، السطر ده للعرض بس ومفيهوش أي تعديل على البيانات.

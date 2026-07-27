@@ -98,6 +98,7 @@ async function revRenderBody(presetNo) {
                 <div><label class="ob-label">إلى تاريخ</label><input id="rev-to" type="date" class="ob-input" style="margin:0"></div>
                 <button class="ob-add-btn" onclick="revSearch()">🔍 بحث</button>
                 <button class="ob-add-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="revClearSearch()">✕ مسح</button>
+                <button class="ob-add-btn" style="background:#ECFDF5;color:var(--inv-green)" onclick="revExportExcel()">📊 تصدير Excel</button>
             </div>
         </div>
         <div id="rev-results"></div>
@@ -108,6 +109,35 @@ async function revRenderBody(presetNo) {
 window.revClearSearch = function () {
     ['rev-no','rev-name','rev-from','rev-to'].forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
     revSearch();
+};
+
+// ════════════════════════════════════════════════════════════
+// تصدير نتائج البحث الحالية لإكسل — بيصدّر revList بالظبط زي ما هي
+// (بعد فلتر الرقم/الاسم/الفترة اللي مطبّق دلوقتي فى revSearch)، مش كل
+// السجلات — عشان "يحترم الفلتر" زي ما اتطلب.
+// ════════════════════════════════════════════════════════════
+window.revExportExcel = function () {
+    const cfg = revCfg();
+    if (!revList.length) { alert('لا توجد نتائج لتصديرها — طبّق فلتر البحث الأول.'); return; }
+
+    const rows = revList.map(r => {
+        const row = {
+            [cfg.noField === 'invoice_no' ? 'رقم الفاتورة' : 'رقم المرتجع']: r[cfg.noField],
+            [cfg.entityLabel]: r.customers?.name || r.suppliers?.name || 'نقدي',
+        };
+        if (cfg.hasPaymentType) row['نوع الدفع'] = r.payment_type === 'credit' ? 'آجل' : 'نقدي';
+        else row['مرتبط بفاتورة'] = (r.sale_id || r.purchase_id) ? 'نعم' : 'مستقل';
+        row['التاريخ'] = new Date(r.created_at).toLocaleDateString('ar-EG');
+        row['الإجمالي'] = Number(r.total) || 0;
+        row['الحالة'] = r.status === 'confirmed' ? 'مؤكدة' : r.status === 'cancelled' ? 'ملغاة' : r.status;
+        return row;
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, cfg.label.slice(0, 31));
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `${cfg.label}_${today}.xlsx`);
 };
 
 window.revSearch = async function () {
