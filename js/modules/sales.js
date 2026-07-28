@@ -290,7 +290,7 @@ async function renderSales(c) {
     try {
         await invLoadData();
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message}<br><small>تأكد من اتصال Supabase</small></div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message}<br><small>تأكد من اتصال Supabase</small></div>`;
         return;
     }
 
@@ -366,14 +366,14 @@ async function renderSales(c) {
 
     c.innerHTML = `
     <div class="inv-root density-${invGetDensity()}">
-        ${invEditingId ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
+        ${invEditingId ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
             <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على الفاتورة <strong>${invEditingOldInvoiceNo}</strong>. عند الحفظ: هتتلغي الفاتورة القديمة تلقائياً (مع إرجاع المخزون والرصيد) وتتسجّل فاتورة جديدة بالتعديلات.</span>
             <button class="inv-top-btn" style="padding:4px 10px" onclick="invEditingId=null;invEditingOldInvoiceNo=null;renderSales(document.getElementById('app-content'))">إلغاء التعديل</button>
         </div>` : ''}
         ${invPendingOrderId ? `<div style="background:#DCFCE7;border:2px solid #16A34A;color:#166534;padding:12px 16px;border-radius:9px;margin-bottom:8px;font-size:13.5px;font-weight:700">
             ✅ بتعتمد طلب سلطانو <strong>${invPendingOrderNo || ''}</strong> بإجمالي <strong>${invFmt(invPendingOrderTotal || 0)} ج.م</strong> — تأكد إن الأصناف والإجمالي تحت مطابقين للرقم ده بالظبط قبل ما تحفظ، خصوصًا لو بتراجع أكتر من طلب في نفس الوقت.
         </div>` : ''}
-        ${INV_DB.isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
+        ${INV_DB.isOfflineData ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
             📴 <strong>غير متصل بالإنترنت</strong> — الأصناف والعملاء المعروضة من آخر نسخة محفوظة (${INV_DB.offlineDataAge ? new Date(INV_DB.offlineDataAge).toLocaleString('ar-EG') : '—'})، وممكن ماتكونش محدّثة. الفاتورة هتتسجّل محلياً برقم مؤقت وتتزامن تلقائياً برقم رسمي لما الاتصال يرجع. <strong>تعديل فاتورة موجودة مش متاح أوفلاين.</strong>
         </div>` : ''}
         ${invHeaderHTML()}

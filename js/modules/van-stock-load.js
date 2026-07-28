@@ -44,7 +44,7 @@ async function renderVanStockLoad(container) {
         await Promise.all([vlLoadRecent(), vlComputeLoadSequence()]);
         vlRenderScreen(container);
     } catch (err) {
-        container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        container.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -74,7 +74,7 @@ async function vlLoadRecent() {
 
 function vlRenderScreen(c) {
     if (!VL_DB.reps.length) {
-        c.innerHTML = `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:16px;border-radius:12px">
+        c.innerHTML = `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:16px;border-radius:12px">
             ⚠️ لا يوجد مندوبون نشطون بعد. أضف مندوباً أولاً من صفحة "🚗 المندوبون" (ولازم يكون له حساب دخول من صفحة "👥 المستخدمون" بدور "مندوب مبيعات").
         </div>`;
         return;
@@ -268,7 +268,7 @@ async function vlRunSuggest(days) {
         _vlSuggestRows.forEach(r => { _vlMultiSelected[r.pid] = r.qty; });
         vlRenderSuggestList(usedFallback);
     } catch (err) {
-        if (box) box.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:14px;border-radius:10px">خطأ: ${err.message}</div>`;
+        if (box) box.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:14px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -280,7 +280,7 @@ function vlRenderSuggestList(usedFallback) {
         return;
     }
     const note = usedFallback
-        ? `<div style="font-size:11px;color:#B45309;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:6px 10px;margin-bottom:8px">⚠️ المندوب ده لسه مالوش مبيعات كفاية فى الفترة دى، فالاقتراح مبني على الأكثر مبيعاً على مستوى كل المندوبين.</div>`
+        ? `<div style="font-size:11px;color:#B45309;background:var(--inv-gold-bg);border:1px solid #FCD34D;border-radius:8px;padding:6px 10px;margin-bottom:8px">⚠️ المندوب ده لسه مالوش مبيعات كفاية فى الفترة دى، فالاقتراح مبني على الأكثر مبيعاً على مستوى كل المندوبين.</div>`
         : '';
     box.innerHTML = note + _vlSuggestRows.map(r => {
         const p = VL_DB.products.find(x => x.id === r.pid);

@@ -89,7 +89,7 @@ async function renderAdvancedPermissions(c) {
     try {
         const isAdmin = await apCurrentIsAdmin();
         if (!isAdmin) {
-            c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:24px;border-radius:12px;text-align:center">
+            c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:24px;border-radius:12px;text-align:center">
                 <div style="font-size:32px;margin-bottom:8px">🔒</div>
                 هذه الصفحة متاحة لمدير النظام فقط.
             </div>`;
@@ -106,13 +106,13 @@ async function renderAdvancedPermissions(c) {
 
         apRenderMatrix(c, denyMap, tableMissing);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
 function apRenderMatrix(c, denyMap, tableMissing) {
     c.innerHTML = `
-    ${tableMissing ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
+    ${tableMissing ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
         ⚠️ جدول <code>role_permissions</code> غير موجود بعد. شغّل ملف <code>advanced_permissions_migration.sql</code> في Supabase أولاً.
     </div>` : ''}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
@@ -201,7 +201,7 @@ window.loadMod = async function (el, modName) {
         const titleEl = document.getElementById('topbarTitle');
         if (titleEl) titleEl.innerText = '🔒 غير مصرّح';
         if (c) {
-            c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:40px 24px;border-radius:12px;text-align:center">
+            c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:40px 24px;border-radius:12px;text-align:center">
                 <div style="font-size:40px;margin-bottom:10px">🔒</div>
                 <div style="font-weight:800;margin-bottom:6px">لا تملك صلاحية الوصول لهذه الصفحة</div>
                 <div style="font-size:13px;color:var(--inv-muted)">تواصل مع مدير النظام لو محتاج صلاحية إضافية.</div>

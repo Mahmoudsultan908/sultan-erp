@@ -62,7 +62,7 @@ async function renderCustomersManage(c) {
             custShowStatement(pendId);
         }
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -83,7 +83,7 @@ function custRenderPage(c) {
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${_mgCustList.length}</div><div class="mod-card-lbl">إجمالي العملاء</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${mdFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
         </div>
 
@@ -143,7 +143,7 @@ function custRenderRows() {
             <td style="text-align:left;font-weight:700;color:${bal>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(bal)}</td>
             <td style="text-align:center;white-space:nowrap">
                 <button class="cc-edit" onclick="custOpenEdit('${x.id}')">✏️</button>
-                <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="custShowStatement('${x.id}')">📄 كشف حساب</button>
+                <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="custShowStatement('${x.id}')">📄 كشف حساب</button>
                 ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenAdd('${x.id}','${(x.name||'').replace(/'/g,"\\'")}')" title="تسجيل تفاعل سريع">📞</button>` : ''}
             </td>
         </tr>`;
@@ -215,8 +215,8 @@ function custOpenModal(x) {
                             <option value="check" ${x?.preferred_payment_method==='check'?'selected':''}>شيك</option>
                         </select></div>
                 </div>
-                <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;margin-top:4px">
-                    <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:#991B1B;cursor:pointer">
+                <div style="background:var(--inv-red-bg);border:1px solid #FECACA;border-radius:8px;padding:10px 14px;margin-top:4px">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--inv-red);cursor:pointer">
                         <input type="checkbox" id="custDebtLocked" ${x?.debt_locked?'checked':''} style="width:17px;height:17px">
                         🔒 قفل بيع الآجل لهذا العميل — المندوب يقدر يبيعله نقدي ويحصّل منه بس، مايقدرش يسجّل آجل
                     </label>
@@ -315,7 +315,7 @@ async function renderSuppliersManage(c) {
             supShowStatement(pendId);
         }
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -331,8 +331,8 @@ function suppRenderPage(c) {
         </div>
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold)">🏭</div><div class="mod-card-val">${_mgSuppList.length}</div><div class="mod-card-lbl">إجمالي الموردين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">🏭</div><div class="mod-card-val">${_mgSuppList.length}</div><div class="mod-card-lbl">إجمالي الموردين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">✅</div><div class="mod-card-val">${debtFree}</div><div class="mod-card-lbl">موردين بلا مستحقات</div></div>
         </div>
 
@@ -360,7 +360,7 @@ function suppRenderRows() {
         <td style="text-align:left;font-weight:700;color:${Number(x.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(x.balance)}</td>
         <td style="text-align:center;white-space:nowrap">
             <button class="cc-edit" onclick="suppOpenEdit('${x.id}')">✏️</button>
-            <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="supShowStatement('${x.id}')">📄 كشف حساب</button>
+            <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="supShowStatement('${x.id}')">📄 كشف حساب</button>
         </td>
     </tr>`).join('');
 }

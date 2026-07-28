@@ -44,13 +44,13 @@ async function renderPurchaseOrders(c) {
                     <td>${PO_STATUS_LABELS[o.status]||o.status}</td>
                     <td>
                         ${o.status==='pending' ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="poConvertToPurchase('${o.id}')">🔄 تحويل لفاتورة</button>
-                        <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="poCancel('${o.id}')">🚫</button>` : ''}
+                        <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="poCancel('${o.id}')">🚫</button>` : ''}
                     </td>
                 </tr>`).join('') : '<tr><td colspan="6" class="empty-state"><span>📋</span>لا توجد أوامر شراء بعد</td></tr>'}
             </tbody></table>
         </div>`;
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 

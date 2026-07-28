@@ -65,7 +65,7 @@ async function renderGeneralImportExport(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري التحقق من الصلاحيات...</div>';
     const isAdmin = await gxCurrentIsAdmin();
     if (!isAdmin) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:24px;border-radius:12px;text-align:center">
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:24px;border-radius:12px;text-align:center">
             <div style="font-size:32px;margin-bottom:8px">🔒</div>
             هذه الصفحة متاحة لمدير النظام فقط.
         </div>`;
@@ -140,7 +140,7 @@ function gxRenderImportTab() {
     const body = document.getElementById('gx-body');
     if (!body) return;
     body.innerHTML = `
-    <div style="background:#FFFBEB;border:1px solid #FED7AA;color:#92400E;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:16px">
+    <div style="background:var(--inv-gold-bg);border:1px solid #FED7AA;color:var(--inv-gold);padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:16px">
         ⚠️ الاستيراد هنا مقصور عمداً على جداول البيانات المرجعية (مخازن، بنود مصروفات، مناطق/تصنيفات/مجموعات عملاء، مستويات أسعار، مندوبين، شجرة حسابات).
         الأصناف/العملاء/الموردين ليهم شاشات استيراد مخصصة أدق (📥 استيراد أصناف/عملاء/موردين Excel من القائمة الجانبية).
         باقي الجداول (فواتير، مرتجعات، قيود...) مش متاحة للاستيراد العام هنا لأنها مرتبطة بمحرك مخزون/محاسبة تلقائي (Triggers) هيتخطّاه أي استيراد خام.

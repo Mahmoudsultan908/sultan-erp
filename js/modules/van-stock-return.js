@@ -41,7 +41,7 @@ async function renderVanStockReturn(container) {
         await vrLoadRecent();
         vrRenderScreen(container);
     } catch (err) {
-        container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        container.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -65,7 +65,7 @@ function vrRepProducts() {
 
 function vrRenderScreen(c) {
     if (!VR_DB.reps.length) {
-        c.innerHTML = `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:16px;border-radius:12px">
+        c.innerHTML = `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:16px;border-radius:12px">
             ⚠️ لا يوجد مندوبون نشطون بعد.
         </div>`;
         return;

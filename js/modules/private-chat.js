@@ -137,9 +137,9 @@ async function renderPrivateChat(c) {
         pchRenderScreen(c);
     } catch (err) {
         if (/relation .* does not exist/i.test(err.message || '')) {
-            c.innerHTML = `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:16px;border-radius:12px">⚠️ جداول المحادثات الخاصة لسه مش موجودة — شغّل <code>private_chat_migration.sql</code> فى Supabase أولاً.</div>`;
+            c.innerHTML = `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:16px;border-radius:12px">⚠️ جداول المحادثات الخاصة لسه مش موجودة — شغّل <code>private_chat_migration.sql</code> فى Supabase أولاً.</div>`;
         } else {
-            c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+            c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
         }
     }
 }
@@ -150,7 +150,7 @@ function pchRenderScreen(c) {
         <div><h2 style="font-size:22px;font-weight:800">🔒 المحادثات الخاصة</h2>
         <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">محادثة محمية بكلمة سر منفصلة عن كلمة سر الدخول — كل شخص بيحط كلمة السر بتاعته وبيدخلها فى كل مرة يفتحها</p></div>
         <div style="display:flex;gap:8px">
-            ${typeof Notification !== 'undefined' && Notification.permission !== 'granted' ? `<button class="mod-btn" style="background:#FFFBEB;color:var(--inv-gold)" onclick="pchRequestNotifyPermission()">🔔 تفعيل الإشعارات</button>` : ''}
+            ${typeof Notification !== 'undefined' && Notification.permission !== 'granted' ? `<button class="mod-btn" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="pchRequestNotifyPermission()">🔔 تفعيل الإشعارات</button>` : ''}
             ${PCH_DB.isAdmin && !_pchUnlockedThreadId ? `<button class="mod-btn mod-btn-primary" onclick="pchOpenNewThread()">+ محادثة جديدة</button>` : ''}
         </div>
     </div>
@@ -315,12 +315,12 @@ function pchChatViewHTML() {
             <div style="font-weight:800">🔒 محادثة مع ${pchOtherPerson(t)}</div>
             <div style="display:flex;gap:6px">
                 <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft);font-size:12px;padding:6px 10px" onclick="pchLockAndBack()">🔙 رجوع</button>
-                <button class="mod-btn" style="background:#FFFBEB;color:var(--inv-gold);font-size:12px;padding:6px 10px" onclick="pchOpenChangePass()">🔑 غيّر كلمة السر بتاعتي</button>
+                <button class="mod-btn" style="background:var(--inv-gold-bg);color:var(--inv-gold);font-size:12px;padding:6px 10px" onclick="pchOpenChangePass()">🔑 غيّر كلمة السر بتاعتي</button>
             </div>
         </div>
     </div>
-    ${pinned.length ? `<div class="mod-card" style="background:#FFFBEB;border-color:#FCD34D;margin-bottom:10px;padding:12px 16px">
-        <div style="font-weight:700;font-size:12px;color:#92400E;margin-bottom:8px">📌 رسائل مثبتة</div>
+    ${pinned.length ? `<div class="mod-card" style="background:var(--inv-gold-bg);border-color:#FCD34D;margin-bottom:10px;padding:12px 16px">
+        <div style="font-weight:700;font-size:12px;color:var(--inv-gold);margin-bottom:8px">📌 رسائل مثبتة</div>
         <div style="display:flex;flex-direction:column;gap:8px">${pinned.map(m => pchMessageHTML(m)).join('')}</div>
     </div>` : ''}
     <div class="mod-card" style="padding:14px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:8px" id="pchMsgList">
@@ -347,7 +347,7 @@ function pchMessageHTML(m) {
     }
     const textHTML = m.body ? `<div style="${attachmentHTML ? 'margin-top:6px' : ''}">${m.body.replace(/</g, '&lt;')}</div>` : '';
     return `<div style="align-self:${mine ? 'flex-end' : 'flex-start'};max-width:75%">
-        <div style="background:${mine ? '#DBEAFE' : '#F1F5F9'};border-radius:12px;padding:8px 12px;font-size:13px;white-space:pre-wrap">${attachmentHTML}${textHTML}</div>
+        <div style="background:${mine ? '#DBEAFE' : '#F1F5F9'};color:#1A2233;border-radius:12px;padding:8px 12px;font-size:13px;white-space:pre-wrap">${attachmentHTML}${textHTML}</div>
         <div style="font-size:10px;color:var(--inv-muted-light);margin-top:2px;display:flex;gap:6px;align-items:center">
             <span>${m.sender?.name || ''} · ${new Date(m.created_at).toLocaleString('ar-EG')}</span>
             <span style="cursor:pointer" title="${m.is_pinned ? 'إلغاء التثبيت' : 'تثبيت'}" onclick="pchTogglePin('${m.id}',${!m.is_pinned})">${m.is_pinned ? '📌' : '📍'}</span>
@@ -397,7 +397,7 @@ function pchUpdateMicButton() {
     const btn = document.getElementById('pchMicBtn');
     if (!btn) return;
     btn.textContent = _pchIsRecording ? '⏹️' : '🎤';
-    btn.style.background = _pchIsRecording ? '#FEE2E2' : '#F1F5F9';
+    btn.style.background = _pchIsRecording ? 'var(--inv-red-bg)' : '#F1F5F9';
     btn.style.color = _pchIsRecording ? 'var(--inv-red)' : 'var(--inv-text-soft)';
 }
 

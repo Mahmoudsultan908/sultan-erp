@@ -134,11 +134,11 @@ async function renderReturns(c) {
                 RET_DB.isOfflineData = true;
                 RET_DB.offlineDataAge = Math.min(cc?.updatedAt || Date.now(), cp?.updatedAt || Date.now());
             } else {
-                c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message || 'تعذر تحميل البيانات'}</div>`;
+                c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message || 'تعذر تحميل البيانات'}</div>`;
                 return;
             }
         } else {
-            c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message || 'تعذر تحميل البيانات'}</div>`;
+            c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ في تحميل البيانات: ${err.message || 'تعذر تحميل البيانات'}</div>`;
             return;
         }
     }
@@ -291,15 +291,15 @@ async function retAllocateRealReturnNo() {
 function retRenderScreen(c) {
     c.innerHTML = `
     <div class="inv-root density-cozy">
-        ${retEditingId ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
+        ${retEditingId ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
             <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على المرتجع <strong>${retEditingOldReturnNo}</strong>. عند الحفظ: هيتلغي المرتجع القديم تلقائياً (مع عكس أثره على المخزون والرصيد) ويتسجّل مرتجع جديد بالتعديلات.</span>
             <button class="inv-top-btn" style="padding:4px 10px" onclick="retEditingId=null;retEditingOldReturnNo=null;retEditingLinkId=null;renderReturns(document.getElementById('app-content'))">إلغاء التعديل</button>
         </div>` : ''}
-        ${retTableMissing ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12px">
+        ${retTableMissing ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12px">
             ⚠️ <strong>تنبيه:</strong> جدول <code>${retType === 'sales' ? 'sales_returns' : 'purchase_returns'}</code> أو جدول البنود المرتبط به غير مكتمل في قاعدة البيانات بعد.
             شغّل ملف <code>returns_migration.sql</code> في Supabase أولاً حتى تتحرّك المخازن والأرصدة تلقائياً.
         </div>` : ''}
-        ${RET_DB.isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
+        ${RET_DB.isOfflineData ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px">
             📴 <strong>غير متصل بالإنترنت</strong> — البيانات من آخر نسخة محفوظة (${RET_DB.offlineDataAge ? new Date(RET_DB.offlineDataAge).toLocaleString('ar-EG') : '—'}). <strong>مرتجع المبيعات</strong> هيتسجّل محلياً ويتزامن تلقائياً برقم رسمي لما الاتصال يرجع. <strong>مرتجع المشتريات مش متاح أوفلاين.</strong>
         </div>` : ''}
         ${retHeaderHTML()}

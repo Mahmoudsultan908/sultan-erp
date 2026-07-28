@@ -74,7 +74,7 @@ async function renderInvestors(c) {
             </div>
         `;
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -155,7 +155,7 @@ window.invsCalcPreview = async function() {
         area.innerHTML = `
             <div class="mod-card">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-                    <div class="mod-card-icon" style="background:${result.is_loss?'#FEE2E2':'#F0FDF4'};color:${result.is_loss?'var(--inv-red)':'var(--inv-green)'};width:40px;height:40px;font-size:18px">${result.is_loss?'📉':'📊'}</div>
+                    <div class="mod-card-icon" style="background:${result.is_loss?'var(--inv-red-bg)':'var(--inv-green-light)'};color:${result.is_loss?'var(--inv-red)':'var(--inv-green)'};width:40px;height:40px;font-size:18px">${result.is_loss?'📉':'📊'}</div>
                     <div style="font-size:15px;font-weight:800">معاينة ${new Date(_invsPreview.period_month).toLocaleDateString('ar-EG',{year:'numeric',month:'long'})}</div>
                 </div>
                 ${result.is_loss ? `<div class="mod-alert-banner danger" style="margin-bottom:14px"><span>⚠️</span><span>خسارة الشهر — المستثمر هيتحمّل نصيبه من رأس المال بس (مش من المجهود).</span></div>` : ''}
@@ -170,8 +170,8 @@ window.invsCalcPreview = async function() {
                         <tr><td>صافي ربح الشهر</td><td style="text-align:left;font-weight:800;color:${result.is_loss?'var(--inv-red)':'var(--inv-green)'}">${invsFmt(result.net_profit)}</td></tr>
                         <tr><td>نسبة المستثمر من رأس المال المملوك</td><td style="text-align:left">${(result.investor_ratio*100).toFixed(1)}%</td></tr>
                         <tr><td>نسبة صاحب المحل من رأس المال المملوك</td><td style="text-align:left">${(result.owner_ratio*100).toFixed(1)}%</td></tr>
-                        <tr style="background:#FFFBEB"><td><strong>نصيب المستثمر الإجمالي</strong></td><td style="text-align:left;font-weight:800;color:var(--inv-gold)">${invsFmt(result.investor_total)}</td></tr>
-                        <tr style="background:#FFFBEB"><td><strong>نصيب صاحب المحل الإجمالي</strong> ${!result.is_loss?`<small style="color:var(--inv-muted-light)">(مجهود ${invsFmt(result.effort_amount)} + رأس مال ${invsFmt(result.owner_capital_share)})</small>`:''}</td><td style="text-align:left;font-weight:800;color:var(--inv-gold)">${invsFmt(result.owner_total)}</td></tr>
+                        <tr style="background:var(--inv-gold-bg)"><td><strong>نصيب المستثمر الإجمالي</strong></td><td style="text-align:left;font-weight:800;color:var(--inv-gold)">${invsFmt(result.investor_total)}</td></tr>
+                        <tr style="background:var(--inv-gold-bg)"><td><strong>نصيب صاحب المحل الإجمالي</strong> ${!result.is_loss?`<small style="color:var(--inv-muted-light)">(مجهود ${invsFmt(result.effort_amount)} + رأس مال ${invsFmt(result.owner_capital_share)})</small>`:''}</td><td style="text-align:left;font-weight:800;color:var(--inv-gold)">${invsFmt(result.owner_total)}</td></tr>
                     </tbody></table>
                 </div>
                 <div class="mod-form-group" style="margin-top:14px"><label>ملاحظات (اختياري)</label>
@@ -181,7 +181,7 @@ window.invsCalcPreview = async function() {
             </div>
         `;
     } catch (err) {
-        area.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:12px">خطأ: ${err.message}</div>`;
+        area.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 };
 

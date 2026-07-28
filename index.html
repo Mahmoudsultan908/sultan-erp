@@ -228,6 +228,8 @@ body.inv-fullscreen .content { padding: 12px !important; }
   --inv-muted-light: #94A3B8;
   --inv-text-soft: #475569;
   --inv-divider: #FBF9F4;
+  --inv-red-bg: #FEE2E2;
+  --inv-gold-bg: #FFFBEB;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -245,7 +247,7 @@ body.inv-fullscreen .content { padding: 12px !important; }
    limit-status، dash-badge-*) لسه ثابتة — مقبول بصريًا، مش عنصر
    أساسي في القراءة. ═══════════════════════════════════════════ */
 @media (prefers-color-scheme: dark) {
-  :root { --inv-navy: #7FA5D1; --inv-navy-deep: #0B1622; --inv-navy-light: #9FB4D1; --inv-gold: #D6A75C; --inv-gold-light: #E8B768; --inv-gold-soft: #F0C987; --inv-green: #4FBE8B; --inv-green-light: #123024; --inv-red: #E2726B; --inv-bg: #0F1520; --inv-card: #171F2B; --inv-border: #28324A; --inv-text: #E9ECF2; --inv-muted: #8A93A3; --inv-muted-light: #6E7889; --inv-text-soft: #A7B0C0; --inv-divider: #131A26; }
+  :root { --inv-navy: #7FA5D1; --inv-navy-deep: #0B1622; --inv-navy-light: #9FB4D1; --inv-gold: #D6A75C; --inv-gold-light: #E8B768; --inv-gold-soft: #F0C987; --inv-green: #4FBE8B; --inv-green-light: #123024; --inv-red: #E2726B; --inv-bg: #0F1520; --inv-card: #171F2B; --inv-border: #28324A; --inv-text: #E9ECF2; --inv-muted: #8A93A3; --inv-muted-light: #6E7889; --inv-text-soft: #A7B0C0; --inv-divider: #131A26; --inv-red-bg: #331917; --inv-gold-bg: #2E2410; }
   .mod-form-input { background: var(--inv-card); color: var(--inv-text); }
   .mod-alert-banner, .mod-alert-banner.warning { background: #2E2410; color: #E8B768; border-color: #5C4416; }
   .mod-alert-banner.info { background: #16233A; color: #7FA5D1; border-color: #28324A; }
@@ -257,8 +259,8 @@ body.inv-fullscreen .content { padding: 12px !important; }
 /* نفس القيم فوق، بس كـ attribute selector عشان تكسب على تفضيل النظام
    في أي اتجاه (الأولوية الأعلى بتاعة [data-theme] بتكسب بغض النظر عن
    ترتيب القواعد) — ده اللي بيخلي زرار التبديل اليدوي شغال فعليًا. */
-:root[data-theme="dark"] { --inv-navy: #7FA5D1; --inv-navy-deep: #0B1622; --inv-navy-light: #9FB4D1; --inv-gold: #D6A75C; --inv-gold-light: #E8B768; --inv-gold-soft: #F0C987; --inv-green: #4FBE8B; --inv-green-light: #123024; --inv-red: #E2726B; --inv-bg: #0F1520; --inv-card: #171F2B; --inv-border: #28324A; --inv-text: #E9ECF2; --inv-muted: #8A93A3; --inv-muted-light: #6E7889; --inv-text-soft: #A7B0C0; --inv-divider: #131A26; }
-:root[data-theme="light"] { --inv-navy: #1E293B; --inv-navy-deep: #0F172A; --inv-navy-light: #334155; --inv-gold: #D97706; --inv-gold-light: #F59E0B; --inv-gold-soft: #FBBF24; --inv-green: #059669; --inv-green-light: #D1FAE5; --inv-red: #DC2626; --inv-bg: #F7F4EF; --inv-card: #FFFFFF; --inv-border: #E8E1D3; --inv-text: #0F172A; --inv-muted: #64748B; --inv-muted-light: #94A3B8; --inv-text-soft: #475569; --inv-divider: #FBF9F4; }
+:root[data-theme="dark"] { --inv-navy: #7FA5D1; --inv-navy-deep: #0B1622; --inv-navy-light: #9FB4D1; --inv-gold: #D6A75C; --inv-gold-light: #E8B768; --inv-gold-soft: #F0C987; --inv-green: #4FBE8B; --inv-green-light: #123024; --inv-red: #E2726B; --inv-bg: #0F1520; --inv-card: #171F2B; --inv-border: #28324A; --inv-text: #E9ECF2; --inv-muted: #8A93A3; --inv-muted-light: #6E7889; --inv-text-soft: #A7B0C0; --inv-divider: #131A26; --inv-red-bg: #331917; --inv-gold-bg: #2E2410; }
+:root[data-theme="light"] { --inv-navy: #1E293B; --inv-navy-deep: #0F172A; --inv-navy-light: #334155; --inv-gold: #D97706; --inv-gold-light: #F59E0B; --inv-gold-soft: #FBBF24; --inv-green: #059669; --inv-green-light: #D1FAE5; --inv-red: #DC2626; --inv-bg: #F7F4EF; --inv-card: #FFFFFF; --inv-border: #E8E1D3; --inv-text: #0F172A; --inv-muted: #64748B; --inv-muted-light: #94A3B8; --inv-text-soft: #475569; --inv-divider: #FBF9F4; --inv-red-bg: #FEE2E2; --inv-gold-bg: #FFFBEB; }
 [data-theme="dark"] .mod-form-input { background: var(--inv-card); color: var(--inv-text); }
 [data-theme="dark"] .mod-alert-banner, [data-theme="dark"] .mod-alert-banner.warning { background: #2E2410; color: #E8B768; border-color: #5C4416; }
 [data-theme="dark"] .mod-alert-banner.info { background: #16233A; color: #7FA5D1; border-color: #28324A; }

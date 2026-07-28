@@ -49,7 +49,7 @@ async function renderPurchaseSuggestions(c) {
         psgRenderScreen(c);
         if (psgCompanyId) await psgRunSuggest();
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -68,7 +68,7 @@ function psgDefaultSupplierFor(companyId) {
 
 function psgRenderScreen(c) {
     if (!PSG_DB.companies.length) {
-        c.innerHTML = `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:16px;border-radius:12px">
+        c.innerHTML = `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:16px;border-radius:12px">
             ⚠️ لا توجد شركات مضافة بعد. أضف شركة أولاً من شاشة "🗂️ إدارة الأصناف" (قسم الشركة المصنّعة).
         </div>`;
         return;
@@ -182,7 +182,7 @@ async function psgRunSuggest() {
         psgRows.forEach(r => { _psgSelected[r.pid] = r.qty; });
         psgRenderResult();
     } catch (err) {
-        if (box) box.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:14px;border-radius:10px">خطأ: ${err.message}</div>`;
+        if (box) box.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:14px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 }
 

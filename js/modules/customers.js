@@ -41,7 +41,7 @@ window.custShowStatement = async function(customerId) {
         <div class="mod-modal" style="max-width:820px">
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${cust.name}</h3>
                 <div style="display:flex;align-items:center;gap:10px">
-                    <button class="cc-edit" style="background:${custThemeBg('#FFFBEB','#2E2410')};color:var(--inv-gold)" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
+                    <button class="cc-edit" style="background:${custThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold)" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
                     <button class="mod-modal-close" onclick="custCloseModal('custStmtModal')">&times;</button>
                 </div></div>
             <div class="mod-modal-body" id="custStmtBody">
@@ -243,14 +243,14 @@ window.custShowStatement = async function(customerId) {
                 <div style="font-size:13px;font-weight:800;color:var(--inv-navy);margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
                 ${docs.length === 0 ? `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد مستندات مرتبطة بهذا العميل في الأرشيف.</div>` :
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
-                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:${custThemeBg('#FFFBEB','#2E2410')};color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
+                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:${custThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
                 </div>`}
             </div>
 
             <div style="margin-top:16px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                     <div style="font-size:13px;font-weight:800;color:var(--inv-navy)">🤝 سجل التفاعلات (${interactions.length})</div>
-                    ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:${custThemeBg('#FFFBEB','#2E2410')};color:var(--inv-gold)" onclick="crmOpenAdd('${customerId}','${(cust.name||'').replace(/'/g,"\\'")}')">+ تسجيل تفاعل</button>` : ''}
+                    ${typeof crmOpenAdd === 'function' ? `<button class="cc-edit" style="background:${custThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold)" onclick="crmOpenAdd('${customerId}','${(cust.name||'').replace(/'/g,"\\'")}')">+ تسجيل تفاعل</button>` : ''}
                 </div>
                 <div id="custInteractionsWrap">${custInteractionsHTML(interactions)}</div>
             </div>`;
@@ -258,7 +258,7 @@ window.custShowStatement = async function(customerId) {
 
         custStmtRecomputeAndRender();
     } catch (err) {
-        document.getElementById('custStmtBody').innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        document.getElementById('custStmtBody').innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -368,8 +368,8 @@ function custStmtRowsHtml(moves) {
     if (!moves.length) return `<tr><td colspan="6" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>`;
     return moves.map(m => {
         const isCash = m.type.endsWith('-cash');
-        const bg = m.type==='sale-credit' ? custThemeBg('#FEF2F2','#331917') : m.type==='payment' ? custThemeBg('#ECFDF5','#123024')
-            : m.type==='return-credit' || m.type==='return-cash' ? custThemeBg('#FFFBEB','#2E2410')
+        const bg = m.type==='sale-credit' ? custThemeBg('var(--inv-red-bg)','#331917') : m.type==='payment' ? custThemeBg('var(--inv-green-light)','#123024')
+            : m.type==='return-credit' || m.type==='return-cash' ? custThemeBg('var(--inv-gold-bg)','#2E2410')
             : m.type==='transfer-out' || m.type==='transfer-in' ? custThemeBg('#EFF6FF','#16233A')
             : m.type==='opening' ? custThemeBg('#F5F3FF','#241A3D')
             : m.type==='legacy-carry' ? custThemeBg('#F1F5F9','#131A26') : custThemeBg('#F8FAFC','#131A26');
@@ -565,6 +565,6 @@ function custThemeBg(light, dark) { return (typeof window.themeIsDark === 'funct
 // null = تسجيل يدوي/قديم قبل إضافة العمود، مفيش بادچ ليه
 function custSourceBadge(source) {
     if (source === 'sultanoo') return '<span style="font-size:9.5px;background:#EFF6FF;color:#2563EB;padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">📱 سلطانو</span>';
-    if (source === 'rep_app') return '<span style="font-size:9.5px;background:#F0FDF4;color:var(--inv-green);padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">🚗 مندوب</span>';
+    if (source === 'rep_app') return '<span style="font-size:9.5px;background:var(--inv-green-light);color:var(--inv-green);padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">🚗 مندوب</span>';
     return '';
 }

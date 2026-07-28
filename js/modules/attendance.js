@@ -64,7 +64,7 @@ async function renderAttendance(c) {
         `;
         await attLoadHistory();
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -77,8 +77,8 @@ function attTodayRowsHtml() {
         if (!r) {
             action = `<div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap">
                 <button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="attCheckIn('${emp.id}','present')">✅ حاضر</button>
-                <button class="cc-edit" style="background:#FEF3C7;color:var(--inv-gold)" onclick="attCheckIn('${emp.id}','late')">⚠️ متأخر</button>
-                <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="attCheckIn('${emp.id}','absent')">❌ غايب</button>
+                <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="attCheckIn('${emp.id}','late')">⚠️ متأخر</button>
+                <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="attCheckIn('${emp.id}','absent')">❌ غايب</button>
                 <button class="cc-edit" style="background:#EDE9FE;color:#7C3AED" onclick="attCheckIn('${emp.id}','leave')">🏖️ إجازة</button>
             </div>`;
         } else if (r.check_in_time && !r.check_out_time && r.status !== 'absent' && r.status !== 'leave') {
@@ -134,7 +134,7 @@ window.attLoadHistory = async function() {
         _attHistRows = data || [];
         attRenderHistory();
     } catch (err) {
-        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:#991B1B;text-align:center;padding:20px">خطأ: ${err.message}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:var(--inv-red);text-align:center;padding:20px">خطأ: ${err.message}</td></tr>`;
     }
 };
 

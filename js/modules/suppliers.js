@@ -35,7 +35,7 @@ window.supShowStatement = async function(supplierId) {
         <div class="mod-modal" style="max-width:820px">
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${sup.name}</h3>
                 <div style="display:flex;align-items:center;gap:10px">
-                    <button class="cc-edit" style="background:${supThemeBg('#FFFBEB','#2E2410')};color:var(--inv-gold)" onclick="supGoEditProfile('${sup.id}')">✏️ تعديل بيانات المورد</button>
+                    <button class="cc-edit" style="background:${supThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold)" onclick="supGoEditProfile('${sup.id}')">✏️ تعديل بيانات المورد</button>
                     <button class="mod-modal-close" onclick="supCloseModal('supStmtModal')">&times;</button>
                 </div></div>
             <div class="mod-modal-body" id="supStmtBody">
@@ -182,13 +182,13 @@ window.supShowStatement = async function(supplierId) {
                 <div style="font-size:13px;font-weight:800;color:var(--inv-navy);margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
                 ${docs.length === 0 ? `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد مستندات مرتبطة بهذا المورد في الأرشيف.</div>` :
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
-                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:${supThemeBg('#FFFBEB','#2E2410')};color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
+                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:${supThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
                 </div>`}
             </div>`;
 
         supStmtRecomputeAndRender();
     } catch (err) {
-        document.getElementById('supStmtBody').innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        document.getElementById('supStmtBody').innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -294,8 +294,8 @@ function supStmtRowsHtml(moves) {
     if (!moves.length) return `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد حركات.</td></tr>`;
     return moves.map(m => {
         const isCash = m.type.endsWith('-cash');
-        const bg = m.type==='purchase-credit' ? supThemeBg('#FEF3C7','#2E2410') : m.type==='payment' ? supThemeBg('#ECFDF5','#123024')
-            : m.type.startsWith('return') ? supThemeBg('#FFFBEB','#2E2410')
+        const bg = m.type==='purchase-credit' ? supThemeBg('var(--inv-gold-bg)','#2E2410') : m.type==='payment' ? supThemeBg('var(--inv-green-light)','#123024')
+            : m.type.startsWith('return') ? supThemeBg('var(--inv-gold-bg)','#2E2410')
             : m.type==='transfer-out' || m.type==='transfer-in' || m.type==='cash-refund' ? supThemeBg('#EFF6FF','#16233A')
             : m.type==='opening' ? supThemeBg('#F5F3FF','#241A3D')
             : m.type==='legacy-carry' ? supThemeBg('#F1F5F9','#131A26') : supThemeBg('#F8FAFC','#131A26');

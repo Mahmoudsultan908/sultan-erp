@@ -43,7 +43,7 @@ async function renderWarehouseReports(c) {
         _wrTab = 'valuation';
         wrRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -100,7 +100,7 @@ function wrRenderValuation() {
     body.innerHTML = `
     <div class="mod-grid" style="margin-bottom:16px">
         <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🏭</div><div class="mod-card-val">${_wrWarehouses.length}</div><div class="mod-card-lbl">عدد المخازن</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">📦</div><div class="mod-card-val">${_wrStock.filter(s => Number(s.qty) > 0).length}</div><div class="mod-card-lbl">أرصدة أصناف نشطة</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">📦</div><div class="mod-card-val">${_wrStock.filter(s => Number(s.qty) > 0).length}</div><div class="mod-card-lbl">أرصدة أصناف نشطة</div></div>
         <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💰</div><div class="mod-card-val">${wrFmt(grandTotal)}</div><div class="mod-card-lbl">قيمة المخزون الإجمالية (تكلفة)</div></div>
     </div>
 
@@ -226,7 +226,7 @@ window.wrRunMovement = async function () {
         resultEl.innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📦</div><div class="mod-card-val" style="font-size:16px">${prod?.name || '—'}</div><div class="mod-card-lbl">${wh ? wh.name : 'كل المخازن'}</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">🔄</div><div class="mod-card-val">${moves.length}</div><div class="mod-card-lbl">عدد الحركات (بالفلتر الحالي)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">🔄</div><div class="mod-card-val">${moves.length}</div><div class="mod-card-lbl">عدد الحركات (بالفلتر الحالي)</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">✅</div><div class="mod-card-val">${wrFmt(liveTotal)}</div><div class="mod-card-lbl">الرصيد الفعلي الحالي (كل الأوقات)</div></div>
         </div>
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px">
@@ -253,7 +253,7 @@ window.wrRunMovement = async function () {
             </tbody></table>
         </div>`;
     } catch (err) {
-        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 

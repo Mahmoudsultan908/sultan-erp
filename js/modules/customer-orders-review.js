@@ -75,7 +75,7 @@ async function corRenderOrders(c) {
         COR_ORDERS = data || [];
         corRenderOrdersPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -126,7 +126,7 @@ function corRowHTML(o) {
         <td style="color:var(--inv-muted)">${o.created_at ? new Date(o.created_at).toLocaleString('ar-EG') : '—'}</td>
         <td style="white-space:nowrap">
             <button class="cc-edit" style="background:#DCFCE7;color:#166534" onclick="corApproveOrder('${o.id}')">✅ اعتماد/مراجعة</button>
-            <button class="cc-edit" style="background:#FEE2E2;color:#991B1B;margin-right:4px" onclick="corRejectOrder('${o.id}')">❌ رفض</button>
+            <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red);margin-right:4px" onclick="corRejectOrder('${o.id}')">❌ رفض</button>
         </td>
     </tr>`;
 }
@@ -183,7 +183,7 @@ async function corRenderBanners(c) {
         COR_CATS = cats || [];
         corRenderBannersPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -206,7 +206,7 @@ function corRenderBannersPage(c) {
                 <td>${b.is_active ? '<span style="color:var(--inv-green);font-weight:700">✅ فعّال</span>' : '<span style="color:var(--inv-muted-light)">⏸️ متوقف</span>'}</td>
                 <td style="white-space:nowrap">
                     <button class="cc-edit" onclick="corOpenBannerModal('${b.id}')">✏️</button>
-                    <button class="cc-edit" style="background:#FEE2E2;color:#991B1B;margin-right:4px" onclick="corDeleteBanner('${b.id}')">🗑️</button>
+                    <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red);margin-right:4px" onclick="corDeleteBanner('${b.id}')">🗑️</button>
                 </td>
             </tr>`).join('')}
         </tbody></table>

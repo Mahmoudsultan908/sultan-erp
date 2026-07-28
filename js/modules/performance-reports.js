@@ -74,7 +74,7 @@ async function renderPerformanceReports(c) {
         _perfTab = 'product';
         prfRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -201,7 +201,7 @@ window.prfLoadByProduct = async function () {
         resultEl.innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📦</div><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">عدد الأصناف المباعة</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">🔢</div><div class="mod-card-val">${perfFmt(totalQty)}</div><div class="mod-card-lbl">إجمالي الكمية</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">🔢</div><div class="mod-card-val">${perfFmt(totalQty)}</div><div class="mod-card-lbl">إجمالي الكمية</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">💰</div><div class="mod-card-val">${perfFmt(totalRevenue)}</div><div class="mod-card-lbl">إجمالي الإيراد</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📈</div><div class="mod-card-val">${perfFmt(totalProfit)}</div><div class="mod-card-lbl">إجمالي الربح</div></div>
         </div>
@@ -224,7 +224,7 @@ window.prfLoadByProduct = async function () {
         window._prfPrintTitle = `مبيعات حسب الصنف (${from} إلى ${to})`;
         window._prfExportRows = rows.map(r => ({ الصنف: r.name, الكود: r.code, الكمية: r.qty, الإيراد: r.revenue, الربح: r.profit, 'هامش %': r.marginPct.toFixed(1) }));
     } catch (err) {
-        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -269,7 +269,7 @@ window.prfLoadByCustomer = async function () {
         resultEl.innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">عدد العملاء (بمن فيهم نقدي)</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">🧾</div><div class="mod-card-val">${totalInvoices}</div><div class="mod-card-lbl">عدد الفواتير</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">🧾</div><div class="mod-card-val">${totalInvoices}</div><div class="mod-card-lbl">عدد الفواتير</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💰</div><div class="mod-card-val">${perfFmt(totalRevenue)}</div><div class="mod-card-lbl">إجمالي المبيعات</div></div>
         </div>
         <div class="mod-table-wrap">
@@ -289,7 +289,7 @@ window.prfLoadByCustomer = async function () {
         window._prfPrintTitle = `مبيعات حسب العميل (${from} إلى ${to})`;
         window._prfExportRows = rows.map(r => ({ العميل: r.name, 'عدد الفواتير': r.count, الإجمالي: r.total, 'متوسط الفاتورة': r.avg }));
     } catch (err) {
-        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -348,16 +348,16 @@ window.prfLoadByRep = async function () {
         }).sort((a, b) => b.total - a.total);
 
         resultEl.innerHTML = `
-        ${!_perfReps.length ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
+        ${!_perfReps.length ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
             ⚠️ لا يوجد مندوبون مسجّلون بعد. أضِف مندوبين من صفحة "🚗 المندوبون" واربطهم بالفواتير عشان يظهروا هنا.
         </div>` : ''}
-        ${e3 ? `<div style="background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
+        ${e3 ? `<div style="background:var(--inv-red-bg);border:1px solid #FCA5A5;color:var(--inv-red);padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
             ⚠️ <strong>تعذّر جلب بيانات مرتجعات المبيعات (${e3.message || 'خطأ غير معروف'})</strong> — أرقام "صافي المبيعات" و"مرتجعات" أدناه محسوبة من غير خصم أي مرتجع فعلياً حتى لو حصل. غالباً السبب إن عمود <code>sales_returns.rep_id</code> لسه مش موجود — تأكد إن ملف <code>sales_returns_rep_id_migration.sql</code> اتشغّل بنجاح (من غير أي رسالة خطأ) في Supabase SQL Editor.
         </div>` : ''}
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">🚗</div><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">مندوبون لهم مبيعات</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💰</div><div class="mod-card-val">${perfFmt(attributedTotal)}</div><div class="mod-card-lbl">صافي مبيعات مرتبطة بمندوب (بعد خصم المرتجعات)</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">📊</div><div class="mod-card-val">${coverage.toFixed(0)}%</div><div class="mod-card-lbl">نسبة التغطية (من ${perfFmt(netGrandTotal)} صافي إجمالي)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">📊</div><div class="mod-card-val">${coverage.toFixed(0)}%</div><div class="mod-card-lbl">نسبة التغطية (من ${perfFmt(netGrandTotal)} صافي إجمالي)</div></div>
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
@@ -378,7 +378,7 @@ window.prfLoadByRep = async function () {
         window._prfPrintTitle = `مبيعات حسب المندوب (${from} إلى ${to})`;
         window._prfExportRows = rows.map(r => ({ المندوب: r.name, 'عدد الفواتير': r.count, مرتجعات: r.returns, 'صافي المبيعات': r.total, العمولة: r.commission }));
     } catch (err) {
-        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -501,7 +501,7 @@ window.prfLoadCompare = async function () {
             ...movers.map(m => ({ البند: 'صنف: ' + m.name, 'الفترة أ': m.revA, 'الفترة ب': m.revB })),
         ];
     } catch (err) {
-        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -549,7 +549,7 @@ window.prfLoadPayments = async function () {
 
         prfRenderPaymentsResult(rows);
     } catch (err) {
-        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -578,7 +578,7 @@ function prfRenderPaymentsResult(rows) {
     resultEl.innerHTML = `
     <div class="mod-grid" style="margin-bottom:16px">
         <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📥</div><div class="mod-card-val">${perfFmt(totalCollect)}</div><div class="mod-card-lbl">إجمالي التحصيل من العملاء</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📤</div><div class="mod-card-val">${perfFmt(totalPay)}</div><div class="mod-card-lbl">إجمالي الدفع للموردين</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">📤</div><div class="mod-card-val">${perfFmt(totalPay)}</div><div class="mod-card-lbl">إجمالي الدفع للموردين</div></div>
         <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">⚖️</div><div class="mod-card-val">${perfFmt(totalCollect - totalPay)}</div><div class="mod-card-lbl">صافي الحركة النقدية</div></div>
     </div>
     <div class="mod-table-wrap" style="margin-bottom:20px">
@@ -657,7 +657,7 @@ window.prfLoadReturns = async function () {
 
         prfRenderReturnsResult(rows);
     } catch (err) {
-        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -685,7 +685,7 @@ function prfRenderReturnsResult(rows) {
 
     resultEl.innerHTML = `
     <div class="mod-grid" style="margin-bottom:16px">
-        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">↩️</div><div class="mod-card-val">${perfFmt(salesTotal)}</div><div class="mod-card-lbl">إجمالي مرتجعات البيع</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">↩️</div><div class="mod-card-val">${perfFmt(salesTotal)}</div><div class="mod-card-lbl">إجمالي مرتجعات البيع</div></div>
         <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">↩️</div><div class="mod-card-val">${perfFmt(purchaseTotal)}</div><div class="mod-card-lbl">إجمالي مرتجعات الشراء</div></div>
         <div class="mod-card"><div class="mod-card-icon" style="background:#F1F5F9;color:var(--inv-text-soft)">Σ</div><div class="mod-card-val">${perfFmt(salesTotal + purchaseTotal)}</div><div class="mod-card-lbl">إجمالي المرتجعات</div></div>
     </div>

@@ -82,11 +82,11 @@ async function opRenderReconciliation(body) {
     const items = (await getReconciliation()).sort((a, b) => b.at - a.at);
     body.innerHTML = `
         ${items.length ? items.map(it => `
-            <div style="background:${it.resolved ? '#F8FAFC' : '#FFFBEB'};border:1px solid ${it.resolved ? '#E2E8F0' : '#FED7AA'};border-radius:10px;padding:10px 14px;margin-bottom:8px">
+            <div style="background:${it.resolved ? 'var(--inv-divider)' : 'var(--inv-gold-bg)'};border:1px solid ${it.resolved ? 'var(--inv-border)' : '#FED7AA'};border-radius:10px;padding:10px 14px;margin-bottom:8px">
                 <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
                     <div>
                         <div style="font-weight:700;font-size:13px">${it.summary}</div>
-                        <div style="font-size:11px;color:#92400E;margin-top:4px">${(it.flags || []).join(' — ')}</div>
+                        <div style="font-size:11px;color:var(--inv-gold);margin-top:4px">${(it.flags || []).join(' — ')}</div>
                         <div style="font-size:11.5px;color:var(--inv-muted-light);margin-top:2px">${opTimeAgo(it.at)}</div>
                     </div>
                     ${!it.resolved ? `<button class="cc-edit" onclick="resolveReconciliation(${it.id}).then(()=>opRenderTab())">✅ تمت المراجعة</button>` : ''}

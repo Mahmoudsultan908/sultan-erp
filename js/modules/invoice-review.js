@@ -98,7 +98,7 @@ async function revRenderBody(presetNo) {
                 <div><label class="ob-label">إلى تاريخ</label><input id="rev-to" type="date" class="ob-input" style="margin:0"></div>
                 <button class="ob-add-btn" onclick="revSearch()">🔍 بحث</button>
                 <button class="ob-add-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="revClearSearch()">✕ مسح</button>
-                <button class="ob-add-btn" style="background:#ECFDF5;color:var(--inv-green)" onclick="revExportExcel()">📊 تصدير Excel</button>
+                <button class="ob-add-btn" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="revExportExcel()">📊 تصدير Excel</button>
             </div>
         </div>
         <div id="rev-results"></div>
@@ -165,7 +165,7 @@ window.revSearch = async function () {
         revList = rows;
         revRenderTable(rows);
     } catch (err) {
-        resEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:12px">خطأ: ${err.message}${revIsReturn() ? '<br><small>تأكد من تشغيل ملف returns_migration.sql في Supabase (جدول المرتجعات).</small>' : ''}</div>`;
+        resEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:12px">خطأ: ${err.message}${revIsReturn() ? '<br><small>تأكد من تشغيل ملف returns_migration.sql في Supabase (جدول المرتجعات).</small>' : ''}</div>`;
     }
 };
 
@@ -191,9 +191,9 @@ function revRenderTable(rows) {
                     <td>${r.status==='confirmed' ? '<span style="color:var(--inv-green);font-weight:600">✅ مؤكدة</span>' : r.status==='cancelled' ? '<span style="color:var(--inv-muted-light)">🚫 ملغاة (معدّلة)</span>' : `<span style="color:var(--inv-gold)">${r.status}</span>`}</td>
                     <td style="white-space:nowrap">
                         <button class="cc-edit" onclick="revViewDetails('${r.id}')">👁️ عرض</button>
-                        ${cfg.canPrint ? `<button class="cc-edit" style="background:#ECFDF5;color:var(--inv-green)" onclick="revPrintInvoice('${r.id}')">🖨️ طباعة</button>` : ''}
-                        ${r.status==='confirmed' && cfg.canEdit ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="revEditInvoice('${r.id}')">✏️ تعديل</button>` : ''}
-                        ${r.status==='confirmed' && cfg.canCancel ? `<button class="cc-edit" style="background:#FEF2F2;color:var(--inv-red)" onclick="revCancelReturn('${r.id}')">🚫 إلغاء</button>` : ''}
+                        ${cfg.canPrint ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="revPrintInvoice('${r.id}')">🖨️ طباعة</button>` : ''}
+                        ${r.status==='confirmed' && cfg.canEdit ? `<button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="revEditInvoice('${r.id}')">✏️ تعديل</button>` : ''}
+                        ${r.status==='confirmed' && cfg.canCancel ? `<button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="revCancelReturn('${r.id}')">🚫 إلغاء</button>` : ''}
                     </td>
                 </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--inv-muted-light)">لا توجد نتائج</td></tr>`}
             </tbody>
@@ -245,9 +245,9 @@ window.revViewDetails = async function (id) {
         </div>
         <div class="mod-modal-footer">
             <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('revModal').remove()">إغلاق</button>
-            ${cfg.canPrint ? `<button class="mod-btn" style="background:#ECFDF5;color:var(--inv-green)" onclick="revPrintInvoice('${data.id}')">🖨️ طباعة</button>` : ''}
+            ${cfg.canPrint ? `<button class="mod-btn" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="revPrintInvoice('${data.id}')">🖨️ طباعة</button>` : ''}
             ${data.status==='confirmed' && cfg.canEdit ? `<button class="mod-btn mod-btn-primary" onclick="document.getElementById('revModal').remove();revEditInvoice('${data.id}')">✏️ تعديل ${revIsReturn() ? 'هذا المرتجع' : 'هذه الفاتورة'}</button>` : ''}
-            ${data.status==='confirmed' && cfg.canCancel ? `<button class="mod-btn" style="background:#FEF2F2;color:var(--inv-red)" onclick="document.getElementById('revModal').remove();revCancelReturn('${data.id}')">🚫 إلغاء هذا المرتجع</button>` : ''}
+            ${data.status==='confirmed' && cfg.canCancel ? `<button class="mod-btn" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="document.getElementById('revModal').remove();revCancelReturn('${data.id}')">🚫 إلغاء هذا المرتجع</button>` : ''}
         </div>
     </div>`;
     document.body.appendChild(modal);

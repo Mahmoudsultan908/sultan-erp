@@ -25,11 +25,11 @@ function eevTotal(x) {
 }
 
 function eevRatingInfo(avg) {
-    if (avg >= 9) return { label: 'ممتاز', color: 'var(--inv-green)', bg: '#F0FDF4' };
+    if (avg >= 9) return { label: 'ممتاز', color: 'var(--inv-green)', bg: 'var(--inv-green-light)' };
     if (avg >= 7) return { label: 'جيد جدًا', color: '#2563EB', bg: '#EFF6FF' };
-    if (avg >= 5) return { label: 'جيد', color: 'var(--inv-gold)', bg: '#FFFBEB' };
+    if (avg >= 5) return { label: 'جيد', color: 'var(--inv-gold)', bg: 'var(--inv-gold-bg)' };
     if (avg >= 3) return { label: 'مقبول', color: '#EA580C', bg: '#FFF7ED' };
-    return { label: 'ضعيف', color: 'var(--inv-red)', bg: '#FEF2F2' };
+    return { label: 'ضعيف', color: 'var(--inv-red)', bg: 'var(--inv-red-bg)' };
 }
 
 // ════════════════════════════════════════════════════════════
@@ -57,7 +57,7 @@ async function renderEmployeeEvaluation(c) {
         }
         eevRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -75,13 +75,13 @@ function eevRenderPage(c) {
             <button class="mod-btn mod-btn-primary" onclick="eevOpenAdd()">+ تسجيل تقييم</button>
         </div>
 
-        ${_eevTableMissing ? `<div style="background:#FEF3C7;color:#92400E;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول التقييمات لسه مش موجود — شغّل <code>employee_evaluation_migration.sql</code> في Supabase.</div>` : ''}
+        ${_eevTableMissing ? `<div style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول التقييمات لسه مش موجود — شغّل <code>employee_evaluation_migration.sql</code> في Supabase.</div>` : ''}
         ${(!_eevTableMissing && !_eevEmployees.length) ? `<div style="background:#EFF6FF;color:#1D4ED8;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">ℹ️ لا يوجد موظفون نشطون بعد — أضِفهم أولاً من صفحة <b>👥 الموظفون والرواتب</b>.</div>` : ''}
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📋</div><div class="mod-card-val">${totalCount}</div><div class="mod-card-lbl">عدد التقييمات المسجلة</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">⭐</div><div class="mod-card-val">${totalCount ? overallAvg.toFixed(1) : '—'}</div><div class="mod-card-lbl">متوسط التقييم العام (من 10)</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">👥</div><div class="mod-card-val">${evaluatedEmpCount}</div><div class="mod-card-lbl">عدد الموظفين المُقيَّمين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">⭐</div><div class="mod-card-val">${totalCount ? overallAvg.toFixed(1) : '—'}</div><div class="mod-card-lbl">متوسط التقييم العام (من 10)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">👥</div><div class="mod-card-val">${evaluatedEmpCount}</div><div class="mod-card-lbl">عدد الموظفين المُقيَّمين</div></div>
         </div>
 
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
@@ -117,7 +117,7 @@ function eevRenderPage(c) {
                         <td style="text-align:center;font-weight:600">${Number(x.compliance_score) || 0}</td>
                         <td style="text-align:center"><span style="background:${info.bg};color:${info.color};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${avg.toFixed(1)} — ${info.label}</span></td>
                         <td style="color:var(--inv-muted);max-width:200px">${x.notes || '—'}</td>
-                        <td style="text-align:center"><button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="eevDelete('${x.id}')">🗑️</button></td>
+                        <td style="text-align:center"><button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="eevDelete('${x.id}')">🗑️</button></td>
                     </tr>`;
                 }).join('')}
             </tbody></table>

@@ -46,13 +46,13 @@ async function renderQuotations(c) {
                     <td>${QT_STATUS_LABELS[q.status]||q.status}</td>
                     <td>
                         ${q.status==='pending' ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="qtConvertToSale('${q.id}')">🔄 تحويل لفاتورة</button>
-                        <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="qtCancel('${q.id}')">🚫</button>` : ''}
+                        <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="qtCancel('${q.id}')">🚫</button>` : ''}
                     </td>
                 </tr>`).join('') : '<tr><td colspan="6" class="empty-state"><span>📋</span>لا توجد عروض أسعار بعد</td></tr>'}
             </tbody></table>
         </div>`;
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 

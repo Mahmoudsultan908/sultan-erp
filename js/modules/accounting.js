@@ -63,7 +63,7 @@ async function renderChartOfAccounts(c) {
             </div>`;
         }).join('')}`;
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -84,7 +84,7 @@ window.accOpenAddAccount = async function() {
                     <select id="accType" class="mod-form-input">
                         ${Object.entries(ACC_TYPE_LABELS).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
                     </select></div>
-                <div style="background:#FFFBEB;border:1px solid #FED7AA;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400E">
+                <div style="background:var(--inv-gold-bg);border:1px solid #FED7AA;border-radius:8px;padding:10px 14px;font-size:12px;color:var(--inv-gold)">
                     ⚠️ الحسابات الأساسية (الخزينة، العملاء، الموردون...) موجودة بالفعل. أضف حساباً جديداً فقط عند الحاجة لتصنيف مصروف أو إيراد إضافي.
                 </div>
             </div>
@@ -146,7 +146,7 @@ async function renderJournalView(c) {
             </table>
         </div>`;
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -237,8 +237,8 @@ async function accLoadTrialBalance(c, from, to) {
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📊</div><div class="mod-card-val">${accFmt(totalDr)}</div><div class="mod-card-lbl">إجمالي المدين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📊</div><div class="mod-card-val">${accFmt(totalCr)}</div><div class="mod-card-lbl">إجمالي الدائن</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'var(--inv-green-light)':'#FEF3C7'};color:${balanced?'var(--inv-green)':'var(--inv-gold)'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازن':'غير متوازن'}</div><div class="mod-card-lbl">حالة الميزان</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">📊</div><div class="mod-card-val">${accFmt(totalCr)}</div><div class="mod-card-lbl">إجمالي الدائن</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'var(--inv-green-light)':'var(--inv-gold-bg)'};color:${balanced?'var(--inv-green)':'var(--inv-gold)'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازن':'غير متوازن'}</div><div class="mod-card-lbl">حالة الميزان</div></div>
         </div>
 
         <div class="mod-table-wrap" id="tb-table-wrap">
@@ -266,7 +266,7 @@ async function accLoadTrialBalance(c, from, to) {
         window._tbExport = () => repExportExcel('ميزان_المراجعة', tbExportRows);
         window._tbPrint = () => repPrintReport(`ميزان المراجعة (${from || 'البداية'} إلى ${to || 'اليوم'})`, document.getElementById('tb-table-wrap').outerHTML);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -339,8 +339,8 @@ async function renderBalanceSheet(c, asOfDate) {
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🏦</div><div class="mod-card-val">${accFmt(totalAssets)}</div><div class="mod-card-lbl">إجمالي الأصول</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📉</div><div class="mod-card-val">${accFmt(totalLiabilities)}</div><div class="mod-card-lbl">إجمالي الخصوم</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'var(--inv-green-light)':'#FEF3C7'};color:${balanced?'var(--inv-green)':'var(--inv-gold)'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازنة':'غير متوازنة'}</div><div class="mod-card-lbl">حالة الميزانية</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">📉</div><div class="mod-card-val">${accFmt(totalLiabilities)}</div><div class="mod-card-lbl">إجمالي الخصوم</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:${balanced?'var(--inv-green-light)':'var(--inv-gold-bg)'};color:${balanced?'var(--inv-green)':'var(--inv-gold)'}">${balanced?'✅':'⚠️'}</div><div class="mod-card-val">${balanced?'متوازنة':'غير متوازنة'}</div><div class="mod-card-lbl">حالة الميزانية</div></div>
         </div>
 
         <div class="dash-row" id="bs-rows">
@@ -375,7 +375,7 @@ async function renderBalanceSheet(c, asOfDate) {
         ]);
         window._bsPrint = () => repPrintReport(`الميزانية العمومية — حتى ${asOfDate}`, document.getElementById('bs-rows').outerHTML);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 

@@ -113,7 +113,7 @@ async function renderAuditLog(c) {
     try {
         await alLoadData(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -161,9 +161,9 @@ async function alLoadData(c) {
         <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">كل عملية مالية تُسجَّل هنا تلقائياً — من قام بها ومتى وماذا تغيّر</p></div>
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">➕</div><div class="mod-card-val">${totalCreate}</div><div class="mod-card-lbl">عمليات إنشاء</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">✏️</div><div class="mod-card-val">${totalUpdate}</div><div class="mod-card-lbl">عمليات تعديل</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">🚫</div><div class="mod-card-val">${totalCancel}</div><div class="mod-card-lbl">عمليات إلغاء</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">➕</div><div class="mod-card-val">${totalCreate}</div><div class="mod-card-lbl">عمليات إنشاء</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">✏️</div><div class="mod-card-val">${totalUpdate}</div><div class="mod-card-lbl">عمليات تعديل</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">🚫</div><div class="mod-card-val">${totalCancel}</div><div class="mod-card-lbl">عمليات إلغاء</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📋</div><div class="mod-card-val">${(events||[]).length}</div><div class="mod-card-lbl">إجمالي (آخر 300)</div></div>
         </div>
 
@@ -210,7 +210,7 @@ async function alLoadData(c) {
             alLoadData(c);
         };
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -229,11 +229,11 @@ window.alViewDetails = async function(eventId) {
                 <p style="font-size:13px;color:var(--inv-muted);margin-bottom:14px">${alTranslateDescription(ev.description)}</p>
                 ${ev.old_data ? `<div style="margin-bottom:14px">
                     <div style="font-weight:800;font-size:12.5px;color:var(--inv-red);margin-bottom:6px">قبل التعديل</div>
-                    <pre style="background:#FEF2F2;padding:12px;border-radius:8px;font-size:11px;direction:ltr;text-align:left;overflow-x:auto;max-height:200px">${JSON.stringify(ev.old_data, null, 2)}</pre>
+                    <pre style="background:var(--inv-red-bg);padding:12px;border-radius:8px;font-size:11px;direction:ltr;text-align:left;overflow-x:auto;max-height:200px">${JSON.stringify(ev.old_data, null, 2)}</pre>
                 </div>` : ''}
                 ${ev.new_data ? `<div>
                     <div style="font-weight:800;font-size:12.5px;color:var(--inv-green);margin-bottom:6px">${ev.old_data ? 'بعد التعديل' : 'البيانات'}</div>
-                    <pre style="background:#F0FDF4;padding:12px;border-radius:8px;font-size:11px;direction:ltr;text-align:left;overflow-x:auto;max-height:200px">${JSON.stringify(ev.new_data, null, 2)}</pre>
+                    <pre style="background:var(--inv-green-light);padding:12px;border-radius:8px;font-size:11px;direction:ltr;text-align:left;overflow-x:auto;max-height:200px">${JSON.stringify(ev.new_data, null, 2)}</pre>
                 </div>` : ''}
             </div>
         </div>`;

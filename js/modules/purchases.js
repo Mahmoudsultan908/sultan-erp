@@ -85,7 +85,7 @@ async function renderPurchases(c) {
     try {
         await purLoadData();
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ في التحميل: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ في التحميل: ${err.message}</div>`;
         return;
     }
 
@@ -149,7 +149,7 @@ async function renderPurchases(c) {
 
     c.innerHTML = `
     <div class="inv-root density-${localStorage.getItem('inv_density') || 'cozy'}">
-        ${purEditingId ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
+        ${purEditingId ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center">
             <span>✏️ <strong>وضع تعديل</strong> — بتعدّل على فاتورة الشراء <strong>${purEditingOldInvoiceNo}</strong>. عند الحفظ: هتتلغي الفاتورة القديمة تلقائياً (مع إرجاع المخزون والرصيد) وتتسجّل فاتورة جديدة بالتعديلات.</span>
             <button class="inv-top-btn" style="padding:4px 10px" onclick="purEditingId=null;purEditingOldInvoiceNo=null;renderPurchases(document.getElementById('app-content'))">إلغاء التعديل</button>
         </div>` : ''}

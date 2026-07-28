@@ -52,7 +52,7 @@ async function renderStockTransfer(container) {
 
         stRenderScreen(container);
     } catch (err) {
-        container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        container.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -76,7 +76,7 @@ async function stLoadRecent() {
 function stRenderScreen(c) {
     c.innerHTML = `
     <div class="inv-root density-cozy">
-        ${stTableMissing ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12px">
+        ${stTableMissing ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:8px;font-size:12px">
             ⚠️ <strong>تنبيه:</strong> جدول <code>stock_transfers</code> أو جدول البنود المرتبط به غير مكتمل في قاعدة البيانات بعد.
             شغّل ملف <code>stock_transfer_migration.sql</code> في Supabase أولاً حتى يتسجّل تاريخ التحويلات ويتحرّك المخزون تلقائياً.
         </div>` : ''}

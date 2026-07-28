@@ -88,7 +88,7 @@ async function renderProducts(c) {
             prodOpenEdit(pendId);
         }
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -102,8 +102,8 @@ function prodRenderPage(c) {
 
         <div class="mod-grid">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🏷️</div><div class="mod-card-val" id="prodCardTotal">${_prodList.length}</div><div class="mod-card-lbl">إجمالي الأصناف</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">📦</div><div class="mod-card-val" id="prodCardInStock">${_prodList.filter(p=>p._totalStock>0).length}</div><div class="mod-card-lbl">متوفر بالمخزون</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">🔴</div><div class="mod-card-val" id="prodCardOutStock">${_prodList.filter(p=>p._totalStock<=0).length}</div><div class="mod-card-lbl">نفد المخزون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📦</div><div class="mod-card-val" id="prodCardInStock">${_prodList.filter(p=>p._totalStock>0).length}</div><div class="mod-card-lbl">متوفر بالمخزون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">🔴</div><div class="mod-card-val" id="prodCardOutStock">${_prodList.filter(p=>p._totalStock<=0).length}</div><div class="mod-card-lbl">نفد المخزون</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#F5F3FF;color:#7C3AED">📁</div><div class="mod-card-val" id="prodCardCats">${_prodCategories.length}</div><div class="mod-card-lbl">مجموعات</div></div>
         </div>
 
@@ -119,8 +119,8 @@ function prodRenderPage(c) {
             </select>
             <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="prodOpenCategoryManager()">📁 إدارة المجموعات</button>
             <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="prodOpenCompanyManager()">🏢 إدارة الشركات</button>
-            <button class="mod-btn" style="background:#F0FDF4;color:var(--inv-green)" onclick="prodOpenNewRestockedReport()">🆕 أصناف جديدة/اتشرت تاني</button>
-            <button class="mod-btn" style="background:#F0FDF4;color:var(--inv-green)" onclick="prodHubSwitchTab('import')">📥 استيراد Excel</button>
+            <button class="mod-btn" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="prodOpenNewRestockedReport()">🆕 أصناف جديدة/اتشرت تاني</button>
+            <button class="mod-btn" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="prodHubSwitchTab('import')">📥 استيراد Excel</button>
             <button class="mod-btn" style="background:#EFF6FF;color:#2563EB" onclick="prodExportXls()">📤 تصدير Excel</button>
         </div>
 
@@ -180,7 +180,7 @@ function prodRenderRows() {
             <td style="display:flex;gap:4px;justify-content:center">
                 <button class="cc-edit" onclick="prodOpenEdit('${p.id}')">✏️</button>
                 <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="prodOpenDuplicate('${p.id}')" title="تكرار الصنف">🔁</button>
-                <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="prodToggleActive('${p.id}', ${p.is_active===false})">${p.is_active===false?'↩️':'🗑️'}</button>
+                <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="prodToggleActive('${p.id}', ${p.is_active===false})">${p.is_active===false?'↩️':'🗑️'}</button>
             </td>
         </tr>`;
     }).join('');
@@ -474,8 +474,8 @@ window.prodOpenCategoryManager = function() {
                         <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
                             📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_categories','${cat.id}',this)">
                         </label>
-                        <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_categories','${cat.id}')">✏️</button>
-                        <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red);padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_categories','${cat.id}')">🗑️</button>
+                        <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_categories','${cat.id}')">✏️</button>
+                        <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red);padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_categories','${cat.id}')">🗑️</button>
                     </div>`).join('') || '<p style="color:var(--inv-muted-light);text-align:center;padding:20px">لا توجد مجموعات بعد</p>'}
                 </div>
             </div>
@@ -612,8 +612,8 @@ window.prodOpenCompanyManager = function() {
                         <label class="mod-btn" style="padding:4px 10px;font-size:12px;cursor:pointer;margin:0">
                             📷<input type="file" accept="image/*" style="display:none" onchange="prodUploadLookupImage('product_companies','${co.id}',this)">
                         </label>
-                        <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_companies','${co.id}')">✏️</button>
-                        <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red);padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_companies','${co.id}')">🗑️</button>
+                        <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:4px 8px" title="تعديل الاسم" onclick="prodEditLookup('product_companies','${co.id}')">✏️</button>
+                        <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red);padding:4px 8px" title="حذف" onclick="prodDeleteLookup('product_companies','${co.id}')">🗑️</button>
                     </div>`).join('') || '<p style="color:var(--inv-muted-light);text-align:center;padding:20px">لا توجد شركات بعد</p>'}
                 </div>
             </div>
@@ -698,7 +698,7 @@ window.prodOpenNewRestockedReport = async function() {
             </tr></thead><tbody>${rowsHtml(restocked, p => prodFmt(p._totalStock))}</tbody></table></div>`
                 : '<p class="dash-empty">مفيش أصناف نفدت واتُشترت تاني فى الفترة دي</p>'}`;
     } catch (err) {
-        body.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 

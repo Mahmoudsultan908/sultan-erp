@@ -41,7 +41,7 @@ async function renderUsersManagement(c) {
     try {
         const isAdmin = await usrCurrentIsAdmin();
         if (!isAdmin) {
-            c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:24px;border-radius:12px;text-align:center">
+            c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:24px;border-radius:12px;text-align:center">
                 <div style="font-size:32px;margin-bottom:8px">🔒</div>
                 هذه الصفحة متاحة لمدير النظام فقط.
             </div>`;
@@ -53,7 +53,7 @@ async function renderUsersManagement(c) {
         _usrList = profiles || [];
         usrRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -79,8 +79,8 @@ function usrRenderPage(c) {
 
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">👥</div><div class="mod-card-val">${_usrList.length}</div><div class="mod-card-lbl">إجمالي المستخدمين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">🟢</div><div class="mod-card-val">${_usrList.filter(u=>usrIsOnline(u.last_seen)).length}</div><div class="mod-card-lbl">متصلون الآن</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">🚫</div><div class="mod-card-val">${_usrList.filter(u=>u.is_active===false).length}</div><div class="mod-card-lbl">معطّلون</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">🟢</div><div class="mod-card-val">${_usrList.filter(u=>usrIsOnline(u.last_seen)).length}</div><div class="mod-card-lbl">متصلون الآن</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">🚫</div><div class="mod-card-val">${_usrList.filter(u=>u.is_active===false).length}</div><div class="mod-card-lbl">معطّلون</div></div>
         </div>
 
         <div class="mod-table-wrap">
@@ -111,9 +111,9 @@ function usrRenderRows() {
                     ${Object.entries(USR_ROLE_LABELS).map(([v,l])=>`<option value="${v}" ${u.role===v?'selected':''}>${l}</option>`).join('')}
                 </select>
             </td>
-            <td><span class="dash-badge ${active?'dash-badge-green':'dash-badge-blue'}" style="${!active?'background:#FEE2E2;color:var(--inv-red)':''}">${active?'✅ نشط':'🚫 معطّل'}</span></td>
+            <td><span class="dash-badge ${active?'dash-badge-green':'dash-badge-blue'}" style="${!active?'background:var(--inv-red-bg);color:var(--inv-red)':''}">${active?'✅ نشط':'🚫 معطّل'}</span></td>
             <td class="dash-muted" style="font-size:12.5px">${usrFmtLastSeen(u.last_seen)}</td>
-            <td><button class="cc-edit" style="${active?'background:#FEE2E2;color:var(--inv-red)':'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="usrToggleActive('${u.id}', ${!active})">${active?'🚫 تعطيل':'✅ تفعيل'}</button></td>
+            <td><button class="cc-edit" style="${active?'background:var(--inv-red-bg);color:var(--inv-red)':'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="usrToggleActive('${u.id}', ${!active})">${active?'🚫 تعطيل':'✅ تفعيل'}</button></td>
         </tr>`;
     }).join('');
 }

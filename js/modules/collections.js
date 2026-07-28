@@ -75,11 +75,11 @@ async function renderCollections(c) {
             <button class="mod-btn mod-btn-primary" onclick="colOpenAdd()">+ تحصيل دفعة جديدة</button>
         </div>
 
-        ${isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
+        ${isOfflineData ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
             📴 <strong>غير متصل بالإنترنت</strong> — بيانات العملاء المعروضة من آخر نسخة محفوظة (${offlineDataAge ? new Date(offlineDataAge).toLocaleString('ar-EG') : '—'}). التحصيل هيتسجّل محلياً ويتزامن تلقائياً لما الاتصال يرجع.
         </div>` : ''}
 
-        ${(!isOfflineData && payments.length === 0) ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
+        ${(!isOfflineData && payments.length === 0) ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
             ⚠️ <strong>تنبيه:</strong> جدول التحصيل (<code>customer_payments</code>) لم يتم إنشاؤه بعد في قاعدة البيانات، أو لا يحتوي على Trigger.
             شغّل الـ Migration أولاً، وأنشئ الـ Trigger لكي تتحرّك الخزنة وأرصدة العملاء تلقائياً عند كل تحصيل.
         </div>` : ''}
@@ -87,7 +87,7 @@ async function renderCollections(c) {
         <div class="mod-grid">
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${colFmt(totalCollected)}</div><div class="mod-card-lbl">إجمالي المحصّل</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">📊</div><div class="mod-card-val">${payments.length}</div><div class="mod-card-lbl">سند قبض</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold)">📋</div><div class="mod-card-val">${colFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق من العملاء (${debtCustomers.length})</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">📋</div><div class="mod-card-val">${colFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق من العملاء (${debtCustomers.length})</div></div>
         </div>
 
         ${colDebtListHTML(debtCustomers)}
@@ -110,7 +110,7 @@ async function renderCollections(c) {
                     <td>${p._queue
                         ? (p.status === 'failed' ? '<span style="color:var(--inv-red);font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:var(--inv-gold);font-weight:600">⏳ غير مُزامن</span>')
                         : (p.status==='confirmed'?'<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:var(--inv-muted-light);font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:var(--inv-gold)">${p.status}</span>`)}</td>
-                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="colOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="colReversePayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="colPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="colOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="colReversePayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
@@ -154,7 +154,7 @@ function colDebtListHTML(debtCustomers) {
     return `
     <div class="mod-card" style="margin-top:16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-            <div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold);width:40px;height:40px;font-size:18px">📋</div>
+            <div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold);width:40px;height:40px;font-size:18px">📋</div>
             <div><div style="font-size:14px;font-weight:800">عملاء لهم مستحقات (مديونيات)</div><div style="font-size:11px;color:var(--inv-muted)">اضغط "تحصيل" بجوار أي عميل لتحصيل المبلغ فوراً</div></div>
         </div>
         ${debtCustomers.slice(0,8).map(c => `<div class="cat-card">
@@ -300,7 +300,7 @@ window.colPreview = function() {
     const bal = Number(c.balance) || 0;
     const after = bal - amount;
     area.innerHTML = `
-        <div class="limit-box" style="border-color:var(--inv-green-light);background:#ECFDF5">
+        <div class="limit-box" style="border-color:var(--inv-green-light);background:var(--inv-green-light)">
             <div class="limit-row"><span class="lr-label">المستحق على العميل:</span><span class="lr-val" style="color:var(--inv-red)">${colFmt(bal)} ج.م</span></div>
             ${amount > 0 ? `
             <div class="limit-row"><span class="lr-label">هذا التحصيل:</span><span class="lr-val" style="color:var(--inv-green)">${colFmt(amount)} ج.م</span></div>
@@ -426,7 +426,7 @@ window.colOpenEditModal = function(id) {
             <div class="mod-modal-header"><h3>✏️ تعديل سند تحصيل ${p.ref||''}</h3>
                 <button class="mod-modal-close" onclick="colCloseModal('colEditModal')">&times;</button></div>
             <div class="mod-modal-body">
-                <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 12px;border-radius:8px;margin-bottom:14px;font-size:12px">
+                <div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 12px;border-radius:8px;margin-bottom:14px;font-size:12px">
                     ⚠️ الحفظ هيلغي سند التحصيل القديم تلقائياً (المبلغ يرجع لرصيد العميل والخزنة) ويسجّل سنداً جديداً بالبيانات المعدّلة — حفاظاً على سجل تاريخي كامل، بدل التعديل المباشر.
                 </div>
                 <div class="mod-form-group"><label>العميل *</label>

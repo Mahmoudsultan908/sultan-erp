@@ -55,11 +55,11 @@ async function renderExpenses(container) {
                 isOfflineData = true;
                 offlineDataAge = Math.min(cc.updatedAt || Date.now(), ce?.updatedAt || cc.updatedAt || Date.now());
             } else {
-                container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message || 'تعذر تحميل البيانات'}</div>`;
+                container.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message || 'تعذر تحميل البيانات'}</div>`;
                 return;
             }
         } else {
-            container.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message || 'تعذر تحميل البيانات'}</div>`;
+            container.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message || 'تعذر تحميل البيانات'}</div>`;
             return;
         }
     }
@@ -106,7 +106,7 @@ async function renderExpenses(container) {
             <button class="mod-btn mod-btn-primary" onclick="expOpenAdd()">+ تسجيل مصروف جديد</button>
         </div>
 
-        ${isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
+        ${isOfflineData ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
             📴 <strong>غير متصل بالإنترنت</strong> — بيانات البنود المعروضة من آخر نسخة محفوظة (${offlineDataAge ? new Date(offlineDataAge).toLocaleString('ar-EG') : '—'}). المصروف هيتسجّل محلياً ويتزامن تلقائياً لما الاتصال يرجع (بدون فحص الحد لحد ما يتزامن).
         </div>` : ''}
 
@@ -119,7 +119,7 @@ async function renderExpenses(container) {
         <!-- ===== تبويب المصروفات ===== -->
         <div id="expPanelTransactions">
             <div class="mod-grid">
-                <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold)">💸</div><div class="mod-card-val">${_expFmt(total)}</div><div class="mod-card-lbl">إجمالي المصروفات</div></div>
+                <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">💸</div><div class="mod-card-val">${_expFmt(total)}</div><div class="mod-card-lbl">إجمالي المصروفات</div></div>
                 <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📅</div><div class="mod-card-val">${_expFmt(monthTotal)}</div><div class="mod-card-lbl">مصروفات هذا الشهر</div></div>
                 <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">📊</div><div class="mod-card-val">${activeExpenses.length}</div><div class="mod-card-lbl">عملية منفذة</div></div>
             </div>
@@ -157,7 +157,7 @@ function _expMonthExpTableHTML(expenses) {
                     : '<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>'}</td>
                 <td style="white-space:nowrap">${e._queue ? '' : `
                     <button class="cc-edit" onclick="expPrintVoucher('${e.id}')">🖨️</button>
-                    ${e.status === 'confirmed' ? `<button class="cc-edit" style="background:#FEE2E2;color:#991B1B" onclick="expCancelExpense('${e.id}')">❌ إلغاء</button>` : ''}
+                    ${e.status === 'confirmed' ? `<button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="expCancelExpense('${e.id}')">❌ إلغاء</button>` : ''}
                 `}</td>
             </tr>`).join('')}
         </tbody></table>
@@ -174,7 +174,7 @@ function _expGlobalLimitCardHTML(monthTotal) {
     return `
     <div class="mod-card" style="margin-top:16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-            <div class="mod-card-icon" style="background:#FEF2F2;color:var(--inv-red);width:40px;height:40px;font-size:18px">🎯</div>
+            <div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red);width:40px;height:40px;font-size:18px">🎯</div>
             <div><div style="font-size:14px;font-weight:800">الحد الإجمالي الشهري للمصروفات</div><div style="font-size:11px;color:var(--inv-muted)">مراقبة إجمالي مصروفات الشهر كله</div></div>
         </div>
         <div class="limit-row"><span class="lr-label">المصروف حتى الآن:</span><span class="lr-val">${_expFmt(monthTotal)} ج.م</span><span class="lr-val" style="margin:0;color:var(--inv-muted-light);font-weight:600">/ ${_expFmt(_expGlobalLimit)} ج.م</span></div>
@@ -227,7 +227,7 @@ function _expCatsPanelHTML(categories, catUsage) {
                             <div class="lim">/ ${lim > 0 ? _expFmt(lim) : '∞'}</div>
                         </div>
                         <button class="cc-edit" onclick="expOpenLimit('${c.id}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})">✏️ الحد</button>
-                        <button class="cc-edit" style="${isActive ? 'background:#FEE2E2;color:#991B1B' : 'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="expToggleCategoryActive('${c.id}', ${isActive})">${isActive ? '⛔ تعطيل' : '✅ تفعيل'}</button>
+                        <button class="cc-edit" style="${isActive ? 'background:var(--inv-red-bg);color:var(--inv-red)' : 'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="expToggleCategoryActive('${c.id}', ${isActive})">${isActive ? '⛔ تعطيل' : '✅ تفعيل'}</button>
                     </div>`;
                 }).join('')}
             </div>
@@ -253,7 +253,7 @@ window.expCatsApplyRange = async function () {
         (data || []).forEach(e => { catUsage[e.category_id] = (catUsage[e.category_id] || 0) + (e.amount || 0); });
         panel.innerHTML = _expCatsPanelHTML(_expCatsCategories, catUsage);
     } catch (err) {
-        panel.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        panel.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
@@ -406,7 +406,7 @@ window.expOpenAdd = async function() {
                 <!-- سبب التجاوز -->
                 <div class="limit-over-box" id="expOverrideBox">
                     <h4>⚠️ تم تجاوز الحد المسموح</h4>
-                    <p style="font-size:12px;color:#92400E;margin-bottom:8px">${_expUserRole==='admin' ? 'بصفتك مدير يمكنك المتابعة — يُفضّل كتابة سبب:' : 'للمتابعة، يجب إدخال سبب التجاوز:'}</p>
+                    <p style="font-size:12px;color:var(--inv-gold);margin-bottom:8px">${_expUserRole==='admin' ? 'بصفتك مدير يمكنك المتابعة — يُفضّل كتابة سبب:' : 'للمتابعة، يجب إدخال سبب التجاوز:'}</p>
                     <textarea id="expOverrideReason" placeholder="سبب تجاوز الحد المسموح..."></textarea>
                 </div>
             </div>
@@ -470,8 +470,8 @@ window.expCheckLimit = async function() {
     }
 
     if (typeof isOnline === 'function' && !isOnline()) {
-        area.innerHTML = `<div class="limit-box" style="border-color:#FCD34D;background:#FFFBEB">
-            <div style="font-size:12px;color:#92400E">📴 غير متصل — تعذر فحص الحد الشهري الآن. المصروف هيتسجّل محلياً وهيتفحص تلقائياً بعد المزامنة (وهيظهر تنبيه لو طلع متجاوز الحد).</div>
+        area.innerHTML = `<div class="limit-box" style="border-color:#FCD34D;background:var(--inv-gold-bg)">
+            <div style="font-size:12px;color:var(--inv-gold)">📴 غير متصل — تعذر فحص الحد الشهري الآن. المصروف هيتسجّل محلياً وهيتفحص تلقائياً بعد المزامنة (وهيظهر تنبيه لو طلع متجاوز الحد).</div>
         </div>`;
         document.getElementById('expOverrideBox').classList.remove('show');
         _expLimitExceeded = false;

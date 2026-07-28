@@ -134,13 +134,13 @@ function csiRenderPreview() {
     document.getElementById('csiPreviewArea').innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📋</div><div class="mod-card-val">${_csiParsedRows.length}</div><div class="mod-card-lbl">إجمالي الصفوف</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">✅</div><div class="mod-card-val">${validRows.length}</div><div class="mod-card-lbl">صفوف سليمة</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${errorRows.length}</div><div class="mod-card-lbl">صفوف بها أخطاء</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">✅</div><div class="mod-card-val">${validRows.length}</div><div class="mod-card-lbl">صفوف سليمة</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⚠️</div><div class="mod-card-val">${errorRows.length}</div><div class="mod-card-lbl">صفوف بها أخطاء</div></div>
         </div>
 
-        ${errorRows.length ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px;margin-bottom:16px">
-            <strong style="color:#991B1B;font-size:13px">⚠️ صفوف بها أخطاء (لن تُستورد):</strong>
-            <ul style="margin:8px 0 0;padding-right:20px;font-size:12px;color:#991B1B">
+        ${errorRows.length ? `<div style="background:var(--inv-red-bg);border:1px solid #FECACA;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+            <strong style="color:var(--inv-red);font-size:13px">⚠️ صفوف بها أخطاء (لن تُستورد):</strong>
+            <ul style="margin:8px 0 0;padding-right:20px;font-size:12px;color:var(--inv-red)">
                 ${errorRows.map(r=>`<li>صف ${r.rowNum}: ${r.errors.join('، ')}</li>`).join('')}
             </ul>
         </div>` : ''}
@@ -150,7 +150,7 @@ function csiRenderPreview() {
                 <th>#</th><th>الاسم</th><th>الهاتف</th>${isCust?'<th>المنطقة</th><th>التصنيف</th>':''}
                 <th style="text-align:left">${isCust?'الدين الافتتاحي':'المديونية الافتتاحية'}</th><th></th>
             </tr></thead><tbody>
-                ${_csiParsedRows.slice(0, 50).map(r => `<tr style="${r.errors.length?'background:#FEF2F2':''}">
+                ${_csiParsedRows.slice(0, 50).map(r => `<tr style="${r.errors.length?'background:var(--inv-red-bg)':''}">
                     <td>${r.rowNum}</td>
                     <td>${r.name||'—'}</td>
                     <td dir="ltr" style="text-align:right">${r.phone||'—'}</td>

@@ -52,7 +52,7 @@ async function renderCashMovement(c) {
         _cmTreasuries = treasuries || [];
         await cmLoadData(c, '', '', '', pendingTreasury);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -99,8 +99,8 @@ async function cmLoadData(c, from, to, refType, treasuryId) {
         <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">كل حركة دخول وخروج فلوس بالترتيب الزمني مع الرصيد المتحرك</p></div>
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">📈</div><div class="mod-card-val">${cmFmt(totalIn)}</div><div class="mod-card-lbl">إجمالي الداخل</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📉</div><div class="mod-card-val">${cmFmt(totalOut)}</div><div class="mod-card-lbl">إجمالي الخارج</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📈</div><div class="mod-card-val">${cmFmt(totalIn)}</div><div class="mod-card-lbl">إجمالي الداخل</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">📉</div><div class="mod-card-val">${cmFmt(totalOut)}</div><div class="mod-card-lbl">إجمالي الخارج</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">💰</div><div class="mod-card-val">${cmFmt(cashBalance)}</div><div class="mod-card-lbl">${treasuryName ? 'رصيد ' + treasuryName : 'الرصيد الحالي (كل الخزن)'}</div></div>
         </div>
 
@@ -144,7 +144,7 @@ async function cmLoadData(c, from, to, refType, treasuryId) {
             cmLoadData(c, f, t, rt, trId);
         };
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 

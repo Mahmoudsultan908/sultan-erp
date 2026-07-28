@@ -43,7 +43,7 @@ async function renderArchive(c) {
 
         arcRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -71,7 +71,7 @@ function arcRenderPage(c) {
             <button class="mod-btn mod-btn-primary" onclick="arcOpenUpload()">+ رفع مستند</button>
         </div>
 
-        ${_arcTableMissing ? `<div style="background:#FEF3C7;color:#92400E;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول الأرشيف لسه مش موجود — شغّل <code>archive_documents_migration.sql</code> في Supabase (وتأكد إنك عملت باكت Storage اسمه <code>archive-documents</code>).</div>` : ''}
+        ${_arcTableMissing ? `<div style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول الأرشيف لسه مش موجود — شغّل <code>archive_documents_migration.sql</code> في Supabase (وتأكد إنك عملت باكت Storage اسمه <code>archive-documents</code>).</div>` : ''}
 
         <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
             <input type="text" id="arcSearchInput" class="mod-form-input" style="max-width:280px" placeholder="🔍 بحث بالعنوان/التصنيف..." value="${_arcSearch}" oninput="arcOnSearch(this.value)">
@@ -91,8 +91,8 @@ function arcRenderPage(c) {
                 <div style="font-size:11.5px;color:var(--inv-muted);margin-bottom:6px">${arcLinkedLabel(d)}${d.category?' · '+d.category:''}</div>
                 <div style="font-size:11px;color:var(--inv-muted-light);margin-bottom:10px">${new Date(d.created_at).toLocaleDateString('ar-EG')}</div>
                 <div style="display:flex;gap:6px">
-                    <a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold);text-decoration:none;flex:1;text-align:center">👁️ فتح</a>
-                    <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="arcDelete('${d.id}')">🗑️</button>
+                    <a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold);text-decoration:none;flex:1;text-align:center">👁️ فتح</a>
+                    <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="arcDelete('${d.id}')">🗑️</button>
                 </div>
             </div>`).join('')}
         </div>`;

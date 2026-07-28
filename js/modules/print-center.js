@@ -61,7 +61,7 @@ window.pcSwitchType = function (type) {
 };
 
 function pcNotFoundHTML() {
-    return `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px;text-align:center">❌ لا يوجد مستند بهذا الرقم</div>`;
+    return `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px;text-align:center">❌ لا يوجد مستند بهذا الرقم</div>`;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -153,7 +153,7 @@ window.pcSearch = async function () {
             <button class="mod-btn mod-btn-primary" onclick="pcPrintFound()">🖨️ طباعة A4 / حفظ PDF</button>
         </div>`;
     } catch (err) {
-        resultEl.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 

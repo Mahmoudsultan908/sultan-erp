@@ -17,11 +17,11 @@ let _prlTableMissing = false;
 let _prlLastEvalMap = {}; // employee_id -> { date, avg }
 
 function prlEvalColor(avg) {
-    if (avg >= 9) return { color: 'var(--inv-green)', bg: '#F0FDF4' };
+    if (avg >= 9) return { color: 'var(--inv-green)', bg: 'var(--inv-green-light)' };
     if (avg >= 7) return { color: '#2563EB', bg: '#EFF6FF' };
-    if (avg >= 5) return { color: 'var(--inv-gold)', bg: '#FFFBEB' };
+    if (avg >= 5) return { color: 'var(--inv-gold)', bg: 'var(--inv-gold-bg)' };
     if (avg >= 3) return { color: '#EA580C', bg: '#FFF7ED' };
-    return { color: 'var(--inv-red)', bg: '#FEF2F2' };
+    return { color: 'var(--inv-red)', bg: 'var(--inv-red-bg)' };
 }
 
 function prlFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -56,7 +56,7 @@ async function renderPayroll(c) {
 
         prlRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -71,11 +71,11 @@ function prlRenderPage(c) {
             <button class="mod-btn mod-btn-primary" onclick="prlOpenAdd()">+ إضافة موظف</button>
         </div>
 
-        ${_prlTableMissing ? `<div style="background:#FEF3C7;color:#92400E;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول الموظفين لسه مش موجود — شغّل <code>employees_payroll_migration.sql</code> في Supabase.</div>` : ''}
+        ${_prlTableMissing ? `<div style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول الموظفين لسه مش موجود — شغّل <code>employees_payroll_migration.sql</code> في Supabase.</div>` : ''}
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">👥</div><div class="mod-card-val">${activeEmps.length}</div><div class="mod-card-lbl">عدد الموظفين النشطين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">💰</div><div class="mod-card-val">${prlFmt(totalBase)}</div><div class="mod-card-lbl">إجمالي الرواتب الأساسية</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">👥</div><div class="mod-card-val">${activeEmps.length}</div><div class="mod-card-lbl">عدد الموظفين النشطين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">💰</div><div class="mod-card-val">${prlFmt(totalBase)}</div><div class="mod-card-lbl">إجمالي الرواتب الأساسية</div></div>
         </div>
 
         <div class="mod-table-wrap">
@@ -96,7 +96,7 @@ function prlRenderPage(c) {
                     <td style="text-align:center">${e.is_active !== false ? '<span style="color:var(--inv-green);font-weight:600">✅ نشط</span>' : '<span style="color:var(--inv-muted-light);font-weight:600">🚫 غير نشط</span>'}</td>
                     <td style="text-align:center;white-space:nowrap">
                         <button class="cc-edit" onclick="prlOpenEdit('${e.id}')">✏️</button>
-                        <button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="prlShowStatement('${e.id}')">📄 كشف حساب</button>
+                        <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="prlShowStatement('${e.id}')">📄 كشف حساب</button>
                         ${typeof eevOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FEF9C3;color:#B45309" onclick="eevOpenAdd('${e.id}')" title="تقييم سريع">⭐</button>` : ''}
                     </td>
                 </tr>`;
@@ -279,7 +279,7 @@ async function prlRenderStatement() {
             </div>
             <div style="display:flex;gap:10px;margin-bottom:16px">
                 <button class="mod-btn mod-btn-primary" style="flex:1" onclick="prlOpenPayout(${Math.round(remaining*100)/100})">💸 تسجيل صرف</button>
-                <button class="mod-btn" style="flex:1;background:#F0FDF4;color:var(--inv-green)" onclick="prlOpenIncentive()">➕ تسجيل حافز</button>
+                <button class="mod-btn" style="flex:1;background:var(--inv-green-light);color:var(--inv-green)" onclick="prlOpenIncentive()">➕ تسجيل حافز</button>
             </div>
             <div id="prlPayoutForm"></div>
             <div id="prlIncentiveForm"></div>
@@ -317,7 +317,7 @@ async function prlRenderStatement() {
                 </tr>`).join('')}</tbody></table>
             </div>` : ''}`;
     } catch (err) {
-        body.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -444,7 +444,7 @@ window.prlOpenIncentive = function () {
     const wrap = document.getElementById('prlIncentiveForm');
     if (!wrap) return;
     wrap.innerHTML = `
-    <div class="dash-card" style="padding:16px;margin-bottom:16px;background:#F0FDF4">
+    <div class="dash-card" style="padding:16px;margin-bottom:16px;background:var(--inv-green-light)">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="mod-form-group"><label>المبلغ (ج.م) *</label>
                 <input type="number" id="prlIncentiveAmount" class="mod-form-input" min="0.01" step="0.01"></div>

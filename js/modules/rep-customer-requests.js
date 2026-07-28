@@ -24,7 +24,7 @@ async function renderRepCustomerRequests(c) {
         RCR_LIST = data || [];
         rcrRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -76,7 +76,7 @@ function rcrRowHTML(r) {
         <td style="font-size:12px;color:var(--inv-muted)">${isNew ? 'عميل جديد — مسجّل بالفعل وباع له المندوب' : `الحالي: ${cur?.name||'—'} / ${cur?.phone||'—'}${cur?cur.balance>0?` (رصيد ${rcrFmt(cur.balance)})`:'':''}`}</td>
         <td style="white-space:nowrap">
             <button class="cc-edit" style="background:#DCFCE7;color:#166534" onclick="rcrApprove('${r.id}')">✅ اعتماد</button>
-            <button class="cc-edit" style="background:#FEE2E2;color:#991B1B;margin-right:4px" onclick="rcrReject('${r.id}')">❌ رفض</button>
+            <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red);margin-right:4px" onclick="rcrReject('${r.id}')">❌ رفض</button>
         </td>
     </tr>`;
 }

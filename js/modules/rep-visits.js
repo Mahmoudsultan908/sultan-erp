@@ -38,7 +38,7 @@ async function renderRepVisits(c) {
         if (RV_SUBTAB === 'visits') { await rvLoad(); rvRenderPage(c); }
         else { await rvLoadRoutes(); rvRenderRoutesPage(c); }
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 

@@ -36,7 +36,7 @@ async function renderGeneralLedger(c) {
         _glAccounts = accounts || [];
         glRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -115,8 +115,8 @@ async function glLoadAccount(code, from, to) {
         result.innerHTML = `
         <div class="mod-grid" style="margin-bottom:16px">
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">📋</div><div class="mod-card-val">${account?.code} — ${account?.name}</div><div class="mod-card-lbl">الحساب المحدد</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F0FDF4;color:var(--inv-green)">📊</div><div class="mod-card-val">${glFmt(totalDr)}</div><div class="mod-card-lbl">إجمالي مدين</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">📊</div><div class="mod-card-val">${glFmt(totalCr)}</div><div class="mod-card-lbl">إجمالي دائن</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">📊</div><div class="mod-card-val">${glFmt(totalDr)}</div><div class="mod-card-lbl">إجمالي مدين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">📊</div><div class="mod-card-val">${glFmt(totalCr)}</div><div class="mod-card-lbl">إجمالي دائن</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#F5F3FF;color:#7C3AED">${running>=0?'📈':'📉'}</div><div class="mod-card-val" style="color:${running>=0?'var(--inv-green)':'var(--inv-red)'}">${glFmt(Math.abs(running))}</div><div class="mod-card-lbl">الرصيد الحالي</div></div>
         </div>
 
@@ -144,7 +144,7 @@ async function glLoadAccount(code, from, to) {
             </table>
         </div>`;
     } catch (err) {
-        result.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        result.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 

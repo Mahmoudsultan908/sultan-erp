@@ -10,7 +10,7 @@ function csRenderPage(c, icon, title, description) {
         <div style="font-size:56px;margin-bottom:16px;opacity:0.7">${icon}</div>
         <h2 style="font-size:22px;font-weight:800;color:var(--inv-navy);margin-bottom:10px">${title}</h2>
         <p style="font-size:14px;color:var(--inv-muted);max-width:420px;line-height:1.8;margin-bottom:20px">${description}</p>
-        <span style="background:#FFFBEB;color:var(--inv-gold);padding:8px 20px;border-radius:20px;font-size:13px;font-weight:700">🔜 ستُضاف قريباً</span>
+        <span style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:8px 20px;border-radius:20px;font-size:13px;font-weight:700">🔜 ستُضاف قريباً</span>
     </div>`;
 }
 

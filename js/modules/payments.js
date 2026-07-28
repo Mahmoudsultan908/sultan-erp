@@ -63,14 +63,14 @@ async function renderPayments(c) {
             <button class="mod-btn mod-btn-primary" onclick="payOpenAdd()">+ صرف دفعة جديدة</button>
         </div>
 
-        ${isOfflineData ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
+        ${isOfflineData ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
             📴 <strong>غير متصل بالإنترنت</strong> — بيانات الموردين المعروضة من آخر نسخة محفوظة (${offlineDataAge ? new Date(offlineDataAge).toLocaleString('ar-EG') : '—'}). الدفع هيتسجّل محلياً ويتزامن تلقائياً لما الاتصال يرجع.
         </div>` : ''}
 
         <div class="mod-grid">
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${payFmt(totalPaid)}</div><div class="mod-card-lbl">إجمالي المدفوع</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold)">📋</div><div class="mod-card-val">${payments.length}</div><div class="mod-card-lbl">سند صرف</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${payFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين (${debtSuppliers.length})</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">📋</div><div class="mod-card-val">${payments.length}</div><div class="mod-card-lbl">سند صرف</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⚠️</div><div class="mod-card-val">${payFmt(totalDebt)}</div><div class="mod-card-lbl">مستحق للموردين (${debtSuppliers.length})</div></div>
         </div>
 
         ${paySuppliersDebtListHTML(debtSuppliers)}
@@ -93,7 +93,7 @@ async function renderPayments(c) {
                     <td>${p._queue
                         ? (p.status === 'failed' ? '<span style="color:var(--inv-red);font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:var(--inv-gold);font-weight:600">⏳ غير مُزامن</span>')
                         : (p.status==='confirmed'?'<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:var(--inv-muted-light);font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:var(--inv-gold)">${p.status}</span>`)}</td>
-                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="payReverseSupplierPayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
+                    <td style="white-space:nowrap">${p._queue ? '' : `<button class="cc-edit" onclick="payPrintVoucher('${p.id}')">🖨️</button>${p.status==='confirmed' ? `<button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="payOpenEditModal('${p.id}')">✏️ تعديل</button><button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="payReverseSupplierPayment('${p.id}')">↩️ استرجاع</button>` : ''}`}</td>
                 </tr>`).join('')}
             </tbody></table>
         </div>
@@ -127,7 +127,7 @@ function paySuppliersDebtListHTML(debtSuppliers) {
     return `
     <div class="mod-card" style="margin-top:16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-            <div class="mod-card-icon" style="background:#FEF3C7;color:var(--inv-gold);width:40px;height:40px;font-size:18px">⚠️</div>
+            <div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold);width:40px;height:40px;font-size:18px">⚠️</div>
             <div><div style="font-size:14px;font-weight:800">موردون لهم مستحقات (مديونيات)</div><div style="font-size:11px;color:var(--inv-muted)">اضغط "صرف دفعة" بجوار أي مورد لدفعه فوراً</div></div>
         </div>
         ${debtSuppliers.slice(0,8).map(s => `<div class="cat-card">
@@ -272,7 +272,7 @@ window.payPreview = function() {
     const bal = Number(s.balance) || 0;
     const after = bal - amount;
     area.innerHTML = `
-        <div class="limit-box" style="border-color:var(--inv-green-light);background:#ECFDF5">
+        <div class="limit-box" style="border-color:var(--inv-green-light);background:var(--inv-green-light)">
             <div class="limit-row"><span class="lr-label">المستحق للمورد:</span><span class="lr-val" style="color:var(--inv-red)">${payFmt(bal)} ج.م</span></div>
             <div class="limit-row"><span class="lr-label">هذه الدفعة:</span><span class="lr-val" style="color:var(--inv-green)">${payFmt(amount)} ج.م</span></div>
             <div class="limit-row"><span class="lr-label">المستحق بعد الدفع:</span><span class="lr-val" style="color:${after>0?'var(--inv-gold)':'var(--inv-green)'}">${payFmt(after)} ج.م</span></div>
@@ -397,7 +397,7 @@ window.payOpenEditModal = function(id) {
             <div class="mod-modal-header"><h3>✏️ تعديل سند صرف ${p.ref||''}</h3>
                 <button class="mod-modal-close" onclick="payCloseModal('payEditModal')">&times;</button></div>
             <div class="mod-modal-body">
-                <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:9px 12px;border-radius:8px;margin-bottom:14px;font-size:12px">
+                <div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 12px;border-radius:8px;margin-bottom:14px;font-size:12px">
                     ⚠️ الحفظ هيلغي سند الصرف القديم تلقائياً (المبلغ يرجع للخزنة ويترحّل على رصيد المورد) ويسجّل سنداً جديداً بالبيانات المعدّلة — حفاظاً على سجل تاريخي كامل، بدل التعديل المباشر.
                 </div>
                 <div class="mod-form-group"><label>المورد *</label>

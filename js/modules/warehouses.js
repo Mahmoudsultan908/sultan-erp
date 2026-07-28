@@ -27,7 +27,7 @@ async function renderWarehouses(c) {
 
         whRenderPage(c, stockByWh);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -54,7 +54,7 @@ function whRenderPage(c, stockByWh) {
                         </div>
                         <div style="display:flex;gap:4px">
                             <button class="cc-edit" onclick="whOpenEdit('${w.id}')">✏️</button>
-                            ${!w.is_main ? `<button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="whSetMain('${w.id}')" title="تعيين كمخزن رئيسي">⭐</button>` : ''}
+                            ${!w.is_main ? `<button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="whSetMain('${w.id}')" title="تعيين كمخزن رئيسي">⭐</button>` : ''}
                         </div>
                     </div>
                     <div class="dash-summary-row"><span>عدد الأصناف</span><span style="font-weight:700">${s.items}</span></div>

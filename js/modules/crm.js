@@ -173,7 +173,7 @@ async function renderCRM(c) {
         await Promise.all([crmLoadInteractionsData(), crmLoadLeadsData()]);
         crmRenderShell(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -320,11 +320,11 @@ function crmRenderPage(c) {
             <button class="mod-btn mod-btn-primary" onclick="crmOpenAdd()">+ تسجيل تفاعل / تحديد مهمة</button>
         </div>
 
-        ${_crmTableMissing ? `<div style="background:#FEF3C7;color:#92400E;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول التفاعلات لسه مش موجود — شغّل <code>crm_migration.sql</code> في Supabase.</div>` : ''}
+        ${_crmTableMissing ? `<div style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول التفاعلات لسه مش موجود — شغّل <code>crm_migration.sql</code> في Supabase.</div>` : ''}
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⏰</div><div class="mod-card-val">${overdue}</div><div class="mod-card-lbl">متابعات متأخرة</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">📅</div><div class="mod-card-val">${dueToday}</div><div class="mod-card-lbl">متابعات اليوم</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⏰</div><div class="mod-card-val">${overdue}</div><div class="mod-card-lbl">متابعات متأخرة</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">📅</div><div class="mod-card-val">${dueToday}</div><div class="mod-card-lbl">متابعات اليوم</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">🔜</div><div class="mod-card-val">${upcoming}</div><div class="mod-card-lbl">متابعات قادمة</div></div>
         </div>
 
@@ -343,7 +343,7 @@ function crmRenderPage(c) {
                     const overdueRow = !x.is_done && x.next_follow_up_date && x.next_follow_up_date < today;
                     const waLink = crmCustomerWaLink(x);
                     const assignedName = _crmProfiles.find(p => p.id === x.assigned_to)?.name || x.sales_reps?.name || '—';
-                    return `<tr style="${overdueRow ? 'background:#FEF2F2' : ''}">
+                    return `<tr style="${overdueRow ? 'background:var(--inv-red-bg)' : ''}">
                         <td style="font-weight:600">${x.customers?.name || '—'}</td>
                         <td>${CRM_TYPE_LABELS[x.type] || x.type}</td>
                         <td style="color:var(--inv-muted)">${assignedName}</td>
@@ -353,8 +353,8 @@ function crmRenderPage(c) {
                         <td style="text-align:center;white-space:nowrap">
                             ${waLink ? `<a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${waLink}" target="_blank">📲</a>` : ''}
                             ${x.is_done ? '<span style="color:var(--inv-green);font-weight:600;font-size:12px">✅ تمّت</span>' :
-                              x.next_follow_up_date ? `<button class="cc-edit" style="background:#F0FDF4;color:var(--inv-green)" onclick="crmMarkDone('${x.id}')">✅ تمّت المتابعة</button>` : ''}
-                            <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="crmDelete('${x.id}')">🗑️</button>
+                              x.next_follow_up_date ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="crmMarkDone('${x.id}')">✅ تمّت المتابعة</button>` : ''}
+                            <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="crmDelete('${x.id}')">🗑️</button>
                         </td>
                     </tr>`;
                 }).join('')}
@@ -644,7 +644,7 @@ function crmRenderTasksPage(c) {
                 <th>العميل</th><th>الحالة</th><th>السبب</th><th>آخر تواصل</th><th style="text-align:center">إجراءات</th>
             </tr></thead><tbody>
                 ${queue.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>✅</span>مفيش أي مهمة مستحقة النهارده — كله متابَع!</td></tr>` :
-                queue.map(t => `<tr style="background:#FEF2F2">
+                queue.map(t => `<tr style="background:var(--inv-red-bg)">
                     <td style="font-weight:600">${t.name}<div style="font-size:11px;color:var(--inv-muted-light)">${t.sub || ''}</div></td>
                     <td>${t.badge ? `<span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid ${t.badgeColor};color:${t.badgeColor}">${t.badge}</span>` : `<span style="font-size:12px;color:var(--inv-muted)">${t.sub}</span>`}</td>
                     <td style="font-size:12px;color:var(--inv-red);font-weight:600">${t.reason}</td>
@@ -652,11 +652,11 @@ function crmRenderTasksPage(c) {
                     <td style="text-align:center;white-space:nowrap">
                         ${t.kind === 'lead' ? `
                             ${crmWaButtonHTML(t.lead)}
-                            <button class="cc-edit" style="background:#F0FDF4;color:var(--inv-green)" onclick="crmQuickTouchLead('${t.id}')">📞 اتصلت</button>
+                            <button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="crmQuickTouchLead('${t.id}')">📞 اتصلت</button>
                             <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenEditLead('${t.id}')">✏️</button>
                         ` : `
                             ${t.waLink ? `<a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${t.waLink}" target="_blank">📲</a>` : ''}
-                            <button class="cc-edit" style="background:#F0FDF4;color:var(--inv-green)" onclick="crmMarkDone('${t.id}')">✅ تمّت</button>
+                            <button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="crmMarkDone('${t.id}')">✅ تمّت</button>
                         `}
                     </td>
                 </tr>`).join('')}
@@ -707,7 +707,7 @@ function crmRenderLeadsPage(c) {
     const list = crmLeadsFilteredList();
 
     c.innerHTML = `
-        ${_crmLeadsTableMissing ? `<div style="background:#FEF3C7;color:#92400E;padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول العملاء المحتملين لسه مش موجود — شغّل <code>crm_leads_migration.sql</code> في Supabase.</div>` : ''}
+        ${_crmLeadsTableMissing ? `<div style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول العملاء المحتملين لسه مش موجود — شغّل <code>crm_leads_migration.sql</code> في Supabase.</div>` : ''}
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
             <div class="ob-tabs">
@@ -724,7 +724,7 @@ function crmRenderLeadsPage(c) {
             <div class="mod-card"><div class="mod-card-icon" style="background:#EFF6FF;color:#2563EB">👥</div><div class="mod-card-val">${total}</div><div class="mod-card-lbl">إجمالي العملاء المحتملين</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:#DBEAFE;color:#3B82F6">🆕</div><div class="mod-card-val">${newC}</div><div class="mod-card-lbl">عملاء جدد</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">✅</div><div class="mod-card-val">${ordered}</div><div class="mod-card-lbl">اشتروا</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEE2E2;color:var(--inv-red)">⚠️</div><div class="mod-card-val">${urgent}</div><div class="mod-card-lbl">تحتاج متابعة</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⚠️</div><div class="mod-card-val">${urgent}</div><div class="mod-card-lbl">تحتاج متابعة</div></div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:14px">
@@ -748,7 +748,7 @@ function crmRenderLeadsPage(c) {
                 const active = s === _crmLeadsFilter;
                 const cfg = CRM_LEAD_STAGES[s];
                 const cnt = s === 'الكل' ? scope.length : scope.filter(l => l.status === s).length;
-                return `<button onclick="crmLeadsSetFilter('${s}')" style="white-space:nowrap;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${active && cfg ? cfg.color : '#E2E8F0'};background:${active && cfg ? cfg.color : '#fff'};color:${active ? (cfg ? '#fff' : 'var(--inv-navy-deep)') : 'var(--inv-muted)'}">${s} (${cnt})</button>`;
+                return `<button onclick="crmLeadsSetFilter('${s}')" style="white-space:nowrap;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${active && cfg ? cfg.color : 'var(--inv-border)'};background:${active && cfg ? cfg.color : 'var(--inv-card)'};color:${active ? (cfg ? '#fff' : 'var(--inv-navy-deep)') : 'var(--inv-muted)'}">${s} (${cnt})</button>`;
             }).join('')}
         </div>
 
@@ -761,7 +761,7 @@ function crmRenderLeadsPage(c) {
                 list.map(l => {
                     const cfg = CRM_LEAD_STAGES[l.status] || { color: 'var(--inv-muted)', icon: '?' };
                     const urg = crmLeadUrgent(l);
-                    return `<tr style="${urg ? 'background:#FEF2F2' : ''}">
+                    return `<tr style="${urg ? 'background:var(--inv-red-bg)' : ''}">
                         <td style="font-weight:600">${l.name}${l.converted_customer_id ? ' <span style="font-size:10px;color:var(--inv-green)">(تحوّل لعميل)</span>' : ''}</td>
                         <td style="color:var(--inv-muted)">${l.shop || '—'}<div style="font-size:11px;color:var(--inv-muted-light)">${l.area || ''}</div></td>
                         <td><span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid ${cfg.color};color:${cfg.color}">${cfg.icon} ${l.status}</span></td>
@@ -772,7 +772,7 @@ function crmRenderLeadsPage(c) {
                             ${crmWaButtonHTML(l)}
                             <button class="cc-edit" style="background:#EFF6FF;color:#2563EB" onclick="crmOpenEditLead('${l.id}')">✏️</button>
                             ${l.status === 'اشترى' && !l.converted_customer_id ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="crmConvertLead('${l.id}')">👤 تحويل لعميل</button>` : ''}
-                            <button class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="crmDeleteLead('${l.id}')">🗑️</button>
+                            <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="crmDeleteLead('${l.id}')">🗑️</button>
                         </td>
                     </tr>`;
                 }).join('')}
@@ -996,7 +996,7 @@ window.crmOpenTemplatesModal = function () {
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="mod-btn" style="background:#FEE2E2;color:var(--inv-red)" onclick="crmResetTemplates()">↩️ استعادة الافتراضي</button>
+                <button class="mod-btn" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="crmResetTemplates()">↩️ استعادة الافتراضي</button>
                 <button class="mod-btn mod-btn-primary" onclick="crmSaveTemplates()">💾 حفظ القوالب</button>
             </div>
         </div>`;
@@ -1016,7 +1016,7 @@ function crmRenderVariantRows(stage) {
             <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
                 <input class="mod-form-input" style="width:110px;font-size:11px;padding:6px" value="${name}" onchange="crmRenameVariant('${stage}','${name.replace(/'/g, "\\'")}',this.value)">
                 <textarea class="mod-form-input" style="flex:1;font-size:11px" rows="3" oninput="crmEditVariantText('${stage}','${name.replace(/'/g, "\\'")}',this.value)">${variants[name] || ''}</textarea>
-                <button type="button" class="cc-edit" style="background:#FEE2E2;color:var(--inv-red)" onclick="crmRemoveVariant('${stage}','${name.replace(/'/g, "\\'")}')">✕</button>
+                <button type="button" class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="crmRemoveVariant('${stage}','${name.replace(/'/g, "\\'")}')">✕</button>
             </div>`).join('')}
         <button type="button" class="mod-btn" style="background:#EFF6FF;color:#2563EB;font-size:11px;padding:6px 10px" onclick="crmAddVariant('${stage}')">➕ نسخة جديدة</button>
     `;

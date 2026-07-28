@@ -31,7 +31,7 @@ async function renderBalanceTransfer(c) {
 
         btRender(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -49,7 +49,7 @@ function btRender(c) {
     </div>
 
     <div class="mod-tabs" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        ${BT_TABS.map(t => `<button class="mod-btn" style="background:${t.id===_btTab?'#1E3A8A':'#F1F5F9'};color:${t.id===_btTab?'#fff':'var(--inv-text-soft)'}" onclick="btSwitchTab('${t.id}')">${t.label}</button>`).join('')}
+        ${BT_TABS.map(t => `<button class="mod-btn" style="background:${t.id===_btTab?'#1E3A8A':'var(--inv-divider)'};color:${t.id===_btTab?'#fff':'var(--inv-text-soft)'}" onclick="btSwitchTab('${t.id}')">${t.label}</button>`).join('')}
     </div>
 
     <div class="mod-card" style="max-width:600px">

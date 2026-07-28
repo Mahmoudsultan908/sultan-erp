@@ -153,7 +153,7 @@ async function renderReports(container) {
                 </div>
             </div>
             ${from < SULTAN_LIVE_CUTOVER ? `
-            <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
+            <div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
                 ⚠️ الفترة دي بتشمل بيانات منقولة من ديكسف (قبل ${SULTAN_LIVE_CUTOVER}) فيها تسويات ترحيل لمرة واحدة (رأس مال، تصحيحات أرصدة) مش جزء من الأداء التشغيلي العادي — عشان كده الرقم هنا مش متوقع يطابق "صافي المركز المالي" في الداشبورد. للأداء الفعلي المستمر استخدم فترة تبدأ من ${SULTAN_LIVE_CUTOVER}.
             </div>` : ''}
             <div class="dash-card" style="padding:24px;max-width:550px" id="pl-card">
@@ -212,7 +212,7 @@ async function renderReports(container) {
                 rows.map(cu => `<tr>
                     <td><strong>${cu.name}</strong></td>
                     <td style="text-align:left;font-weight:700;color:${Number(cu.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${fmt(cu.balance)}</td>
-                    <td style="text-align:center"><button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="custShowStatement('${cu.id}')">📄 كشف حساب</button></td>
+                    <td style="text-align:center"><button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="custShowStatement('${cu.id}')">📄 كشف حساب</button></td>
                 </tr>`).join('');
         };
         c.innerHTML = `
@@ -242,7 +242,7 @@ async function renderReports(container) {
                 rows.map(s => `<tr>
                     <td><strong>${s.name}</strong></td>
                     <td style="text-align:left;font-weight:700;color:${Number(s.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${fmt(s.balance)}</td>
-                    <td style="text-align:center"><button class="cc-edit" style="background:#FFFBEB;color:var(--inv-gold)" onclick="supShowStatement('${s.id}')">📄 كشف حساب</button></td>
+                    <td style="text-align:center"><button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="supShowStatement('${s.id}')">📄 كشف حساب</button></td>
                 </tr>`).join('');
         };
         c.innerHTML = `
@@ -330,7 +330,7 @@ async function renderReports(container) {
                         <td>${fmt(s.total_expected)}</td>
                         <td class="dash-s-green">${fmt(s.total_received)}</td>
                         <td class="dash-amount" style="color:${s.total_remaining>0?'var(--inv-gold)':'var(--inv-green)'}">${fmt(s.total_remaining)}</td>
-                        <td>${s.total_remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:#ECFDF5;color:var(--inv-green)" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 تسجيل استلام</button>` : ''}</td>
+                        <td>${s.total_remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 تسجيل استلام</button>` : ''}</td>
                     </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد مؤجلات مسجلة</td></tr>'}
                 </tbody>
             </table>
@@ -350,7 +350,7 @@ async function renderReports(container) {
                         <td class="dash-amount" style="color:${remaining>0?'var(--inv-gold)':'var(--inv-green)'}">${fmt(remaining)}</td>
                         <td>${m.due_date || '—'}</td>
                         <td style="font-size:11px;color:var(--inv-muted)">${m.notes || '—'}</td>
-                        <td>${remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:#ECFDF5;color:var(--inv-green)" onclick="repDefReceiveManual('${m.id}',${remaining})">💰 استلام</button>` : '<span style="color:var(--inv-green);font-size:11px">✅ مكتمل</span>'}</td>
+                        <td>${remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="repDefReceiveManual('${m.id}',${remaining})">💰 استلام</button>` : '<span style="color:var(--inv-green);font-size:11px">✅ مكتمل</span>'}</td>
                     </tr>`;
                     }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد مؤجلات يدوية مسجلة</td></tr>'}
                 </tbody>
@@ -481,7 +481,7 @@ async function renderReports(container) {
                 </tr>`).join('')}
             </tbody></table>`;
         } catch (err) {
-            body.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:12px;border-radius:8px;font-size:12px">خطأ: ${err.message}</div>`;
+            body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:12px;border-radius:8px;font-size:12px">خطأ: ${err.message}</div>`;
         }
     };
 

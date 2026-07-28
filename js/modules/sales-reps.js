@@ -79,7 +79,7 @@ async function renderSalesReps(c) {
 
         repRenderPage(c);
     } catch (err) {
-        c.innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
     }
 }
 
@@ -114,7 +114,7 @@ function repRenderPage(c) {
     const top = repTopThisMonth();
 
     c.innerHTML = `
-    ${_repTableMissing ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
+    ${_repTableMissing ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12px">
         ⚠️ <strong>تنبيه:</strong> جدول <code>sales_reps</code> غير موجود في قاعدة البيانات بعد.
         شغّل ملف <code>sales_reps_migration.sql</code> في Supabase أولاً حتى تقدر تضيف مندوبين وتربطهم بالفواتير.
     </div>` : ''}
@@ -126,7 +126,7 @@ function repRenderPage(c) {
 
     <div class="mod-grid">
         <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">🚗</div><div class="mod-card-val">${activeReps.length}</div><div class="mod-card-lbl">مندوبون نشطون</div></div>
-        <div class="mod-card"><div class="mod-card-icon" style="background:#FFFBEB;color:var(--inv-gold)">🏆</div><div class="mod-card-val" style="font-size:16px">${top.rep ? top.rep.name : '—'}</div><div class="mod-card-lbl">مندوب الشهر (${repFmt(top.total)} ج.م)</div></div>
+        <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">🏆</div><div class="mod-card-val" style="font-size:16px">${top.rep ? top.rep.name : '—'}</div><div class="mod-card-lbl">مندوب الشهر (${repFmt(top.total)} ج.م)</div></div>
         <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💰</div><div class="mod-card-val">${repFmt(totalSalesAll)}</div><div class="mod-card-lbl">إجمالي مبيعات المندوبين (كل الوقت)</div></div>
     </div>
 
@@ -167,11 +167,11 @@ function repRenderRows() {
             <td style="text-align:center">${count}</td>
             <td style="text-align:left;font-weight:700">${repFmt(total)}</td>
             <td style="text-align:left;font-weight:700;color:var(--inv-green)">${repFmt(commission)}</td>
-            <td><span style="font-size:11px;padding:3px 10px;border-radius:50px;background:${active ? 'var(--inv-green-light)' : '#FEE2E2'};color:${active ? '#065F46' : '#991B1B'}">${active ? 'نشط' : 'معطّل'}</span></td>
+            <td><span style="font-size:11px;padding:3px 10px;border-radius:50px;background:${active ? 'var(--inv-green-light)' : 'var(--inv-red-bg)'};color:${active ? 'var(--inv-green)' : 'var(--inv-red)'}">${active ? 'نشط' : 'معطّل'}</span></td>
             <td style="text-align:center;white-space:nowrap">
                 <button class="cc-edit" onclick="repShowStatement('${r.id}')" title="كشف مبيعات">📄</button>
                 <button class="cc-edit" onclick="repOpenEdit('${r.id}')" title="تعديل">✏️</button>
-                <button class="cc-edit" style="background:${active ? '#FEE2E2' : 'var(--inv-green-light)'};color:${active ? 'var(--inv-red)' : 'var(--inv-green)'}" onclick="repToggleActive('${r.id}', ${!active})" title="${active ? 'تعطيل' : 'تفعيل'}">${active ? '🚫' : '✅'}</button>
+                <button class="cc-edit" style="background:${active ? 'var(--inv-red-bg)' : 'var(--inv-green-light)'};color:${active ? 'var(--inv-red)' : 'var(--inv-green)'}" onclick="repToggleActive('${r.id}', ${!active})" title="${active ? 'تعطيل' : 'تفعيل'}">${active ? '🚫' : '✅'}</button>
             </td>
         </tr>`;
     }).join('');
@@ -342,7 +342,7 @@ window.repShowStatement = async function (repId) {
                         <td style="text-align:left;font-weight:700">${repFmt(s.total)}</td>
                     </tr>`).join('')}
                     ${retRows.map(r => `<tr>
-                        <td><span style="background:#FEF2F2;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace">${r.return_no}</span></td>
+                        <td><span style="background:var(--inv-red-bg);padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace">${r.return_no}</span></td>
                         <td>${r.customers?.name || 'نقدي'}</td>
                         <td>↩️ مرتجع</td>
                         <td style="font-size:12px">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
@@ -351,7 +351,7 @@ window.repShowStatement = async function (repId) {
                 </tbody></table>
             </div>`;
     } catch (err) {
-        document.getElementById('repStmtBody').innerHTML = `<div style="background:#FEF2F2;color:#991B1B;padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        document.getElementById('repStmtBody').innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
     }
 };
 
