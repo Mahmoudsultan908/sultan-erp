@@ -77,7 +77,7 @@ async function renderReports(container) {
     // 1) قائمة الدخل P&L
     // ─────────────────────────────────────────
     async function plComputeTotals(from, to) {
-        const [{ data: sales }, { data: expenses }, { data: salesReturns }, { data: saleItemsCost }, { data: returnItemsCost }] = await Promise.all([
+        const [{ data: sales }, { data: expenses }, { data: salesReturns }, { data: saleItemsCost }, { data: returnItemsCost }, { data: collectionDiscounts }] = await Promise.all([
             sb.from('sales').select('total,subtotal').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
             sb.from('expenses').select('amount').eq('status','confirmed').gte('expense_date', from).lte('expense_date', to),
             sb.from('sales_returns').select('total').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
@@ -88,6 +88,9 @@ async function renderReports(container) {
                 q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59')),
             plFetchAllRows('sale_return_items', 'qty, cost_price_snapshot, sales_returns!inner(created_at, status)', (q) =>
                 q.eq('sales_returns.status', 'confirmed').gte('sales_returns.created_at', from).lte('sales_returns.created_at', to + 'T23:59:59')),
+            // خصم العميل وقت التحصيل (collections.js) — بيقفل جزء من المديونية من غير نقدية فعلية،
+            // فمحتاج يترحّل كخسارة حقيقية هنا برضه، مش بس في حساب 5016 بالقيد المحاسبي.
+            sb.from('customer_payments').select('discount').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
         ]);
         const totalSales = (sales||[]).reduce((s,r)=>s+Number(r.total),0);
         const totalReturns = (salesReturns||[]).reduce((s,r)=>s+Number(r.total),0);
@@ -96,9 +99,10 @@ async function renderReports(container) {
         const cogsReturns = (returnItemsCost||[]).reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.cost_price_snapshot)||0),0);
         const totalCOGS = cogsSales - cogsReturns;
         const totalExpenses = (expenses||[]).reduce((s,r)=>s+Number(r.amount),0);
-        const netProfit = netSales - totalCOGS - totalExpenses;
+        const totalCollectionDiscounts = (collectionDiscounts||[]).reduce((s,r)=>s+(Number(r.discount)||0),0);
+        const netProfit = netSales - totalCOGS - totalExpenses - totalCollectionDiscounts;
         const margin = netSales > 0 ? (netProfit/netSales*100) : 0;
-        return { totalSales, totalReturns, netSales, cogsSales, cogsReturns, totalCOGS, totalExpenses, netProfit, margin };
+        return { totalSales, totalReturns, netSales, cogsSales, cogsReturns, totalCOGS, totalExpenses, totalCollectionDiscounts, netProfit, margin };
     }
 
     // اتجاه الربح آخر 6 شهور (أو أقل لو النظام لسه عمره أقل من كده) — بيتوقف
@@ -137,7 +141,7 @@ async function renderReports(container) {
         const toDefault = today.toISOString().slice(0,10);
 
         const load = async (from, to) => {
-            const { totalSales, totalReturns, netSales, cogsSales, cogsReturns, totalCOGS, totalExpenses, netProfit, margin } = await plComputeTotals(from, to);
+            const { totalSales, totalReturns, netSales, cogsSales, cogsReturns, totalCOGS, totalExpenses, totalCollectionDiscounts, netProfit, margin } = await plComputeTotals(from, to);
 
             c.innerHTML = `
             <div class="dash-card" style="padding:20px;margin-bottom:16px">
@@ -163,6 +167,7 @@ async function renderReports(container) {
                 <div class="dash-summary-row"><span>(-) تكلفة البضاعة المباعة</span><span class="dash-s-red">${fmt(totalCOGS)}</span></div>
                 <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light)"><span>(تكلفة مبيعات ${fmt(cogsSales)} - تكلفة مرتجعات ${fmt(cogsReturns)})</span><span></span></div>
                 <div class="dash-summary-row"><span>(-) إجمالي المصروفات</span><span class="dash-s-red">${fmt(totalExpenses)}</span></div>
+                ${totalCollectionDiscounts > 0 ? `<div class="dash-summary-row"><span>(-) خصومات تحصيل من العملاء</span><span class="dash-s-red">${fmt(totalCollectionDiscounts)}</span></div>` : ''}
                 <div class="dash-summary-divider"></div>
                 <div class="dash-summary-row dash-summary-total">
                     <span>${netProfit>=0?'✅ صافي الربح':'📉 صافي الخسارة'}</span>
@@ -186,6 +191,7 @@ async function renderReports(container) {
                 { البند: 'مرتجعات المبيعات', القيمة: totalReturns },
                 { البند: 'تكلفة البضاعة المباعة', القيمة: totalCOGS },
                 { البند: 'إجمالي المصروفات', القيمة: totalExpenses },
+                { البند: 'خصومات تحصيل من العملاء', القيمة: totalCollectionDiscounts },
                 { البند: netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة', القيمة: Math.abs(netProfit) },
                 { البند: 'هامش الربح %', القيمة: margin.toFixed(1) },
             ]);

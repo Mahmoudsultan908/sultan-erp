@@ -56,6 +56,7 @@ async function renderDashboard(container) {
             { data: salesReturnsMonth },
             { data: purchasesMonth },
             { data: expensesMonth },
+            { data: collectionDiscountsMonth },
             { data: saleItemsCostMonth },
             { data: returnItemsCostMonth },
             { data: lowStock },
@@ -81,6 +82,8 @@ async function renderDashboard(container) {
             sb.from('sales_returns').select('total').eq('status','confirmed').gte('created_at', monthStart),
             sb.from('purchases').select('total').eq('status','confirmed').gte('created_at', monthStart),
             sb.from('expenses').select('amount').eq('status','confirmed').gte('expense_date', monthStart),
+            // خصم العميل وقت التحصيل (collections.js) — راجع نفس المنطق في reports.js
+            sb.from('customer_payments').select('discount').eq('status','confirmed').gte('created_at', monthStart),
             // تكلفة البضاعة المباعة الفعلية (مش المشتريات) — راجع نفس المنطق في reports.js.
             // مفلترة بـ dashFetchAllRows عشان أسطر الأصناف تعدّي حد الـ1000 صف الافتراضي مع الوقت.
             dashFetchAllRows('sale_items', 'qty, cost_price_snapshot, sales!inner(created_at, status)', (q) =>
@@ -154,9 +157,10 @@ async function renderDashboard(container) {
         const netMonthSales = monthSales - monthReturns;
         const monthPurchases = (purchasesMonth || []).reduce((s, r) => s + Number(r.total), 0);
         const monthExpenses = (expensesMonth || []).reduce((s, r) => s + Number(r.amount), 0);
+        const monthDiscounts = (collectionDiscountsMonth || []).reduce((s, r) => s + (Number(r.discount) || 0), 0);
         const monthCOGS = (saleItemsCostMonth || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0)
             - (returnItemsCostMonth || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.cost_price_snapshot) || 0), 0);
-        const monthProfit = netMonthSales - monthCOGS - monthExpenses;
+        const monthProfit = netMonthSales - monthCOGS - monthExpenses - monthDiscounts;
 
         // ── هدف المبيعات الشهري = (رواتب الموظفين النشطين + بنود التشغيل بحد شهري + هامش ربح مستهدف) ÷ متوسط هامش الربح الحقيقي ──
         // متوسط الهامش بيتحسب تلقائيًا من مبيعات آخر 90 يوم الفعلية (إيراد
@@ -404,6 +408,7 @@ async function renderDashboard(container) {
                     <div class="dash-summary-row"><span>صافي المبيعات</span><span class="dash-s-green">${fmt(netMonthSales)}</span></div>
                     <div class="dash-summary-row"><span>(-) تكلفة البضاعة المباعة</span><span class="dash-s-red">${fmt(monthCOGS)}</span></div>
                     <div class="dash-summary-row"><span>(-) إجمالي المصروفات</span><span class="dash-s-red">${fmt(monthExpenses)}</span></div>
+                    ${monthDiscounts > 0 ? `<div class="dash-summary-row"><span>(-) خصومات تحصيل من العملاء</span><span class="dash-s-red">${fmt(monthDiscounts)}</span></div>` : ''}
                     <div class="dash-summary-divider"></div>
                     <div class="dash-summary-row dash-summary-total">
                         <span>${monthProfit >= 0 ? '✅ صافي الربح' : '📉 صافي الخسارة'}</span>

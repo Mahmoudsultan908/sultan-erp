@@ -106,7 +106,7 @@ async function renderCollections(c) {
                     <td><span style="background:#F1F5F9;padding:3px 8px;border-radius:5px;font-size:11px;font-family:monospace">${p.ref||'—'}</span></td>
                     <td><strong>${p.customers?.name || '—'}</strong>${_colRepById[p.created_by] ? ` <span style="font-size:11px;color:#2563EB">🚗 ${_colRepById[p.created_by]}</span>` : ''}</td>
                     <td>${new Date(p.created_at).toLocaleDateString('ar-EG')}</td>
-                    <td style="text-align:left;font-weight:700;color:var(--inv-green)">${colFmt(p.amount)}</td>
+                    <td style="text-align:left;font-weight:700;color:var(--inv-green)">${colFmt(p.amount)}${Number(p.discount) > 0 ? `<br><span style="font-size:10.5px;font-weight:600;color:var(--inv-gold)">+ خصم ${colFmt(p.discount)}</span>` : ''}</td>
                     <td>${p._queue
                         ? (p.status === 'failed' ? '<span style="color:var(--inv-red);font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:var(--inv-gold);font-weight:600">⏳ غير مُزامن</span>')
                         : (p.status==='confirmed'?'<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>':p.status==='cancelled'?'<span style="color:var(--inv-muted-light);font-weight:600">🚫 ملغى (معدَّل)</span>':`<span style="color:var(--inv-gold)">${p.status}</span>`)}</td>
@@ -200,6 +200,10 @@ window.colOpenAdd = function(presetCustomerId = null) {
                 <div class="mod-form-group"><label>المبلغ المحصّل (ج.م) *</label>
                     <input type="number" id="colAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="${preset?colFmt(preset.balance):''}" oninput="colPreview()">
                 </div>
+                <div class="mod-form-group"><label>خصم للعميل (ج.م)</label>
+                    <input type="number" id="colDiscount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="0" min="0" oninput="colPreview()">
+                    <small style="color:var(--inv-muted-light)">يقفل من مديونية العميل من غير ما يتحصّل نقدي — بيتسجّل كخصم في الحسابات مش نقدية فعلية</small>
+                </div>
                 <div class="mod-form-group"><label>المرجع / البيان</label>
                     <input type="text" id="colRef" class="mod-form-input" placeholder="مثال: تحصيل على حساب فاتورة INV-0005">
                 </div>
@@ -291,6 +295,7 @@ window.colPickCust = function(id, mode) {
 window.colPreview = function() {
     const cid = document.getElementById('colCustId').value;
     const amount = parseFloat(document.getElementById('colAmount').value) || 0;
+    const discount = parseFloat(document.getElementById('colDiscount')?.value) || 0;
     const area = document.getElementById('colBalancePreview');
     // ★ رصيد العميل يظهر فور اختياره، من غير ما ينتظر إدخال مبلغ — سطر
     //   "بعد التحصيل" بس هو اللي محتاج مبلغ فعلي عشان يتحسب.
@@ -298,12 +303,15 @@ window.colPreview = function() {
     const c = _colCustomers.find(x=>x.id===cid);
     if (!c) return;
     const bal = Number(c.balance) || 0;
-    const after = bal - amount;
+    const after = bal - amount - discount;
     area.innerHTML = `
         <div class="limit-box" style="border-color:var(--inv-green-light);background:var(--inv-green-light)">
             <div class="limit-row"><span class="lr-label">المستحق على العميل:</span><span class="lr-val" style="color:var(--inv-red)">${colFmt(bal)} ج.م</span></div>
             ${amount > 0 ? `
-            <div class="limit-row"><span class="lr-label">هذا التحصيل:</span><span class="lr-val" style="color:var(--inv-green)">${colFmt(amount)} ج.م</span></div>
+            <div class="limit-row"><span class="lr-label">هذا التحصيل:</span><span class="lr-val" style="color:var(--inv-green)">${colFmt(amount)} ج.م</span></div>` : ''}
+            ${discount > 0 ? `
+            <div class="limit-row"><span class="lr-label">خصم للعميل:</span><span class="lr-val" style="color:var(--inv-gold)">${colFmt(discount)} ج.م</span></div>` : ''}
+            ${(amount > 0 || discount > 0) ? `
             <div class="limit-row"><span class="lr-label">المستحق بعد التحصيل:</span><span class="lr-val" style="color:${after>0?'var(--inv-gold)':'var(--inv-green)'}">${colFmt(after)} ج.م</span></div>` : ''}
         </div>`;
 };
@@ -314,10 +322,12 @@ window.colPreview = function() {
 window.colSave = async function() {
     const custId = document.getElementById('colCustId').value;
     const amount = parseFloat(document.getElementById('colAmount').value);
+    const discount = parseFloat(document.getElementById('colDiscount')?.value) || 0;
     const ref = document.getElementById('colRef').value.trim();
     const treasuryId = document.getElementById('colTreasuryId').value || null;
     if (!custId) return alert('اختر العميل');
     if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
+    if (discount < 0) return alert('قيمة الخصم غير صحيحة');
 
     const btn = document.querySelector('#colModal .mod-btn-primary');
     btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
@@ -325,12 +335,12 @@ window.colSave = async function() {
     if (typeof isOnline === 'function' && !isOnline()) {
         try {
             const cust = _colCustomers.find(x => x.id === custId);
-            const estBalanceAfter = (Number(cust?.balance) || 0) - amount;
+            const estBalanceAfter = (Number(cust?.balance) || 0) - amount - discount;
             await queueWrite({
                 module: 'collections', kind: 'collection',
                 payload: {
                     ref: ref || 'COL-' + Date.now(),
-                    customer_id: custId, amount, status: 'confirmed', treasury_id: treasuryId,
+                    customer_id: custId, amount, discount, status: 'confirmed', treasury_id: treasuryId,
                     created_by: currentUser?.id || null,
                     _estBalanceAfter: estBalanceAfter,
                 },
@@ -347,11 +357,12 @@ window.colSave = async function() {
     }
 
     try {
-        // INSERT فقط — الـ Trigger (سيُنشأ لاحقاً) بيتكفّل بـ: زيادة الخزنة + تقليل رصيد العميل + القيد المحاسبي
+        // INSERT فقط — الـ Trigger بيتكفّل بـ: زيادة الخزنة بالمبلغ النقدي بس + تقليل رصيد العميل بالمبلغ+الخصم + القيد المحاسبي (بخصم فى حساب 5016 لو موجود)
         const { error } = await sb.from('customer_payments').insert({
             ref: ref || 'COL-' + Date.now(),
             customer_id: custId,
             amount,
+            discount,
             status: 'confirmed',
             treasury_id: treasuryId,
             created_by: currentUser?.id || null,
@@ -442,6 +453,9 @@ window.colOpenEditModal = function(id) {
                 <div class="mod-form-group"><label>المبلغ المحصّل (ج.م) *</label>
                     <input type="number" id="colEditAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" value="${Number(p.amount)||0}">
                 </div>
+                <div class="mod-form-group"><label>خصم للعميل (ج.م)</label>
+                    <input type="number" id="colEditDiscount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" min="0" value="${Number(p.discount)||0}">
+                </div>
                 <div class="mod-form-group"><label>المرجع / البيان</label>
                     <input type="text" id="colEditRef" class="mod-form-input" value="${p.ref||''}">
                 </div>
@@ -464,10 +478,12 @@ window.colSaveEdit = async function() {
     if (!oldId) return;
     const custId = document.getElementById('colEditCustId').value;
     const amount = parseFloat(document.getElementById('colEditAmount').value);
+    const discount = parseFloat(document.getElementById('colEditDiscount')?.value) || 0;
     const ref = document.getElementById('colEditRef').value.trim();
     const treasuryId = document.getElementById('colEditTreasuryId').value || null;
     if (!custId) return alert('اختر العميل');
     if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
+    if (discount < 0) return alert('قيمة الخصم غير صحيحة');
 
     if (typeof isOnline === 'function' && !isOnline()) {
         alert('📴 تعديل سند تحصيل موجود محتاج اتصال بالإنترنت — حاول تاني لما الاتصال يرجع');
@@ -489,6 +505,7 @@ window.colSaveEdit = async function() {
             ref: finalRef,
             customer_id: custId,
             amount,
+            discount,
             status: 'confirmed',
             treasury_id: treasuryId,
             created_by: currentUser?.id || null,
