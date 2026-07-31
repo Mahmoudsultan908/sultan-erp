@@ -304,10 +304,14 @@ async function invsFetchMonthNumbers(monthStr) {
             q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lt('sales.created_at', to)),
         plFetchAllRows('sale_return_items', 'qty, cost_price_snapshot, sales_returns!inner(created_at, status)', (q) =>
             q.eq('sales_returns.status', 'confirmed').gte('sales_returns.created_at', from).lt('sales_returns.created_at', to)),
-        // مستبعد منها بنود excluded_from_investor_split (مصروفات شخصية زي عربية صاحب المحل)
-        sb.from('expenses').select('amount, category_id, expense_categories!inner(name, excluded_from_investor_split)')
+        // مستبعد منها بنود excluded_from_investor_split على مستوى البند كله
+        // (مصروفات شخصية دايمة) + على مستوى المعاملة نفسها excluded_from_investor_split
+        // (مصروف استثنائي/زيادة لمرة واحدة فى بند عادي، من غير ما يأثر على
+        // باقي معاملات نفس البند فى نفس الشهر أو الشهور الجاية)
+        sb.from('expenses').select('amount, category_id, excluded_from_investor_split, expense_categories!inner(name, excluded_from_investor_split)')
             .eq('status', 'confirmed').gte('expense_date', from).lt('expense_date', to)
-            .eq('expense_categories.excluded_from_investor_split', false),
+            .eq('expense_categories.excluded_from_investor_split', false)
+            .eq('excluded_from_investor_split', false),
     ]);
 
     const totalSales = (sales || []).reduce((s, r) => s + Number(r.total), 0);

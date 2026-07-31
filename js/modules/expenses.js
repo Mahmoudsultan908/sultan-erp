@@ -149,7 +149,7 @@ function _expMonthExpTableHTML(expenses) {
             expenses.map(e => `<tr>
                 <td>${new Date(e.expense_date).toLocaleDateString('ar-EG')}</td>
                 <td><span style="background:#F1F5F9;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600">${e.expense_categories?.name || '—'}</span></td>
-                <td style="color:var(--inv-text-soft)">${_expRepById[e.created_by] ? `<span style="font-size:11px;color:#2563EB">🚗 ${_expRepById[e.created_by]}</span> ` : ''}${e.description || '—'}</td>
+                <td style="color:var(--inv-text-soft)">${_expRepById[e.created_by] ? `<span style="font-size:11px;color:#2563EB">🚗 ${_expRepById[e.created_by]}</span> ` : ''}${e.description || '—'}${e.excluded_from_investor_split ? ' <span style="font-size:10.5px;color:var(--inv-gold);font-weight:700">💼 مستبعد من المستثمر</span>' : ''}</td>
                 <td style="text-align:left;font-weight:700;color:var(--inv-red)">${_expFmt(e.amount)}</td>
                 <td>${e._queue
                     ? (e.status === 'failed' ? '<span style="color:var(--inv-red);font-weight:600">❌ فشلت المزامنة</span>' : '<span style="color:var(--inv-gold);font-weight:600">⏳ غير مُزامن</span>')
@@ -157,6 +157,7 @@ function _expMonthExpTableHTML(expenses) {
                     : '<span style="color:var(--inv-green);font-weight:600">✅ مؤكد</span>'}</td>
                 <td style="white-space:nowrap">${e._queue ? '' : `
                     <button class="cc-edit" onclick="expPrintVoucher('${e.id}')">🖨️</button>
+                    <button class="cc-edit" style="${e.excluded_from_investor_split ? 'background:var(--inv-gold-bg);color:var(--inv-gold)' : ''}" title="استبعاد المعاملة دي بس من حساب أرباح المستثمر" onclick="expToggleLineInvestorExclude('${e.id}', ${!!e.excluded_from_investor_split})">💼</button>
                     ${e.status === 'confirmed' ? `<button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="expCancelExpense('${e.id}')">❌ إلغاء</button>` : ''}
                 `}</td>
             </tr>`).join('')}
@@ -724,9 +725,22 @@ window.expToggleCategoryActive = async function(catId, currentlyActive) {
 //   شريك يتحمّلها.
 window.expToggleInvestorExclude = async function(catId, currentlyExcluded) {
     const next = !currentlyExcluded;
-    if (!confirm(next ? 'استبعاد البند ده من حساب أرباح المستثمر؟ مصروفاته هتتحمّلها إنت لوحدك، مش هتتخصم من الربح المشترك.' : 'رجّع البند ده يدخل في حساب أرباح المستثمر تاني؟')) return;
+    if (!confirm(next ? 'استبعاد البند ده كله من حساب أرباح المستثمر؟ ده هيفضل مستبعد كل شهر لحد ما ترجعه — لو المصروف الزيادة لشهر واحد بس، استبعد المعاملة نفسها بدل البند كله (زرار 💼 جنب كل مصروف فى القائمة).' : 'رجّع البند ده يدخل في حساب أرباح المستثمر تاني؟')) return;
     try {
         const { error } = await sb.from('expense_categories').update({ excluded_from_investor_split: next }).eq('id', catId);
+        if (error) throw error;
+        renderExpenses(document.getElementById('app-content'));
+    } catch (err) { alert('❌ خطأ: ' + err.message); }
+};
+
+// ★ استبعاد معاملة واحدة بذاتها من حساب أرباح المستثمر (مش البند كله) —
+//   لمصروف استثنائي/زيادة حصل مرة واحدة (زي دفعة تأمين إضافية جوه الإيجار)
+//   من غير ما يأثر على باقي معاملات نفس البند فى نفس الشهر أو الشهور الجاية.
+window.expToggleLineInvestorExclude = async function(expId, currentlyExcluded) {
+    const next = !currentlyExcluded;
+    if (!confirm(next ? 'استبعاد المصروف ده بس من حساب أرباح المستثمر؟' : 'رجّع المصروف ده يدخل في حساب أرباح المستثمر تاني؟')) return;
+    try {
+        const { error } = await sb.from('expenses').update({ excluded_from_investor_split: next }).eq('id', expId);
         if (error) throw error;
         renderExpenses(document.getElementById('app-content'));
     } catch (err) { alert('❌ خطأ: ' + err.message); }
