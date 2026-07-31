@@ -337,18 +337,27 @@ async function invsFetchMonthNumbers(monthStr) {
 async function invsComputeCapitalRatios(partners, periodStart, periodEndExclusive) {
     const totalDays = Math.max(1, Math.round((new Date(periodEndExclusive) - new Date(periodStart)) / 86400000));
     const partnerIds = partners.map(p => p.id);
+    // كل حركات الشريك (مش بس اللي قبل نهاية الفترة) — محتاجينها كاملة عشان
+    // نحسب "الرصيد المبدئي" تحت
     const { data: txs } = partnerIds.length ? await sb.from('capital_partner_transactions')
         .select('partner_id, tx_date, tx_type, amount')
         .in('partner_id', partnerIds)
-        .lt('tx_date', periodEndExclusive)
+        .in('tx_type', ['contribution', 'withdrawal'])
         .order('tx_date', { ascending: true }) : { data: [] };
 
     const results = {};
     for (const p of partners) {
         const partnerTxs = (txs || []).filter(t => t.partner_id === p.id);
-        let balance = partnerTxs
-            .filter(t => t.tx_date < periodStart)
+        // رأس مال مُدخل مباشرة وقت تسجيل الشريك (مش عن طريق حركة إيداع) —
+        // نفس فكرة "الرصيد المبدئي" فى كشف الحساب (invsShowStatement).
+        // من غير السطر ده، شريك عنده رأس مال فعلي بس بدون سجل حركات هياخد
+        // نسبة صفر% غلط فى أي تقفيل شهر.
+        const txSum = partnerTxs.reduce((s, t) => s + (t.tx_type === 'contribution' ? Number(t.amount) : -Number(t.amount)), 0);
+        const seed = Number(p.capital_balance) - txSum;
+
+        const beforePeriod = partnerTxs.filter(t => t.tx_date < periodStart)
             .reduce((s, t) => s + (t.tx_type === 'contribution' ? Number(t.amount) : -Number(t.amount)), 0);
+        let balance = seed + beforePeriod;
         const inPeriod = partnerTxs.filter(t => t.tx_date >= periodStart && t.tx_date < periodEndExclusive);
         let cursor = periodStart;
         let weightedSum = 0;
