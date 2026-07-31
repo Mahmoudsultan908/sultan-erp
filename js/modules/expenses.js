@@ -228,6 +228,7 @@ function _expCatsPanelHTML(categories, catUsage) {
                         </div>
                         <button class="cc-edit" onclick="expOpenLimit('${c.id}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})">✏️ الحد</button>
                         <button class="cc-edit" style="${isActive ? 'background:var(--inv-red-bg);color:var(--inv-red)' : 'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="expToggleCategoryActive('${c.id}', ${isActive})">${isActive ? '⛔ تعطيل' : '✅ تفعيل'}</button>
+                        <button class="cc-edit" style="${c.excluded_from_investor_split ? 'background:var(--inv-gold-bg);color:var(--inv-gold)' : ''}" title="مصروفات شخصية ماتدخلش في حساب أرباح المستثمر" onclick="expToggleInvestorExclude('${c.id}', ${!!c.excluded_from_investor_split})">${c.excluded_from_investor_split ? '💼 مستبعد من المستثمر' : '💼 استبعاد من المستثمر'}</button>
                     </div>`;
                 }).join('')}
             </div>
@@ -712,6 +713,20 @@ window.expToggleCategoryActive = async function(catId, currentlyActive) {
     if (!confirm(next ? 'تفعيل البند ده تاني؟' : 'تعطيل البند ده؟ هيختفي من اختيار مصروف/صرف جديد، ومش هيدخل فى حساب هدف المبيعات الشهري.')) return;
     try {
         const { error } = await sb.from('expense_categories').update({ is_active: next }).eq('id', catId);
+        if (error) throw error;
+        renderExpenses(document.getElementById('app-content'));
+    } catch (err) { alert('❌ خطأ: ' + err.message); }
+};
+
+// ★ استبعاد/رجّع بند من حساب أرباح المستثمر (investors.js بيفلتر على
+//   excluded_from_investor_split=false وهو بيحسب operating_expenses للشهر)
+//   — للمصروفات الشخصية البحتة (زي عربية صاحب المحل) اللي مش من حق أي
+//   شريك يتحمّلها.
+window.expToggleInvestorExclude = async function(catId, currentlyExcluded) {
+    const next = !currentlyExcluded;
+    if (!confirm(next ? 'استبعاد البند ده من حساب أرباح المستثمر؟ مصروفاته هتتحمّلها إنت لوحدك، مش هتتخصم من الربح المشترك.' : 'رجّع البند ده يدخل في حساب أرباح المستثمر تاني؟')) return;
+    try {
+        const { error } = await sb.from('expense_categories').update({ excluded_from_investor_split: next }).eq('id', catId);
         if (error) throw error;
         renderExpenses(document.getElementById('app-content'));
     } catch (err) { alert('❌ خطأ: ' + err.message); }
