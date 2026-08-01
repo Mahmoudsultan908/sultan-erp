@@ -203,8 +203,13 @@ async function renderDashboard(container) {
         const suppliersDebt = (allSuppliers || []).reduce((s, sp) => s + (Number(sp.balance) > 0 ? Number(sp.balance) : 0), 0);
         const deferredReceivable = (deferredAuto || []).reduce((s, r) => s + (Number(r.total_remaining) || 0), 0)
             + (deferredManual || []).reduce((s, r) => s + ((Number(r.amount) || 0) - (Number(r.received_amount) || 0)), 0);
+        // ★ عجز شركاء رأس المال معروض للمعلومية بس — ماينفعش يتحسب جوه صافي
+        //   المركز المالي: هو مش فلوس حقيقية حد يقدر يحصّلها دلوقتي، هو بس
+        //   آلية محاسبية بتتحصّل تدريجيًا من نصيب الشريك فى أرباح الشهور
+        //   الجاية. لو اتحسب هنا، الرقم بيرجع تقريبًا لقيمة رأس المال
+        //   الأصلي وكأن الخسارة معملتش حاجة — إحساس مطمئن غلط.
         const partnersDeficit = (capitalPartners || []).reduce((s, p) => s + (Number(p.cumulative_deficit) || 0), 0);
-        const netWorth = stockValue + vanStockValue + cash + customersDebt - suppliersDebt + deferredReceivable + partnersDeficit;
+        const netWorth = stockValue + vanStockValue + cash + customersDebt - suppliersDebt + deferredReceivable;
 
         const fmt = (n) => Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const fmtDate = (d) => new Date(d).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -335,14 +340,17 @@ async function renderDashboard(container) {
                     <div class="dash-summary-row"><span>👥 مديونية العملاء (لينا عندهم)</span><span class="dash-s-green">${fmt(customersDebt)}</span></div>
                     <div class="dash-summary-row"><span>🏭 مستحقات الموردين (عندنا ليهم)</span><span class="dash-s-red">- ${fmt(suppliersDebt)}</span></div>
                     <div class="dash-summary-row"><span>⏳ مؤجلات مستحقة من الموردين</span><span class="dash-s-green">${fmt(deferredReceivable)}</span></div>
-                    <div class="dash-summary-row"><span>🧾 عجز شركاء رأس المال (ذمة مدينة)</span><span class="dash-s-green">${fmt(partnersDeficit)}</span></div>
                     <div class="dash-summary-divider"></div>
                     <div class="dash-summary-row dash-summary-total">
                         <span>${netWorth >= 0 ? '✅ صافي المركز المالي' : '📉 صافي المركز المالي'}</span>
                         <span style="color:${netWorth >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${fmt(Math.abs(netWorth))}</span>
                     </div>
+                    ${partnersDeficit > 0 ? `<div class="dash-summary-row" style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--inv-divider)">
+                        <span style="color:var(--inv-muted)">🧾 عجز شركاء رأس المال (للمعلومية، مش داخل الإجمالي)</span>
+                        <span style="color:var(--inv-gold)">${fmt(partnersDeficit)}</span>
+                    </div>` : ''}
                     <div style="font-size:11px;color:var(--inv-muted-light);margin-top:4px;line-height:1.6">
-                        ⚠️ هذا رقم لحظي (كل الأصول المتاحة والمستحقة ناقص كل المستحق للموردين) وليس "ربح أو خسارة" بالمعنى المحاسبي — لحساب الربح الفعلي يلزم مقارنة فترتين، راجع "ملخص ${monthName}" بجانبه.
+                        ⚠️ هذا رقم لحظي (كل الأصول المتاحة والمستحقة ناقص كل المستحق للموردين) وليس "ربح أو خسارة" بالمعنى المحاسبي — لحساب الربح الفعلي يلزم مقارنة فترتين، راجع "ملخص ${monthName}" بجانبه. عجز شركاء رأس المال مش محسوب هنا لإنه مش فلوس متاحة دلوقتي، بيترد تدريجيًا من أرباح الشهور الجاية.
                     </div>
                 </div>
                 <div class="dash-card" style="flex:1">
