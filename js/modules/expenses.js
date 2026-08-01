@@ -20,10 +20,10 @@ async function renderExpenses(container) {
     // تحديد دور المستخدم
     _expUserRole = currentUser?.role || 'admin';
 
-    let expenses = [], categories = [], monthExpenses = [], globalLimitRow = null;
+    let expenses = [], categories = [], monthExpenses = [], globalLimitRow = null, accrued = [];
     let isOfflineData = false, offlineDataAge = null;
     try {
-        const [r1, r2, r3, r4, r5] = await Promise.all([
+        const [r1, r2, r3, r4, r5, r6] = await Promise.all([
             sb.from('expenses').select('*, expense_categories(name, monthly_limit)').order('expense_date', { ascending: false }).limit(50),
             sb.from('expense_categories').select('*').order('name'),
             // كل مصروفات الشهر الحالي
@@ -33,6 +33,8 @@ async function renderExpenses(container) {
                 .eq('status', 'confirmed'),
             sb.from('app_settings').select('value').eq('key', 'expense_global_monthly_limit').single(),
             sb.from('sales_reps').select('id,name').eq('is_active', true),
+            // التزامات مؤجلة (اختياري — لو الجدول لسه ما اتعملش، نتجاهل الخطأ بهدوء)
+            sb.from('accrued_liabilities_manual').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
         ]);
         if (r1.error || !r1.data || r2.error || !r2.data) throw (r1.error || r2.error || new Error('no data'));
         expenses = r1.data;
@@ -41,6 +43,7 @@ async function renderExpenses(container) {
         globalLimitRow = r4.data;
         _expRepById = {};
         (r5.data || []).forEach(r => { _expRepById[r.id] = r.name; });
+        accrued = r6?.data || [];
         if (typeof dbSetCache === 'function') {
             dbSetCache('expenses', expenses);
             dbSetCache('expense_categories', categories);
@@ -114,6 +117,7 @@ async function renderExpenses(container) {
         <div class="exp-tabs">
             <button class="exp-tab active" id="expTabTransactions" onclick="expSwitchTab('transactions')">📋 المصروفات</button>
             <button class="exp-tab" id="expTabCats" onclick="expSwitchTab('cats')">🗂️ البنود وكشف حساب المصروفات</button>
+            <button class="exp-tab" id="expTabAccrued" onclick="expSwitchTab('accrued')">🧾 التزامات مؤجلة</button>
         </div>
 
         <!-- ===== تبويب المصروفات ===== -->
@@ -131,6 +135,11 @@ async function renderExpenses(container) {
         <!-- ===== تبويب إدارة البنود ===== -->
         <div id="expPanelCats" style="display:none">
             ${_expCatsPanelHTML(categories, catUsage)}
+        </div>
+
+        <!-- ===== تبويب الالتزامات المؤجلة ===== -->
+        <div id="expPanelAccrued" style="display:none">
+            ${_expAccruedPanelHTML(accrued)}
         </div>
     `;
 }
@@ -238,6 +247,102 @@ function _expCatsPanelHTML(categories, catUsage) {
     </div>`;
 }
 
+// ════════════════════════════════════════════════════════════
+// التزامات مؤجلة — مصروفات اتسجلت محاسبيًا (قيد يومية) بس لسه ما
+// اتصرفتش فعليًا (زي مرتب مؤجل أو إيجار مؤجل). لما تتصرف فعليًا، بتتسدد
+// من هنا (حركة خزنة بس، مش مصروف جديد) عشان ماتتحسبش مرتين.
+// ════════════════════════════════════════════════════════════
+function _expAccruedPanelHTML(rows) {
+    const pending = (rows || []).filter(r => r.status !== 'settled');
+    const settled = (rows || []).filter(r => r.status === 'settled');
+    const totalRemaining = pending.reduce((s, r) => s + ((Number(r.amount) || 0) - (Number(r.paid_amount) || 0)), 0);
+    return `
+    <div class="mod-card">
+        <div style="font-size:13px;color:var(--inv-muted);margin-bottom:12px">
+            مصروفات مسجّلة محاسبيًا (قيد يومية) لكن لسه ما اتصرفتش فعليًا من الخزنة. لما تدفعها، سدّدها من هنا — ده بيسجّل حركة خزنة بس، من غير ما يتحسب مصروف جديد (عشان متتكررش).
+        </div>
+        <div class="mod-table-wrap">
+            <table class="mod-table"><thead><tr>
+                <th>البيان</th><th style="text-align:left">القيمة</th><th style="text-align:left">المسدّد</th><th style="text-align:left">المتبقي</th><th>الاستحقاق</th><th></th>
+            </tr></thead><tbody>
+                ${pending.length ? pending.map(r => {
+                    const remaining = (Number(r.amount) || 0) - (Number(r.paid_amount) || 0);
+                    return `<tr>
+                        <td><strong>${r.description}</strong>${r.notes ? `<div style="font-size:11px;color:var(--inv-muted-light)">${r.notes}</div>` : ''}</td>
+                        <td style="text-align:left">${_expFmt(r.amount)}</td>
+                        <td style="text-align:left;color:var(--inv-green)">${_expFmt(r.paid_amount)}</td>
+                        <td style="text-align:left;font-weight:700;color:var(--inv-gold)">${_expFmt(remaining)}</td>
+                        <td style="font-size:12px">${r.due_date || '—'}</td>
+                        <td><button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="expOpenSettleAccrued('${r.id}', ${remaining})">💰 تسديد</button></td>
+                    </tr>`;
+                }).join('') : `<tr><td colspan="6" class="empty-state" style="padding:20px">لا توجد التزامات مؤجلة معلّقة</td></tr>`}
+            </tbody>
+            ${pending.length ? `<tfoot><tr style="background:${'#F8FAFC'};font-weight:800"><td colspan="3">إجمالي المتبقي</td><td style="text-align:left;color:var(--inv-gold)">${_expFmt(totalRemaining)}</td><td colspan="2"></td></tr></tfoot>` : ''}
+            </table>
+        </div>
+        ${settled.length ? `
+        <div style="margin-top:18px;font-size:13px;font-weight:800;color:var(--inv-navy-light)">✅ مسدّدة بالكامل</div>
+        <div class="mod-table-wrap" style="margin-top:8px">
+            <table class="mod-table"><thead><tr><th>البيان</th><th style="text-align:left">القيمة</th></tr></thead><tbody>
+                ${settled.map(r => `<tr><td>${r.description}</td><td style="text-align:left">${_expFmt(r.amount)}</td></tr>`).join('')}
+            </tbody></table>
+        </div>` : ''}
+    </div>`;
+}
+
+window.expOpenSettleAccrued = async function (id, remaining) {
+    let treasuries = [];
+    try {
+        const { data } = await sb.from('treasuries').select('*').eq('is_active', true).order('is_default', { ascending: false });
+        treasuries = data || [];
+    } catch {}
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'expSettleAccruedModal';
+    modal.innerHTML = `
+    <div class="mod-modal" style="max-width:420px">
+        <div class="mod-modal-header"><h3>💰 تسديد التزام مؤجل</h3>
+            <button class="mod-modal-close" onclick="expCloseModal('expSettleAccruedModal')">&times;</button></div>
+        <div class="mod-modal-body">
+            <input type="hidden" id="expSettleAccruedId" value="${id}">
+            <div class="mod-form-group"><label>المبلغ المسدّد (ج.م) <small style="color:var(--inv-muted-light)">(المتبقي: ${_expFmt(remaining)})</small></label>
+                <input type="number" id="expSettleAccruedAmount" class="mod-form-input" value="${remaining}" min="0.01" step="0.01" dir="ltr">
+            </div>
+            <div class="mod-form-group"><label>من خزنة</label>
+                <select id="expSettleAccruedTreasury" class="mod-form-input">
+                    ${treasuries.map(t => `<option value="${t.id}" ${t.is_default?'selected':''}>${t.name}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="expCloseModal('expSettleAccruedModal')">إلغاء</button>
+            <button class="mod-btn mod-btn-primary" onclick="expSaveSettleAccrued()">💾 تسديد</button>
+        </div>
+    </div>`;
+    document.body.appendChild(modal);
+};
+
+window.expSaveSettleAccrued = async function () {
+    const id = document.getElementById('expSettleAccruedId').value;
+    const amount = parseFloat(document.getElementById('expSettleAccruedAmount').value);
+    const treasuryId = document.getElementById('expSettleAccruedTreasury').value;
+    if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
+    if (!treasuryId) return alert('اختر الخزنة');
+    const btn = document.querySelector('#expSettleAccruedModal .mod-btn-primary');
+    btn.innerText = 'جاري التسديد...'; btn.disabled = true;
+    try {
+        const { error } = await sb.rpc('fn_settle_accrued_liability', {
+            p_id: id, p_amount: amount, p_treasury_id: treasuryId, p_created_by: currentUser?.id || null,
+        });
+        if (error) throw error;
+        expCloseModal('expSettleAccruedModal');
+        renderExpenses(document.getElementById('app-content'));
+    } catch (err) {
+        alert('❌ خطأ أثناء التسديد: ' + err.message);
+        btn.innerText = '💾 تسديد'; btn.disabled = false;
+    }
+};
+
 // إعادة تجميع "دليل بنود المصروفات" لفترة تانية غير الشهر الحالي (بند 11)
 window.expCatsApplyRange = async function () {
     const from = document.getElementById('expCatsFrom')?.value || _expMonthStart();
@@ -322,15 +427,13 @@ window.expPickCat = function (id) {
 // 3) تبديل التبويبات
 // ════════════════════════════════════════════════════════════
 window.expSwitchTab = function(tab) {
-    const t = document.getElementById('expTabTransactions'), c = document.getElementById('expTabCats');
-    const tp = document.getElementById('expPanelTransactions'), cp = document.getElementById('expPanelCats');
-    if (tab === 'cats') {
-        c.classList.add('active'); t.classList.remove('active');
-        cp.style.display = ''; tp.style.display = 'none';
-    } else {
-        t.classList.add('active'); c.classList.remove('active');
-        tp.style.display = ''; cp.style.display = 'none';
-    }
+    const t = document.getElementById('expTabTransactions'), c = document.getElementById('expTabCats'), a = document.getElementById('expTabAccrued');
+    const tp = document.getElementById('expPanelTransactions'), cp = document.getElementById('expPanelCats'), ap = document.getElementById('expPanelAccrued');
+    [t, c, a].forEach(el => el?.classList.remove('active'));
+    [tp, cp, ap].forEach(el => { if (el) el.style.display = 'none'; });
+    if (tab === 'cats') { c.classList.add('active'); cp.style.display = ''; }
+    else if (tab === 'accrued') { a.classList.add('active'); ap.style.display = ''; }
+    else { t.classList.add('active'); tp.style.display = ''; }
 };
 
 // ════════════════════════════════════════════════════════════
