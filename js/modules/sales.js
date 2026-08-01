@@ -28,6 +28,15 @@ let invEditingOldPayType = null;
 let invEditingOldCustId = null;
 let invEditingOldInvoiceNo = null;
 let invEditingOldSourceApp = null; // source_app الأصلي للفاتورة قبل التعديل — عشان نحافظ عليه (راجع التعليق فوق fn_create_sale)
+let invEditingOldDueDate = null;
+
+// المهلة الافتراضية لتاريخ استحقاق الفاتورة الآجلة (يوم) — قابلة للتعديل يدوي وقت البيع دايماً
+const INV_DEFAULT_CREDIT_TERM_DAYS = 15;
+function invDefaultDueDate() {
+    const d = new Date();
+    d.setDate(d.getDate() + INV_DEFAULT_CREDIT_TERM_DAYS);
+    return d.toISOString().slice(0, 10);
+}
 let invPendingQuoteId = null; // عرض سعر بيتحوّل حالياً — يتعلّم "تم التحويل" بعد نجاح الحفظ بس (مش قبله)
 let invPendingOrderId = null; // طلب سلطانو بيتحوّل حالياً — نفس المنطق، customer_orders.converted_sale_id بيتحدّث بعد الحفظ بس
 let invPendingOrderNo = null; // رقم/إجمالي الطلب الأصلي — بيتعرض في بانر تأكيد واضح فوق الفاتورة عشان مايتلخبطش مع طلب تاني
@@ -301,7 +310,7 @@ async function renderSales(c) {
     invTreasuryId = INV_DB.treasuries?.find(t => t.is_default)?.id || null;
     invPriceLevelCode = 'RETAIL';
     invRepId = null;
-    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null;
+    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null; invEditingOldDueDate = null;
     invPendingQuoteId = null;
     invPendingOrderId = null;
     invPendingOrderNo = null;
@@ -324,6 +333,7 @@ async function renderSales(c) {
                 invEditingOldCustId = oldSale.customer_id;
                 invEditingOldInvoiceNo = oldSale.invoice_no;
                 invEditingOldSourceApp = oldSale.source_app;
+                invEditingOldDueDate = oldSale.due_date || null;
 
                 invItems = (oldSale.sale_items || []).map(it => ({
                     id: Date.now() + Math.random(), pid: it.product_id,
@@ -571,7 +581,7 @@ function invDueCardHTML() {
     return `
     <div class="inv-card inv-due" id="invDueCard">
         <div class="inv-card-title" style="color:var(--inv-red)">📅 تاريخ الاستحقاق</div>
-        <input type="date" class="inv-due-input" id="invDueDate" value="${invToday()}">
+        <input type="date" class="inv-due-input" id="invDueDate" value="${invEditingOldDueDate || invDefaultDueDate()}">
     </div>`;
 }
 
@@ -1414,6 +1424,7 @@ async function invSave(andNew) {
                 saleRow: {
                     customer_id: invCustId || null,
                     payment_type: invPayType,
+                    due_date: invPayType === 'credit' ? (document.getElementById('invDueDate')?.value || null) : null,
                     subtotal, vat_amount: 0, total: net, discount: extra,
                     status: 'confirmed', warehouse_id: invWarehouseId,
                     rep_id: invNormalizeRepId(invRepId),
@@ -1537,6 +1548,17 @@ async function invSave(andNew) {
         });
         if (rpcErr) throw rpcErr;
         if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
+
+        // ★ تاريخ الاستحقاق مش موجود كـ parameter في fn_create_sale (الدالة دي
+        //   في Supabase مش في الريبو، وتعديلها أخطر من تحديث بسيط بعد الإدراج) —
+        //   بنحدّثه بـ UPDATE منفصل خفيف على نفس الصف بعد النجاح، مش جزء من
+        //   الترانزاكشن المالية لأنه حقل معلوماتي بحت مالوش أثر على القيد/الرصيد.
+        if (invPayType === 'credit' && rpcRows?.[0]?.id) {
+            const dueDateVal = document.getElementById('invDueDate')?.value || null;
+            if (dueDateVal) {
+                try { await sb.from('sales').update({ due_date: dueDateVal }).eq('id', rpcRows[0].id); } catch {}
+            }
+        }
 
         // تحديث الـ cache المحلي للمخزون فقط
         // (الخصم الفعلي في قاعدة البيانات بيقوم بيه الـ trigger تلقائياً عند INSERT في sale_items)
@@ -1940,6 +1962,10 @@ if (typeof registerSyncHandler === 'function') {
             });
             if (rpcErr) return { ok: false, error: rpcErr.message, summary: `فاتورة ${tempInvoiceNo}` };
             const invoiceNo = rpcRows[0].invoice_no;
+
+            if (saleRow.payment_type === 'credit' && saleRow.due_date && rpcRows[0].id) {
+                try { await sb.from('sales').update({ due_date: saleRow.due_date }).eq('id', rpcRows[0].id); } catch {}
+            }
 
             // لو الفاتورة دي جاية أصلاً من تحويل عرض سعر، اتعلّم "تم التحويل"
             // دلوقتي بس — بعد ما فاتورة البيع اتزامنت فعلياً على السيرفر.

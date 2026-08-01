@@ -12,7 +12,7 @@
    اللي renderCustomersManage نفسها بتقرأها بالفعل، محدش لمسها.
    ════════════════════════════════════════════════════════════ */
 
-let _custHubTab = 'manage'; // 'manage' | 'import'
+let _custHubTab = 'manage'; // 'manage' | 'import' | 'decision'
 
 async function renderCustomersHub(c) {
     if (window._pendingCustHubTab) { _custHubTab = window._pendingCustHubTab; window._pendingCustHubTab = null; }
@@ -20,6 +20,7 @@ async function renderCustomersHub(c) {
     <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
         <button class="mod-btn ${_custHubTab==='manage'?'mod-btn-primary':''}" onclick="custHubSwitchTab('manage')">👤 القائمة</button>
         <button class="mod-btn ${_custHubTab==='import'?'mod-btn-primary':''}" onclick="custHubSwitchTab('import')">📥 استيراد Excel</button>
+        <button class="mod-btn ${_custHubTab==='decision'?'mod-btn-primary':''}" onclick="custHubSwitchTab('decision')">🎯 مركز القرار</button>
     </div>
     <div id="custHubBody"></div>`;
     await custHubRenderTab();
@@ -29,6 +30,7 @@ async function custHubRenderTab() {
     const body = document.getElementById('custHubBody');
     if (!body) return;
     if (_custHubTab === 'import') await renderCustomerImport(body);
+    else if (_custHubTab === 'decision') await renderCustomerDecisionCenter(body);
     else await renderCustomersManage(body);
 }
 
