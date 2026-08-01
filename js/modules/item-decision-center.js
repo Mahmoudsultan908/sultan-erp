@@ -17,8 +17,11 @@
 
 let idcRules = { min_margin: 0.05, fast_turnover: 6.0, dead_days: 60, min_gmroi: 2.0, period_days: 30 };
 let idcMetrics = [];
+let idcCompanies = [];
 let idcFilter = 'all';
 let idcSearch = '';
+let idcCompanyId = 'all';
+let idcStockFilter = 'all'; // 'all' | 'instock' | 'outstock'
 let idcSaveTimer = null;
 let idcContainer = null;
 
@@ -64,11 +67,13 @@ async function idcLoadAndCompute(c) {
     const periodDays = idcRules.period_days || 30;
     const since = new Date(Date.now() - periodDays * 86400000).toISOString();
 
-    const [{ data: products }, { data: stock }, { data: saleItems }] = await Promise.all([
-        sb.from('products').select('id,name,code,unit,purchase_price,wholesale_price,retail_price,is_active,created_at,product_categories(name)').eq('is_active', true).order('name'),
+    const [{ data: products }, { data: stock }, { data: saleItems }, { data: companies }] = await Promise.all([
+        sb.from('products').select('id,name,code,unit,company_id,purchase_price,wholesale_price,retail_price,is_active,created_at,product_categories(name)').eq('is_active', true).order('name'),
         sb.from('inventory_stock').select('product_id,qty'),
         sb.from('sale_items').select('product_id,qty,unit_price,line_total,cost_price_snapshot,sales!inner(created_at,status)').eq('sales.status', 'confirmed').gte('sales.created_at', since),
+        sb.from('product_companies').select('id,name').order('name'),
     ]);
+    idcCompanies = companies || [];
 
     const stockMap = {};
     (stock || []).forEach(r => { stockMap[r.product_id] = (stockMap[r.product_id] || 0) + (Number(r.qty) || 0); });
@@ -101,7 +106,7 @@ async function idcLoadAndCompute(c) {
         const gmroi = avg_inv_value > 0 ? profit / avg_inv_value : (profit > 0 ? Infinity : 0);
         const is_new = !!p.created_at && (now - new Date(p.created_at).getTime()) < periodDays * 86400000;
         return {
-            id: p.id, name: p.name, code: p.code, unit: p.unit, category: p.product_categories?.name || '',
+            id: p.id, name: p.name, code: p.code, unit: p.unit, category: p.product_categories?.name || '', company_id: p.company_id || null,
             current_stock, avg_stock, units_sold, avg_price, avg_cost, margin, turnover, days_to_clear,
             profit, avg_inv_value, gmroi, is_new,
         };
@@ -144,8 +149,17 @@ function idcRenderScreen(c) {
 
     <div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start" id="idcMainGrid">
         <div class="mod-card" style="padding:0;overflow-x:auto">
-            <div style="padding:14px 16px 0">
-                <input type="text" id="idcSearch" class="mod-form-input" placeholder="🔍 بحث بالاسم أو الكود..." value="${idcSearch}" oninput="idcOnSearch(this.value)">
+            <div style="padding:14px 16px 0;display:flex;gap:10px;flex-wrap:wrap">
+                <input type="text" id="idcSearch" class="mod-form-input" style="flex:2;min-width:180px" placeholder="🔍 بحث بالاسم أو الكود..." value="${idcSearch}" oninput="idcOnSearch(this.value)">
+                <select id="idcCompanyFilter" class="mod-form-input" style="flex:1;min-width:150px" onchange="idcOnCompanyFilter(this.value)">
+                    <option value="all">كل الشركات</option>
+                    ${idcCompanies.map(co => `<option value="${co.id}" ${idcCompanyId === co.id ? 'selected' : ''}>${co.name}</option>`).join('')}
+                </select>
+                <select id="idcStockFilter" class="mod-form-input" style="flex:1;min-width:150px" onchange="idcOnStockFilter(this.value)">
+                    <option value="all" ${idcStockFilter === 'all' ? 'selected' : ''}>كل الأرصدة</option>
+                    <option value="instock" ${idcStockFilter === 'instock' ? 'selected' : ''}>فيه رصيد فقط</option>
+                    <option value="outstock" ${idcStockFilter === 'outstock' ? 'selected' : ''}>بدون رصيد فقط</option>
+                </select>
             </div>
             <div id="idcTableWrap"></div>
         </div>
@@ -211,6 +225,16 @@ function idcOnSearch(val) {
     idcRenderTable();
 }
 
+function idcOnCompanyFilter(val) {
+    idcCompanyId = val || 'all';
+    idcRenderTable();
+}
+
+function idcOnStockFilter(val) {
+    idcStockFilter = val || 'all';
+    idcRenderTable();
+}
+
 async function idcOnPeriodChange(val) {
     idcRules.period_days = parseInt(val) || 30;
     idcSaveRules();
@@ -222,6 +246,9 @@ function idcRenderTable() {
     if (!wrap) return;
     let rows = idcMetrics.map(m => Object.assign({}, m, { cls: idcClassify(m) }));
     if (idcFilter !== 'all') rows = rows.filter(r => r.cls.key === idcFilter);
+    if (idcCompanyId !== 'all') rows = rows.filter(r => r.company_id === idcCompanyId);
+    if (idcStockFilter === 'instock') rows = rows.filter(r => r.current_stock > 0);
+    else if (idcStockFilter === 'outstock') rows = rows.filter(r => r.current_stock <= 0);
     if (idcSearch) {
         const q = idcSearch.toLowerCase();
         rows = rows.filter(r => (r.name || '').toLowerCase().includes(q) || (r.code || '').toLowerCase().includes(q));
@@ -233,11 +260,19 @@ function idcRenderTable() {
         return;
     }
 
-    wrap.innerHTML = `<table class="mod-table"><thead><tr>
-        <th>الصنف</th><th>الهامش</th><th>الدوران/شهر</th><th>أيام التصريف</th><th>GMROI</th><th>القرار</th>
+    wrap.innerHTML = `<div style="padding:6px 16px;font-size:12px;color:var(--inv-muted)">${rows.length} صنف</div>
+    <table class="mod-table"><thead><tr>
+        <th>الصنف</th><th>الرصيد الحالي</th><th>المباع بالفترة</th>
+        <th title="نسبة الربح من سعر البيع = (سعر البيع - التكلفة) ÷ سعر البيع">الهامش</th>
+        <th title="كام مرة يتباع رصيد المخزون كامل في الشهر (كلما زاد = أسرع بيعاً)">الدوران/شهر</th>
+        <th title="لو استمر معدل البيع الحالي، هياخد كام يوم يخلّص الرصيد الموجود">أيام التصريف</th>
+        <th title="العائد على قيمة المخزون = الربح ÷ قيمة المخزون (كلما زاد = المخزون بيرجّع فلوسه أسرع)">GMROI</th>
+        <th>القرار</th>
     </tr></thead><tbody>
         ${rows.map(r => `<tr style="cursor:pointer" onclick="idcShowDetail('${r.id}')">
             <td><strong>${r.name}</strong>${r.is_new ? ' <span style="background:var(--inv-green-light);color:var(--inv-green);font-size:10.5px;padding:2px 7px;border-radius:20px;font-weight:700">🆕 جديد</span>' : ''}<div style="font-size:11px;color:var(--inv-muted-light)">${r.code || ''} ${r.category ? '· ' + r.category : ''}</div></td>
+            <td style="font-weight:700;color:${r.current_stock <= 0 ? 'var(--inv-red)' : 'var(--inv-text)'}">${idcFmt(r.current_stock)} <small style="color:var(--inv-muted-light);font-weight:400">${r.unit || ''}</small></td>
+            <td>${idcFmt(r.units_sold)}</td>
             <td style="color:${r.margin >= idcRules.min_margin ? 'var(--inv-green)' : 'var(--inv-red)'};font-weight:700">${idcPct(r.margin)}</td>
             <td>${idcFmt(r.turnover)}</td>
             <td style="color:${r.days_to_clear > idcRules.dead_days ? 'var(--inv-red)' : 'var(--inv-text)'};font-weight:700">${idcFmt(r.days_to_clear)}</td>
@@ -301,5 +336,5 @@ function idcShowDetail(pid) {
 
 Object.assign(window, {
     renderItemDecisionCenter, idcOnRuleInput, idcSaveRules, idcApplyFilter, idcOnSearch,
-    idcOnPeriodChange, idcSmartSuggest, idcShowDetail,
+    idcOnCompanyFilter, idcOnStockFilter, idcOnPeriodChange, idcSmartSuggest, idcShowDetail,
 });
