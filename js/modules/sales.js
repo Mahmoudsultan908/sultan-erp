@@ -1373,6 +1373,28 @@ async function invSave(andNew) {
         }
     }
 
+    // ★ تحذير: العميل ده كان له فاتورة اتلغت من عربية مندوب (source_app='rep_van')
+    //   في آخر أسبوع — لو الفاتورة الجديدة دي بتتسجل عادي من المخزن الرئيسي
+    //   (مش تعديل لنفس الفاتورة، وده مش عن طريق تطبيق المندوب)، هتخصم من
+    //   المخزن الرئيسي بدل عربية المندوب، وعربيته هتفضل شايلة كمية خرجت
+    //   منها فعلاً بس النظام لسه شايفها موجودة — نفس السبب اللي بيسيب رصيد
+    //   عربيات المناديب غلط تراكميًا (راجع الذاكرة/الشكوى السابقة).
+    if (!invEditingId && invCustId) {
+        try {
+            const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            const { data: cancelledVanSales } = await sb.from('sales')
+                .select('id, invoice_no, created_at, sales_reps(name)')
+                .eq('customer_id', invCustId).eq('status', 'cancelled').eq('source_app', 'rep_van')
+                .gte('created_at', since).order('created_at', { ascending: false }).limit(1);
+            if (cancelledVanSales?.length) {
+                const cv = cancelledVanSales[0];
+                const repName = cv.sales_reps?.name || 'مندوب';
+                const proceed = confirm(`⚠️ تنبيه: العميل ده كان له فاتورة (${cv.invoice_no}) اتلغت من عربية "${repName}" بتاريخ ${new Date(cv.created_at).toLocaleDateString('ar-EG')}.\n\nلو الفاتورة دي بتعمل نفس البضاعة تاني، لازم تتسجل من نفس عربية المندوب (من تطبيق المندوب) مش من المخزن العادي هنا — وإلا رصيد عربيته هيفضل غلط ومش هيعكس اللي طلع منها فعلاً.\n\nمتأكد عايز تكمل التسجيل من هنا (المخزن العادي)؟`);
+                if (!proceed) return { ok: false };
+            }
+        } catch {}
+    }
+
     // زرار التحميل
     const saveBtns = document.querySelectorAll('.inv-btn-save, .inv-top-save');
     saveBtns.forEach(b => { b.innerText = '⏳ جاري الحفظ...'; b.disabled = true; });
