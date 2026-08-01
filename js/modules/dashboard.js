@@ -75,6 +75,9 @@ async function renderDashboard(container) {
             { data: monthlyMarginRow },
             { data: marginSaleItems },
             { data: marginReturnItems },
+            { data: deferredAuto },
+            { data: deferredManual },
+            { data: capitalPartners },
         ] = await Promise.all([
             sb.rpc('get_cash_balance'),
             sb.from('sales').select('total').eq('status','confirmed').gte('created_at', today),
@@ -123,6 +126,14 @@ async function renderDashboard(container) {
                 q.eq('sales.status', 'confirmed').gte('sales.created_at', marginWindowStart)),
             dashFetchAllRows('sale_return_items', 'qty, line_total, cost_price_snapshot, sales_returns!inner(created_at, status)', (q) =>
                 q.eq('sales_returns.status', 'confirmed').gte('sales_returns.created_at', marginWindowStart)),
+            // مؤجلات مستحقة من الموردين (تلقائية من فواتير الشراء + يدوية قديمة) —
+            // نفس منطق renderDeferred فى reports.js — جزء من صافي المركز المالي
+            sb.from('deferred_rebates_supplier_summary').select('total_remaining'),
+            sb.from('deferred_rebates_manual').select('amount, received_amount').neq('status', 'cancelled'),
+            // عجز/ذمم شركاء رأس المال (صاحب المحل والمستثمرين) — ذمة مدينة
+            // حقيقية على الشركة (أصل)، جزء من صافي المركز المالي زي أي رصيد
+            // مدين تاني، راجع فحص "الميزانية العمومية" فى accounting.js لنفس المنطق
+            sb.from('capital_partners').select('cumulative_deficit').eq('status', 'active'),
         ]);
 
         // ── تجميع مبيعات آخر 30 يوم يوميًا (تعبئة الأيام الفاضية بصفر) ──
@@ -190,7 +201,10 @@ async function renderDashboard(container) {
         const vanStockValue = (allVanStock || []).reduce((s, r) => s + (Number(r.qty) || 0) * Number(r.products?.purchase_price || 0), 0);
         const customersDebt = (allCustomers || []).reduce((s, c) => s + (Number(c.balance) > 0 ? Number(c.balance) : 0), 0);
         const suppliersDebt = (allSuppliers || []).reduce((s, sp) => s + (Number(sp.balance) > 0 ? Number(sp.balance) : 0), 0);
-        const netWorth = stockValue + vanStockValue + cash + customersDebt - suppliersDebt;
+        const deferredReceivable = (deferredAuto || []).reduce((s, r) => s + (Number(r.total_remaining) || 0), 0)
+            + (deferredManual || []).reduce((s, r) => s + ((Number(r.amount) || 0) - (Number(r.received_amount) || 0)), 0);
+        const partnersDeficit = (capitalPartners || []).reduce((s, p) => s + (Number(p.cumulative_deficit) || 0), 0);
+        const netWorth = stockValue + vanStockValue + cash + customersDebt - suppliersDebt + deferredReceivable + partnersDeficit;
 
         const fmt = (n) => Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const fmtDate = (d) => new Date(d).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -311,7 +325,7 @@ async function renderDashboard(container) {
                 </div>
             </div>
 
-            <!-- تقرير الجرد اليومي — نزل هنا تحت الصف الأول -->
+            <!-- تقرير الجرد اليومي + ملخص الشهر — جنب بعض عشان تبان العلاقة بينهم -->
             <div class="dash-row">
                 <div class="dash-card" style="flex:1">
                     <div class="dash-card-header"><span>📋 تقرير الجرد اليومي — صافي المركز المالي</span></div>
@@ -320,13 +334,31 @@ async function renderDashboard(container) {
                     <div class="dash-summary-row"><span>💰 رصيد الخزنة (كل الخزن)</span><span class="dash-s-green">${fmt(cash)}</span></div>
                     <div class="dash-summary-row"><span>👥 مديونية العملاء (لينا عندهم)</span><span class="dash-s-green">${fmt(customersDebt)}</span></div>
                     <div class="dash-summary-row"><span>🏭 مستحقات الموردين (عندنا ليهم)</span><span class="dash-s-red">- ${fmt(suppliersDebt)}</span></div>
+                    <div class="dash-summary-row"><span>⏳ مؤجلات مستحقة من الموردين</span><span class="dash-s-green">${fmt(deferredReceivable)}</span></div>
+                    <div class="dash-summary-row"><span>🧾 عجز شركاء رأس المال (ذمة مدينة)</span><span class="dash-s-green">${fmt(partnersDeficit)}</span></div>
                     <div class="dash-summary-divider"></div>
                     <div class="dash-summary-row dash-summary-total">
                         <span>${netWorth >= 0 ? '✅ صافي المركز المالي' : '📉 صافي المركز المالي'}</span>
                         <span style="color:${netWorth >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${fmt(Math.abs(netWorth))}</span>
                     </div>
                     <div style="font-size:11px;color:var(--inv-muted-light);margin-top:4px;line-height:1.6">
-                        ⚠️ هذا رقم لحظي (مخزون + خزنة + مديونيات - مستحقات) وليس "ربح أو خسارة" بالمعنى المحاسبي — لحساب الربح الفعلي يلزم مقارنة فترتين، راجع "ملخص ${monthName}" بجانبه.
+                        ⚠️ هذا رقم لحظي (كل الأصول المتاحة والمستحقة ناقص كل المستحق للموردين) وليس "ربح أو خسارة" بالمعنى المحاسبي — لحساب الربح الفعلي يلزم مقارنة فترتين، راجع "ملخص ${monthName}" بجانبه.
+                    </div>
+                </div>
+                <div class="dash-card" style="flex:1">
+                    <div class="dash-card-header"><span>📊 ملخص ${monthName}</span></div>
+                    <div class="dash-summary-row"><span>صافي المبيعات</span><span class="dash-s-green">${fmt(netMonthSales)}</span></div>
+                    <div class="dash-summary-row"><span>(-) تكلفة البضاعة المباعة</span><span class="dash-s-red">${fmt(monthCOGS)}</span></div>
+                    <div class="dash-summary-row"><span>(-) إجمالي المصروفات</span><span class="dash-s-red">${fmt(monthExpenses)}</span></div>
+                    ${monthDiscounts > 0 ? `<div class="dash-summary-row"><span>(-) خصومات تحصيل من العملاء</span><span class="dash-s-red">${fmt(monthDiscounts)}</span></div>` : ''}
+                    <div class="dash-summary-divider"></div>
+                    <div class="dash-summary-row dash-summary-total">
+                        <span>${monthProfit >= 0 ? '✅ صافي الربح' : '📉 صافي الخسارة'}</span>
+                        <span style="color:${monthProfit >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${fmt(Math.abs(monthProfit))}</span>
+                    </div>
+                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light);margin-top:4px">
+                        <span>هامش الربح</span>
+                        <span>${netMonthSales > 0 ? Math.round(monthProfit / netMonthSales * 100) : 0}%</span>
                     </div>
                 </div>
             </div>
@@ -400,24 +432,6 @@ async function renderDashboard(container) {
                         </div>
                         <span class="dash-low-qty ${s.qty <= 0 ? 'dash-low-zero' : 'dash-low-warn'}">${s.qty} وحدة</span>
                     </div>`).join('') : '<p class="dash-empty">كل الأصناف بمخزون جيد ✅</p>'}
-                </div>
-
-                <!-- ملخص الشهر -->
-                <div class="dash-card" style="flex:1">
-                    <div class="dash-card-header"><span>📊 ملخص ${monthName}</span></div>
-                    <div class="dash-summary-row"><span>صافي المبيعات</span><span class="dash-s-green">${fmt(netMonthSales)}</span></div>
-                    <div class="dash-summary-row"><span>(-) تكلفة البضاعة المباعة</span><span class="dash-s-red">${fmt(monthCOGS)}</span></div>
-                    <div class="dash-summary-row"><span>(-) إجمالي المصروفات</span><span class="dash-s-red">${fmt(monthExpenses)}</span></div>
-                    ${monthDiscounts > 0 ? `<div class="dash-summary-row"><span>(-) خصومات تحصيل من العملاء</span><span class="dash-s-red">${fmt(monthDiscounts)}</span></div>` : ''}
-                    <div class="dash-summary-divider"></div>
-                    <div class="dash-summary-row dash-summary-total">
-                        <span>${monthProfit >= 0 ? '✅ صافي الربح' : '📉 صافي الخسارة'}</span>
-                        <span style="color:${monthProfit >= 0 ? 'var(--inv-green)' : 'var(--inv-red)'}">${fmt(Math.abs(monthProfit))}</span>
-                    </div>
-                    <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light);margin-top:4px">
-                        <span>هامش الربح</span>
-                        <span>${netMonthSales > 0 ? Math.round(monthProfit / netMonthSales * 100) : 0}%</span>
-                    </div>
                 </div>
             </div>
         </div>`;
