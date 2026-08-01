@@ -20,12 +20,12 @@
    مش متوصل من القائمة الجانبية دلوقتي).
    ════════════════════════════════════════════════════════════ */
 
-let _prodHubTab = 'list'; // 'list' | 'import' | 'transfer' | 'stock' | 'warehouses' | 'reports'
+let _prodHubTab = 'list'; // 'list' | 'import' | 'transfer' | 'stock' | 'warehouses' | 'reports' | 'decision'
 
 async function renderProductsHub(c) {
     if (window._pendingProdHubTab) { _prodHubTab = window._pendingProdHubTab; window._pendingProdHubTab = null; }
     const invDenied = typeof apGetDeniedSet === 'function' ? (await apGetDeniedSet()).has('inventory-hub') : false;
-    if (invDenied && ['transfer', 'stock', 'warehouses', 'reports'].includes(_prodHubTab)) _prodHubTab = 'list';
+    if (invDenied && ['transfer', 'stock', 'warehouses', 'reports', 'decision'].includes(_prodHubTab)) _prodHubTab = 'list';
     c.innerHTML = `
     <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
         <button class="mod-btn ${_prodHubTab==='list'?'mod-btn-primary':''}" onclick="prodHubSwitchTab('list')">📋 القائمة</button>
@@ -34,7 +34,8 @@ async function renderProductsHub(c) {
         <button class="mod-btn ${_prodHubTab==='transfer'?'mod-btn-primary':''}" onclick="prodHubSwitchTab('transfer')">🔄 تحويل مخزون</button>
         <button class="mod-btn ${_prodHubTab==='stock'?'mod-btn-primary':''}" onclick="prodHubSwitchTab('stock')">📦 أرصدة المخزون</button>
         <button class="mod-btn ${_prodHubTab==='warehouses'?'mod-btn-primary':''}" onclick="prodHubSwitchTab('warehouses')">🏭 إدارة المخازن</button>
-        <button class="mod-btn ${_prodHubTab==='reports'?'mod-btn-primary':''}" onclick="prodHubSwitchTab('reports')">📊 تقارير المخازن</button>`}
+        <button class="mod-btn ${_prodHubTab==='reports'?'mod-btn-primary':''}" onclick="prodHubSwitchTab('reports')">📊 تقارير المخازن</button>
+        <button class="mod-btn ${_prodHubTab==='decision'?'mod-btn-primary':''}" onclick="prodHubSwitchTab('decision')">🎯 مركز القرار</button>`}
     </div>
     <div id="prodHubBody"></div>`;
     await prodHubRenderTab();
@@ -48,6 +49,7 @@ async function prodHubRenderTab() {
     else if (_prodHubTab === 'stock') await renderInventory(body);
     else if (_prodHubTab === 'warehouses') await renderWarehouses(body);
     else if (_prodHubTab === 'reports') await renderWarehouseReports(body);
+    else if (_prodHubTab === 'decision') await renderItemDecisionCenter(body);
     else await renderProducts(body);
 }
 
