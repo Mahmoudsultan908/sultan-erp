@@ -447,10 +447,16 @@ function purCalcNet() {
     const subtotal = purItems.reduce((s,i)=>s+(i.qty||0)*(i.price||0),0);
     const rowsDisc = purItems.reduce((s,i)=>s+(i.qty||0)*(i.price||0)*(i.disc||0)/100,0);
     const extra = parseFloat(document.getElementById('purDiscExtra')?.value)||0;
+    // المؤجل = المبلغ الظاهر في الخلية (نسبة% أو ثابت) + خصم ثابت دائم إضافي
+    // من كارت الصنف نفسه (products.default_deferred_fixed_extra) — بند مستقل
+    // بيتجمع فوق أي حاجة يدوية في الخلية، عشان يتطابق مع اتفاقات موردين زي
+    // "1 جنيه ثابت + 2% مؤجل" مع بعض، مش نوع واحد بس.
     const deferred = purItems.reduce((s,i) => {
-        if ((i.deferredType||'percent') === 'fixed') return s + (i.qty||0)*(i.deferredRate||0);
+        const prod = i.pid ? PUR_DB.products.find(p=>p.id===i.pid) : null;
+        const fixedExtra = (i.qty||0) * (Number(prod?.default_deferred_fixed_extra) || 0);
+        if ((i.deferredType||'percent') === 'fixed') return s + (i.qty||0)*(i.deferredRate||0) + fixedExtra;
         const lt = (i.qty||0)*(i.price||0)*(1-(i.disc||0)/100);
-        return s + lt*((i.deferredRate||0)/100);
+        return s + lt*((i.deferredRate||0)/100) + fixedExtra;
     }, 0);
     return { subtotal, rowsDisc, extra, deferred, net: subtotal - rowsDisc - extra };
 }
@@ -891,9 +897,13 @@ async function purSave(andNew) {
             // column ثابت)، يعني "rate" لازم يوصل دايماً كمبلغ فعلي للوحدة —
             // لو المستخدم اختار % هنا بنحوّلها لمبلغ للوحدة *قبل* الحفظ، بحيث
             // qty*rate في القاعدة يطابق بالظبط اللي شايفه في إجمالي الفاتورة.
-            const deferredPerUnit = (it.deferredType||'percent') === 'fixed'
+            // + خصم ثابت دائم إضافي من كارت الصنف (default_deferred_fixed_extra)
+            // بيتجمع فوق أي حاجة في الخلية — نفس منطق purCalcNet بالظبط، عشان
+            // الرقم المحفوظ يطابق اللي كان ظاهر في إجمالي الفاتورة وقت الحفظ.
+            const deferredPerUnit = ((it.deferredType||'percent') === 'fixed'
                 ? (it.deferredRate || 0)
-                : (it.price||0) * (1 - (it.disc||0)/100) * (it.deferredRate||0) / 100;
+                : (it.price||0) * (1 - (it.disc||0)/100) * (it.deferredRate||0) / 100)
+                + (Number(prod?.default_deferred_fixed_extra) || 0);
             return {
                 product_id: it.pid,
                 qty: it.qty,
