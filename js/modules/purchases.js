@@ -29,6 +29,7 @@ let purEditingOldSupplierId = null;
 let purEditingOldPayType = null;
 let purEditingOldInvoiceNo = null;
 let purEditingOldDueDate = null;
+let purEditingOldDiscount = 0;
 let purPendingPOOrderId = null; // أمر شراء بيتحوّل حالياً — يتعلّم "تم الاستلام" بعد نجاح الحفظ بس (مش قبله)
 
 // المهلة الافتراضية لتاريخ استحقاق فاتورة الشراء الآجلة (يوم) — قابلة للتعديل يدوي وقت الشراء دايماً
@@ -102,7 +103,7 @@ async function renderPurchases(c) {
     purSupplierId = null;
     purPayType = 'credit';
     purTreasuryId = PUR_DB.treasuries?.find(t => t.is_default)?.id || null;
-    purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null; purEditingOldDueDate = null;
+    purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null; purEditingOldDueDate = null; purEditingOldDiscount = 0;
     purPendingPOOrderId = null;
 
     // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
@@ -122,12 +123,13 @@ async function renderPurchases(c) {
                 purEditingOldPayType = oldPur.payment_type;
                 purEditingOldInvoiceNo = oldPur.invoice_no;
                 purEditingOldDueDate = oldPur.due_date || null;
+                purEditingOldDiscount = Number(oldPur.discount) || 0;
 
                 purItems = (oldPur.purchase_items || []).map(it => ({
                     id: Date.now() + Math.random(), pid: it.product_id,
                     name: it.products?.name || '', code: it.products?.code || '',
                     qty: Number(it.qty) || 0, price: Number(it.unit_price) || 0,
-                    disc: 0, free: 0, unit: it.products?.unit || '', upc: 1,
+                    disc: Number(it.discount_pct) || 0, free: 0, unit: it.products?.unit || '', upc: 1,
                     // deferred_rate المحفوظ فعلياً دايماً مبلغ ثابت للوحدة (راجع
                     // purSave) بصرف النظر إن كان المستخدم أصلاً اختار % وقت الإدخال —
                     // فبنعيد عرضه هنا كـ "ثابت" دايماً، مش بنحاول نرجّع النسبة الأصلية.
@@ -201,6 +203,7 @@ async function renderPurchases(c) {
     </div>`;
     purBindEvents();
     purSetPayType(purPayType); // الـ select فوق بيتفتح على "نقدي" شكلياً — نزامن الشكل مع الحالة الحقيقية
+    document.getElementById('purDiscExtra').value = purEditingOldDiscount || 0;
     purRenderItems();
     purUpdateSummary();
     purUpdateSupplierChip();
@@ -929,6 +932,7 @@ async function purSave(andNew) {
                 qty: it.qty,
                 unit_price: it.price,
                 line_total: lineTotal,
+                discount_pct: it.disc || 0,
                 deferred_rate: deferredPerUnit,
                 deferred_type: it.deferredType || 'percent',
                 deferred_due_date: deferredPerUnit > 0 ? (document.getElementById('purDate')?.value || null) : null,
@@ -941,6 +945,7 @@ async function purSave(andNew) {
             p_subtotal: subtotal,
             p_vat_amount: 0,
             p_total: net,
+            p_discount: extra,
             p_warehouse_id: purWarehouseId,
             p_treasury_id: purPayType === 'cash' ? (document.getElementById('purTreasuryId')?.value || purTreasuryId || null) : null,
             p_created_by: currentUser?.id || null,

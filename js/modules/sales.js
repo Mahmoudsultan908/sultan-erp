@@ -29,6 +29,7 @@ let invEditingOldCustId = null;
 let invEditingOldInvoiceNo = null;
 let invEditingOldSourceApp = null; // source_app الأصلي للفاتورة قبل التعديل — عشان نحافظ عليه (راجع التعليق فوق fn_create_sale)
 let invEditingOldDueDate = null;
+let invEditingOldDiscount = 0;
 
 // المهلة الافتراضية لتاريخ استحقاق الفاتورة الآجلة (يوم) — قابلة للتعديل يدوي وقت البيع دايماً
 const INV_DEFAULT_CREDIT_TERM_DAYS = 15;
@@ -310,7 +311,7 @@ async function renderSales(c) {
     invTreasuryId = INV_DB.treasuries?.find(t => t.is_default)?.id || null;
     invPriceLevelCode = 'RETAIL';
     invRepId = null;
-    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null; invEditingOldDueDate = null;
+    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null; invEditingOldDueDate = null; invEditingOldDiscount = 0;
     invPendingQuoteId = null;
     invPendingOrderId = null;
     invPendingOrderNo = null;
@@ -334,6 +335,7 @@ async function renderSales(c) {
                 invEditingOldInvoiceNo = oldSale.invoice_no;
                 invEditingOldSourceApp = oldSale.source_app;
                 invEditingOldDueDate = oldSale.due_date || null;
+                invEditingOldDiscount = Number(oldSale.discount) || 0;
 
                 invItems = (oldSale.sale_items || []).map(it => ({
                     id: Date.now() + Math.random(), pid: it.product_id,
@@ -429,6 +431,7 @@ async function renderSales(c) {
     // ربط الأحداث
     invBindEvents();
     invSetPayType(invPayType); // القالب فوق بيثبّت "نقدي" شكلياً — نزامن الشكل مع الحالة الحقيقية
+    document.getElementById('invDiscExtra').value = invEditingOldDiscount || 0;
     invRenderItems();
     invUpdateSummary();
     invUpdateCustomerChip();
