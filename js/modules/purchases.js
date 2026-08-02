@@ -28,7 +28,16 @@ let purEditingOldTotal = 0;
 let purEditingOldSupplierId = null;
 let purEditingOldPayType = null;
 let purEditingOldInvoiceNo = null;
+let purEditingOldDueDate = null;
 let purPendingPOOrderId = null; // أمر شراء بيتحوّل حالياً — يتعلّم "تم الاستلام" بعد نجاح الحفظ بس (مش قبله)
+
+// المهلة الافتراضية لتاريخ استحقاق فاتورة الشراء الآجلة (يوم) — قابلة للتعديل يدوي وقت الشراء دايماً
+const PUR_DEFAULT_CREDIT_TERM_DAYS = 15;
+function purDefaultDueDate() {
+    const d = new Date();
+    d.setDate(d.getDate() + PUR_DEFAULT_CREDIT_TERM_DAYS);
+    return d.toISOString().slice(0, 10);
+}
 
 // ════════════════════════════════════════════════════════════
 // 0) تحميل البيانات من Supabase
@@ -93,7 +102,7 @@ async function renderPurchases(c) {
     purSupplierId = null;
     purPayType = 'credit';
     purTreasuryId = PUR_DB.treasuries?.find(t => t.is_default)?.id || null;
-    purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null;
+    purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null; purEditingOldDueDate = null;
     purPendingPOOrderId = null;
 
     // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
@@ -112,6 +121,7 @@ async function renderPurchases(c) {
                 purEditingOldSupplierId = oldPur.supplier_id;
                 purEditingOldPayType = oldPur.payment_type;
                 purEditingOldInvoiceNo = oldPur.invoice_no;
+                purEditingOldDueDate = oldPur.due_date || null;
 
                 purItems = (oldPur.purchase_items || []).map(it => ({
                     id: Date.now() + Math.random(), pid: it.product_id,
@@ -181,6 +191,7 @@ async function renderPurchases(c) {
             <div class="inv-side">
                 ${purSupplierCardHTML()}
                 ${purPayCardHTML()}
+                ${purDueCardHTML()}
                 ${purTotalsCardHTML()}
                 ${purActionsCardHTML()}
                 ${purNotesCardHTML()}
@@ -301,6 +312,14 @@ function purPayCardHTML() {
         <select id="purTreasuryId" class="mod-form-input" style="margin-top:10px">
             ${(PUR_DB.treasuries||[]).map(t => `<option value="${t.id}" ${t.id===purTreasuryId?'selected':''}>${t.name}</option>`).join('')}
         </select>
+    </div>`;
+}
+
+function purDueCardHTML() {
+    return `
+    <div class="inv-card inv-due" id="purDueCard">
+        <div class="inv-card-title" style="color:var(--inv-red)">📅 تاريخ الاستحقاق</div>
+        <input type="date" class="inv-due-input" id="purDueDate" value="${purEditingOldDueDate || purDefaultDueDate()}">
     </div>`;
 }
 
@@ -822,6 +841,7 @@ function purSetPayType(t) {
     const sel = document.getElementById('purPayType');
     if (sel) sel.value = t;
     document.getElementById('purCashPanel').classList.toggle('show', t==='cash');
+    document.getElementById('purDueCard')?.classList.toggle('show', t==='credit');
     if (t==='cash') setTimeout(()=>document.getElementById('purCashPaid')?.focus(),50);
 }
 function purTogglePayType() { purSetPayType(purPayType === 'cash' ? 'credit' : 'cash'); }
@@ -928,6 +948,15 @@ async function purSave(andNew) {
         });
         if (rpcErr) throw rpcErr;
         if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
+
+        // ★ due_date مش parameter في fn_create_purchase (نفس سبب sales.js
+        //   بالظبط) — بيتحدّث بـ UPDATE منفصل خفيف بعد النجاح.
+        if (purPayType === 'credit' && rpcRows?.[0]?.id) {
+            const dueDateVal = document.getElementById('purDueDate')?.value || null;
+            if (dueDateVal) {
+                try { await sb.from('purchases').update({ due_date: dueDateVal }).eq('id', rpcRows[0].id); } catch {}
+            }
+        }
         // العداد بيتقفل ويتحرك جوه الـ RPC نفسها — نطابق العرض المحلي على
         // الرقم الحقيقي اللي الدالة رجّعته
         const invoiceNoMatch = invoiceNo.match(/(\d+)$/);
@@ -1001,6 +1030,7 @@ function purSnapshot() {
         discExtra: parseFloat(document.getElementById('purDiscExtra')?.value) || 0,
         notes: document.getElementById('purNotes')?.value || '',
         date: document.getElementById('purDate')?.value || new Date().toISOString().split('T')[0],
+        dueDate: document.getElementById('purDueDate')?.value || '',
         net,
         savedAt: Date.now(),
     };
@@ -1031,6 +1061,7 @@ function purRestoreDraft(id) {
     document.getElementById('purDiscExtra').value = d.discExtra || 0;
     document.getElementById('purNotes').value = d.notes || '';
     document.getElementById('purDate').value = d.date || new Date().toISOString().split('T')[0];
+    document.getElementById('purDueDate').value = d.dueDate || '';
     document.getElementById('purPayType').value = d.payType;
     purSetPayType(d.payType);
     purRenderItems(); purUpdateSummary(); purUpdateSupplierChip();
@@ -1096,6 +1127,7 @@ function purCheckAutoSaveRestore() {
                 document.getElementById('purDiscExtra').value = saved.discExtra || 0;
                 document.getElementById('purNotes').value = saved.notes || '';
                 document.getElementById('purDate').value = saved.date || new Date().toISOString().split('T')[0];
+                document.getElementById('purDueDate').value = saved.dueDate || '';
                 document.getElementById('purPayType').value = saved.payType;
                 purSetPayType(saved.payType);
                 purRenderItems(); purUpdateSummary(); purUpdateSupplierChip();

@@ -10,7 +10,7 @@
    بتتحط من suppGoEditProfile فى suppliers.js قبل الانتقال.
    ════════════════════════════════════════════════════════════ */
 
-let _suppHubTab = 'manage'; // 'manage' | 'import'
+let _suppHubTab = 'manage'; // 'manage' | 'import' | 'decision'
 
 async function renderSuppliersHub(c) {
     if (window._pendingSuppHubTab) { _suppHubTab = window._pendingSuppHubTab; window._pendingSuppHubTab = null; }
@@ -18,6 +18,7 @@ async function renderSuppliersHub(c) {
     <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
         <button class="mod-btn ${_suppHubTab==='manage'?'mod-btn-primary':''}" onclick="suppHubSwitchTab('manage')">🏭 القائمة</button>
         <button class="mod-btn ${_suppHubTab==='import'?'mod-btn-primary':''}" onclick="suppHubSwitchTab('import')">📥 استيراد Excel</button>
+        <button class="mod-btn ${_suppHubTab==='decision'?'mod-btn-primary':''}" onclick="suppHubSwitchTab('decision')">🎯 مركز القرار</button>
     </div>
     <div id="suppHubBody"></div>`;
     await suppHubRenderTab();
@@ -27,6 +28,7 @@ async function suppHubRenderTab() {
     const body = document.getElementById('suppHubBody');
     if (!body) return;
     if (_suppHubTab === 'import') await renderSupplierImport(body);
+    else if (_suppHubTab === 'decision') await renderSupplierDecisionCenter(body);
     else await renderSuppliersManage(body);
 }
 
