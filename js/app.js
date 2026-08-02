@@ -96,6 +96,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="payroll" onclick="loadMod(this, 'payroll')">👥 الموظفون والرواتب</div>
         <div class="nav-item" data-mod="employee-evaluation" onclick="loadMod(this, 'employee-evaluation')">⭐ تقييم الموظفين</div>
         <div class="nav-item" data-mod="attendance" onclick="loadMod(this, 'attendance')">🕐 الحضور والانصراف</div>
+        <div class="nav-item" data-mod="employee-decision" onclick="loadMod(this, 'employee-decision')">🎯 مركز القرار</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">📒</span><span class="ng-label">المحاسبة والتقارير</span></span><span class="nav-group-arrow">▾</span></div>
@@ -448,6 +449,7 @@ const titles = {
         'ai-dashboard': 'لوحة الذكاء الاصطناعي',
         'employee-evaluation': 'تقييم الموظفين',
         'attendance': 'الحضور والانصراف',
+        'employee-decision': 'مركز قرار الموظفين',
         'customer-orders-link': 'طلبات العملاء',
         'rep-app-link': 'مندوب سلطان',
         'reports-hub': 'التقارير',
@@ -489,6 +491,7 @@ async function _dispatchRender(modName, c) {
     if (modName === 'ai-dashboard' && typeof renderAIDashboard === 'function') await renderAIDashboard(c);
     if (modName === 'employee-evaluation' && typeof renderEmployeeEvaluation === 'function') await renderEmployeeEvaluation(c);
     if (modName === 'attendance' && typeof renderAttendance === 'function') await renderAttendance(c);
+    if (modName === 'employee-decision' && typeof renderEmployeeDecisionCenter === 'function') await renderEmployeeDecisionCenter(c);
     if (modName === 'customer-orders-link' && typeof renderCustomerOrdersLink === 'function') await renderCustomerOrdersLink(c);
     if (modName === 'rep-app-link' && typeof renderRepAppLink === 'function') await renderRepAppLink(c);
     if (modName === 'reports-hub' && typeof renderReportsHub === 'function') await renderReportsHub(c);
