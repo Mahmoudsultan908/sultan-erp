@@ -87,8 +87,10 @@ function buildLayout() {
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">💰</span><span class="ng-label">المالية</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="expenses" onclick="loadMod(this, 'expenses')">💸 المصروفات</div>
+        <div class="nav-item" data-mod="expense-decision" onclick="loadMod(this, 'expense-decision')">🎯 قرار المصروفات</div>
         <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="balance-transfer" onclick="loadMod(this, 'balance-transfer')">🔀 تحويل أرصدة</div>
+        <div class="nav-item" data-mod="liquidity-forecast" onclick="loadMod(this, 'liquidity-forecast')">💧 توقع السيولة</div>
         </div>
 
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">👥</span><span class="ng-label">الموظفين</span></span><span class="nav-group-arrow">▾</span></div>
@@ -450,6 +452,8 @@ const titles = {
         'employee-evaluation': 'تقييم الموظفين',
         'attendance': 'الحضور والانصراف',
         'employee-decision': 'مركز قرار الموظفين',
+        'expense-decision': 'مركز قرار المصروفات',
+        'liquidity-forecast': 'توقع السيولة',
         'customer-orders-link': 'طلبات العملاء',
         'rep-app-link': 'مندوب سلطان',
         'reports-hub': 'التقارير',
@@ -492,6 +496,8 @@ async function _dispatchRender(modName, c) {
     if (modName === 'employee-evaluation' && typeof renderEmployeeEvaluation === 'function') await renderEmployeeEvaluation(c);
     if (modName === 'attendance' && typeof renderAttendance === 'function') await renderAttendance(c);
     if (modName === 'employee-decision' && typeof renderEmployeeDecisionCenter === 'function') await renderEmployeeDecisionCenter(c);
+    if (modName === 'expense-decision' && typeof renderExpenseDecisionCenter === 'function') await renderExpenseDecisionCenter(c);
+    if (modName === 'liquidity-forecast' && typeof renderLiquidityForecast === 'function') await renderLiquidityForecast(c);
     if (modName === 'customer-orders-link' && typeof renderCustomerOrdersLink === 'function') await renderCustomerOrdersLink(c);
     if (modName === 'rep-app-link' && typeof renderRepAppLink === 'function') await renderRepAppLink(c);
     if (modName === 'reports-hub' && typeof renderReportsHub === 'function') await renderReportsHub(c);
