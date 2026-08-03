@@ -15,7 +15,8 @@
    من الأول، فمفيش أي تعديل تاني مطلوب في الراوتر أو القائمة الجانبية)
    ════════════════════════════════════════════════════════════ */
 
-let _corTab = 'orders'; // 'orders' | 'registrations' | 'banners'
+let _corTab = 'orders'; // 'orders' | 'registrations' | 'banners' | 'notifications'
+let COR_NOTIFY_CUSTOMERS = []; // عملاء مفعّلين الإشعارات فعلياً (لهم push_subscriptions)
 let COR_ORDERS = [];
 let COR_BANNERS = [];
 let COR_CATS = [];
@@ -46,6 +47,7 @@ async function renderCustomerOrdersLink(c) {
         <button class="mod-btn ${_corTab==='orders'?'mod-btn-primary':''}" onclick="corSwitchTab('orders')">📦 طلبات سلطانو</button>
         <button class="mod-btn ${_corTab==='registrations'?'mod-btn-primary':''}" onclick="corSwitchTab('registrations')">👤 تسجيل عملاء سلطانو</button>
         <button class="mod-btn ${_corTab==='banners'?'mod-btn-primary':''}" onclick="corSwitchTab('banners')">🖼️ بانرات سلطانو</button>
+        <button class="mod-btn ${_corTab==='notifications'?'mod-btn-primary':''}" onclick="corSwitchTab('notifications')">🔔 إرسال إشعار</button>
     </div>
     <div id="corBody"></div>`;
     await corRenderTab();
@@ -56,6 +58,7 @@ async function corRenderTab() {
     if (!body) return;
     if (_corTab === 'orders') await corRenderOrders(body);
     else if (_corTab === 'banners') await corRenderBanners(body);
+    else if (_corTab === 'notifications') await corRenderNotifications(body);
     else await renderRepCustomerRequests(body);
 }
 
@@ -127,6 +130,7 @@ function corRowHTML(o) {
         <td style="white-space:nowrap">
             <button class="cc-edit" style="background:#DCFCE7;color:#166534" onclick="corApproveOrder('${o.id}')">✅ اعتماد/مراجعة</button>
             <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red);margin-right:4px" onclick="corRejectOrder('${o.id}')">❌ رفض</button>
+            <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold);margin-right:4px" title="إرسال إشعار لهذا العميل" onclick="corQuickNotify('${o.customer_id}', '${(o.customers?.name || '').replace(/'/g, "\\'")}')">🔔</button>
         </td>
     </tr>`;
 }
@@ -319,6 +323,109 @@ window.corDeleteBanner = async function(id) {
         corRenderBanners(document.getElementById('corBody') || document.getElementById('app-content'));
     } catch (err) {
         alert('خطأ: ' + err.message);
+    }
+};
+
+// ════════════════════════════════════════════════════════════
+// إرسال إشعار Push حقيقي (زي إشعارات فيسبوك، مش واتساب) لعملاء سلطانو
+// اللي فعّلوا الإشعارات فعلياً من التطبيق (جدول push_subscriptions).
+// الإرسال الفعلي بيحصل من Edge Function send-push-notification
+// (بروتوكول Web Push بمفتاحي VAPID) — الشاشة هنا بس بتجهّز المحتوى
+// وتستدعيها.
+// ════════════════════════════════════════════════════════════
+async function corRenderNotifications(c) {
+    c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء المفعّلين للإشعارات...</div>';
+    try {
+        const { data, error } = await sb.from('push_subscriptions').select('customer_id, customers(name,phone)');
+        if (error) throw error;
+        const seen = new Set();
+        COR_NOTIFY_CUSTOMERS = [];
+        (data || []).forEach(r => {
+            if (!r.customer_id || seen.has(r.customer_id)) return;
+            seen.add(r.customer_id);
+            COR_NOTIFY_CUSTOMERS.push({ id: r.customer_id, name: r.customers?.name || '—', phone: r.customers?.phone || '' });
+        });
+        COR_NOTIFY_CUSTOMERS.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+        corRenderNotificationsPage(c);
+    } catch (err) {
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+    }
+}
+
+function corRenderNotificationsPage(c) {
+    c.innerHTML = `
+    <div class="mod-card" style="max-width:560px">
+        <div class="mod-form-group"><label>المستهدَف</label>
+            <select id="corNotifyTarget" class="mod-form-input">
+                <option value="all">🔔 كل العملاء المفعّلين (${COR_NOTIFY_CUSTOMERS.length})</option>
+                ${COR_NOTIFY_CUSTOMERS.map(cu => `<option value="${cu.id}">${cu.name}${cu.phone ? ' — ' + cu.phone : ''}</option>`).join('')}
+            </select>
+        </div>
+        ${!COR_NOTIFY_CUSTOMERS.length ? `<div style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:10px 14px;border-radius:9px;font-size:12.5px;margin-bottom:14px">⚠️ لسه مفيش عملاء فعّلوا الإشعارات من تطبيق سلطانو (شاشة الحساب فيها زرار "🔔 تفعيل الإشعارات").</div>` : ''}
+        <div class="mod-form-group"><label>العنوان *</label>
+            <input type="text" id="corNotifyTitle" class="mod-form-input" placeholder="مثال: عرض جديد 🔥" maxlength="60"></div>
+        <div class="mod-form-group"><label>النص *</label>
+            <textarea id="corNotifyBody" class="mod-form-input" rows="3" placeholder="نص الإشعار..." maxlength="180"></textarea></div>
+        <div class="mod-form-group"><label>صورة (اختياري)</label>
+            <div style="display:flex;align-items:center;gap:10px">
+                <img id="corNotifyImgPreview" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#F1F5F9;display:none">
+                <input type="file" id="corNotifyImgFile" class="mod-form-input" accept="image/*" style="margin:0" onchange="corPreviewNotifyImage(this)">
+            </div>
+        </div>
+        <button class="mod-btn mod-btn-primary" style="width:100%" onclick="corSendNotification()" id="corNotifySendBtn">🔔 إرسال الإشعار</button>
+        <div id="corNotifyResult" style="margin-top:12px;font-size:13px"></div>
+    </div>`;
+}
+
+window.corPreviewNotifyImage = function(input) {
+    const file = input.files[0];
+    const img = document.getElementById('corNotifyImgPreview');
+    if (!file || !img) return;
+    img.src = URL.createObjectURL(file);
+    img.style.display = '';
+};
+
+window.corQuickNotify = function(customerId, customerName) {
+    _corTab = 'notifications';
+    renderCustomerOrdersLink(document.getElementById('app-content')).then(() => {
+        const sel = document.getElementById('corNotifyTarget');
+        if (sel && [...sel.options].some(o => o.value === customerId)) sel.value = customerId;
+        else alert(`⚠️ "${customerName}" لسه مفعّلش الإشعارات من تطبيق سلطانو، فمش هيوصله الإشعار ده.`);
+    });
+};
+
+window.corSendNotification = async function() {
+    const title = document.getElementById('corNotifyTitle').value.trim();
+    const body = document.getElementById('corNotifyBody').value.trim();
+    const target = document.getElementById('corNotifyTarget').value;
+    const resultEl = document.getElementById('corNotifyResult');
+    if (!title || !body) { alert('العنوان والنص مطلوبين'); return; }
+    if (!confirm(target === 'all' ? `إرسال الإشعار ده لكل العملاء المفعّلين (${COR_NOTIFY_CUSTOMERS.length})؟` : 'إرسال الإشعار ده للعميل المختار؟')) return;
+
+    const btn = document.getElementById('corNotifySendBtn');
+    btn.disabled = true; btn.innerText = '⏳ جاري الإرسال...';
+    if (resultEl) resultEl.innerHTML = '';
+    try {
+        let image_url = null;
+        const file = document.getElementById('corNotifyImgFile')?.files?.[0];
+        if (file) {
+            const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+            const path = `notifications/${Date.now()}_${safeName}`;
+            const { error: upErr } = await sb.storage.from(COR_IMAGE_BUCKET).upload(path, file);
+            if (upErr) throw upErr;
+            const { data: pub } = sb.storage.from(COR_IMAGE_BUCKET).getPublicUrl(path);
+            image_url = pub.publicUrl;
+        }
+
+        const { data, error } = await sb.functions.invoke('send-push-notification', {
+            body: { customer_ids: target === 'all' ? 'all' : [target], title, body, image: image_url },
+        });
+        if (error) throw error;
+        if (resultEl) resultEl.innerHTML = `<span style="color:var(--inv-green)">✅ اتبعت لـ ${data.sent} جهاز${data.failed ? ` — فشل ${data.failed}` : ''}</span>`;
+    } catch (err) {
+        if (resultEl) resultEl.innerHTML = `<span style="color:var(--inv-red)">❌ خطأ: ${err.message}</span>`;
+    } finally {
+        btn.disabled = false; btn.innerText = '🔔 إرسال الإشعار';
     }
 };
 
