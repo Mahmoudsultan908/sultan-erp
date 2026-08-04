@@ -26,6 +26,7 @@ let retRepId = null;        // مندوب المبيعات (اختياري — �
 let retWarehouseId = null;
 let retItems = [];          // { id, pid, name, code, unit, qty, price, disc, maxQty }
 let retTableMissing = false;
+let RET_LAST_SALE_PRICE_CACHE = {}; // 'customerId|productId' -> آخر سعر بيع فعلي، أو null لو مفيش تاريخ
 // ★ مستوى السعر المختار لمرتجع المبيعات (وضع "مستقل" بس — نفس فكرة
 //   invPriceLevelCode/INV_DB.priceMap في sales.js بالحرف). '' = الافتراضي
 //   (جملة ثم تجزئة). راجع RET_DB.priceMap اللي بيتبني في renderReturns.
@@ -537,8 +538,11 @@ window.retTogglePayCash = function (checked) {
 // المرتبط الأسعار بتفضل زي الفاتورة الأصلية بالظبط لحد ما المستخدم
 // يغيّر المستوى بنفسه فعليًا، مش تلقائي.
 window.retSetPriceLevel = function (code) {
+    // ★ تغيير المستوى يدوي = تجاوز مقصود من المستخدم لآخر سعر بيع فعلي،
+    //   فبيستخدم السعر الثابت بالمستوى مباشرة (مش retGetPrice اللي بيفضّل
+    //   آخر سعر بيع دايمًا)
     retPriceLevelCode = code || '';
-    retItems.forEach(it => { if (it.pid) { const p = RET_DB.products.find(x => x.id === it.pid); if (p) it.price = retGetPrice(p); } });
+    retItems.forEach(it => { if (it.pid) { const p = RET_DB.products.find(x => x.id === it.pid); if (p) it.price = retGetStaticFallbackPrice(p); } });
     retRenderItems(); retUpdateSummary();
 };
 
@@ -590,12 +594,44 @@ function retGetStock(pid) {
     if (!retWarehouseId) return 0;
     return RET_DB.stockMap[retWarehouseId + '|' + pid] || 0;
 }
-function retGetPrice(p) {
+// سعر احتياطي (مستوى سعر / سعر الجملة الثابت على الصنف) — بيتستخدم لما
+// مفيش تاريخ بيع فعلي للعميل ده على الصنف ده، أو للعرض السريع في قوائم
+// المعاينة (retMultiFilter) اللي مش محتاجة استعلام قاعدة بيانات لكل صنف.
+function retGetStaticFallbackPrice(p) {
     if (retType === 'sales' && retPriceLevelCode) {
         const levelPrice = RET_DB.priceMap?.[p.id + '|' + retPriceLevelCode];
         if (levelPrice != null) return levelPrice;
     }
     return retType === 'sales' ? (Number(p.wholesale_price) || Number(p.retail_price) || 0) : (Number(p.purchase_price) || 0);
+}
+
+// آخر سعر بيع فعلي لنفس العميل على نفس الصنف (من فواتير مؤكدة) — الأصول
+// إن مرتجع المبيعات يتسعّر بيه، مش بسعر جملة ثابت مالوش علاقة بسعر
+// العميل الفعلي (ممكن يكون اتفق على سعر خاص/بعد خصم مختلف عن أي مستوى
+// سعر معرّف). مُخزّن مؤقتًا لحد ما العميل أو الصنف يتغيّر.
+async function retFetchLastSalePrice(customerId, productId) {
+    if (!customerId || !productId) return null;
+    const key = customerId + '|' + productId;
+    if (key in RET_LAST_SALE_PRICE_CACHE) return RET_LAST_SALE_PRICE_CACHE[key];
+    let price = null;
+    try {
+        const { data } = await sb.from('sale_items')
+            .select('unit_price, sales!inner(customer_id,status,created_at)')
+            .eq('product_id', productId).eq('sales.customer_id', customerId).eq('sales.status', 'confirmed')
+            .order('created_at', { foreignTable: 'sales', ascending: false })
+            .limit(1).maybeSingle();
+        if (data) price = Number(data.unit_price) || null;
+    } catch {}
+    RET_LAST_SALE_PRICE_CACHE[key] = price;
+    return price;
+}
+
+async function retGetPrice(p) {
+    if (retType === 'sales' && retEntityId) {
+        const lastPrice = await retFetchLastSalePrice(retEntityId, p.id);
+        if (lastPrice != null) return lastPrice;
+    }
+    return retGetStaticFallbackPrice(p);
 }
 function retOnWarehouseChange() {
     const sel = document.getElementById('retWarehouse');
@@ -735,7 +771,7 @@ function retEntACHover(i) {
     items.forEach((el, idx) => el.classList.toggle('active', idx === i));
     items[i]?.scrollIntoView({ block: 'nearest' });
 }
-function retSelectEntity(id) {
+async function retSelectEntity(id) {
     const list = retType === 'sales' ? RET_DB.customers : RET_DB.suppliers;
     const x = list.find(v => v.id === id);
     if (!x) return;
@@ -743,7 +779,20 @@ function retSelectEntity(id) {
     const inp = document.getElementById('retEntitySearch'); if (inp) inp.value = '';
     document.getElementById('retEntityAC')?.classList.remove('show');
     retUpdateEntityChip();
+    // ★ لو الأصناف اتضافت قبل ما العميل يتحدد، حدّث أسعارها دلوقتي بآخر
+    //   سعر بيع فعلي للعميل ده (لو موجود)
+    if (retType === 'sales' && retMode === 'manual' && retItems.some(it => it.pid)) await retRefreshItemPrices();
     setTimeout(() => document.getElementById('retFastSearch')?.focus(), 50);
+}
+
+async function retRefreshItemPrices() {
+    for (const it of retItems) {
+        if (!it.pid) continue;
+        const p = RET_DB.products.find(x => x.id === it.pid);
+        if (p) it.price = await retGetPrice(p);
+    }
+    retRenderItems();
+    retUpdateSummary();
 }
 function retClearEntity() {
     retEntityId = null;
@@ -793,7 +842,7 @@ function retFastSearch(val) {
     if (m.length) {
         ac.innerHTML = m.map((p, i) => `<div class="inv-ac-item" data-i="${i}" onclick="retPickProduct('${p.id}')" onmouseenter="retFastHover(${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code || ''} · ${p.unit || ''}</div></div>
-            <div class="ap"><div class="pr">${retFmt(retGetPrice(p))}</div><div class="as">مخزون: ${retGetStock(p.id)}</div></div>
+            <div class="ap"><div class="pr">${retFmt(retGetStaticFallbackPrice(p))}</div><div class="as">مخزون: ${retGetStock(p.id)}</div></div>
         </div>`).join('');
         ac.classList.add('show');
     } else ac.classList.remove('show');
@@ -813,14 +862,14 @@ function retFastHover(i) {
     items.forEach((el, idx) => el.classList.toggle('active', idx === i));
     items[i]?.scrollIntoView({ block: 'nearest' });
 }
-function retPickProduct(pid) {
+async function retPickProduct(pid) {
     const p = RET_DB.products.find(x => x.id === pid);
     if (!p) return;
     const ex = retItems.findIndex(i => i.pid === pid);
     if (ex >= 0) {
         retItems[ex].qty = (retItems[ex].qty || 1) + 1;
     } else {
-        retItems.push({ id: Date.now() + Math.random(), pid: p.id, name: p.name, code: p.code || '', unit: p.unit || 'قطعة', qty: 1, price: retGetPrice(p), disc: 0, maxQty: null });
+        retItems.push({ id: Date.now() + Math.random(), pid: p.id, name: p.name, code: p.code || '', unit: p.unit || 'قطعة', qty: 1, price: await retGetPrice(p), disc: 0, maxQty: null });
     }
     const fs = document.getElementById('retFastSearch'); if (fs) fs.value = '';
     document.getElementById('retFastAC')?.classList.remove('show');
@@ -861,23 +910,23 @@ window.retMultiFilter = function () {
             <input type="checkbox" class="ret-multi-chk" value="${p.id}" id="retMultiChk-${p.id}">
             <label for="retMultiChk-${p.id}" style="flex:1;cursor:pointer">
                 <div style="font-weight:700;font-size:13px">${p.name}</div>
-                <div style="font-size:11px;color:var(--inv-muted-light)">${p.code || ''} · ${retFmt(retGetPrice(p))}</div>
+                <div style="font-size:11px;color:var(--inv-muted-light)">${p.code || ''} · ${retFmt(retGetStaticFallbackPrice(p))}</div>
             </label>
             <input type="number" class="mod-form-input ret-multi-qty" data-pid="${p.id}" value="1" min="1" style="width:70px;margin:0" dir="ltr">
         </div>`).join('') || '<div style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد أصناف مطابقة</div>';
 };
-window.retMultiConfirm = function () {
-    const checked = document.querySelectorAll('#retMultiList .ret-multi-chk:checked');
-    checked.forEach(chk => {
+window.retMultiConfirm = async function () {
+    const checked = [...document.querySelectorAll('#retMultiList .ret-multi-chk:checked')];
+    for (const chk of checked) {
         const pid = chk.value;
         const p = RET_DB.products.find(x => x.id === pid);
-        if (!p) return;
+        if (!p) continue;
         const qtyInput = document.querySelector(`.ret-multi-qty[data-pid="${pid}"]`);
         const qty = Math.max(1, parseInt(qtyInput?.value) || 1);
         const ex = retItems.findIndex(i => i.pid === pid);
         if (ex >= 0) retItems[ex].qty = (retItems[ex].qty || 0) + qty;
-        else retItems.push({ id: Date.now() + Math.random(), pid: p.id, name: p.name, code: p.code || '', unit: p.unit || 'قطعة', qty, price: retGetPrice(p), disc: 0, maxQty: null });
-    });
+        else retItems.push({ id: Date.now() + Math.random(), pid: p.id, name: p.name, code: p.code || '', unit: p.unit || 'قطعة', qty, price: await retGetPrice(p), disc: 0, maxQty: null });
+    }
     document.getElementById('retMultiModal')?.remove();
     retRenderItems();
     retUpdateSummary();
@@ -904,7 +953,7 @@ function retOnName(idx, val) {
     if (m.length) {
         ac.innerHTML = m.map((p, i) => `<div class="inv-ac-item" data-i="${i}" onclick="retPickInline(${idx},'${p.id}')" onmouseenter="retRowACHover(${idx},${i})">
             <div><div class="an">${p.name}</div><div class="as">${p.code || ''} · ${p.unit || ''}</div></div>
-            <div class="ap"><div class="pr">${retFmt(retGetPrice(p))}</div><div class="as">مخزون: ${retGetStock(p.id)}</div></div>
+            <div class="ap"><div class="pr">${retFmt(retGetStaticFallbackPrice(p))}</div><div class="as">مخزون: ${retGetStock(p.id)}</div></div>
         </div>`).join('');
         ac.classList.add('show');
     } else ac.classList.remove('show');
@@ -924,10 +973,10 @@ function retRowACHover(idx, i) {
     items.forEach((el, x) => el.classList.toggle('active', x === i));
     items[i]?.scrollIntoView({ block: 'nearest' });
 }
-function retPickInline(idx, pid) {
+async function retPickInline(idx, pid) {
     const p = RET_DB.products.find(x => x.id === pid);
     if (!p) return;
-    retItems[idx] = { id: retItems[idx].id, pid: p.id, name: p.name, code: p.code || '', unit: p.unit || 'قطعة', qty: retItems[idx].qty || 1, price: retGetPrice(p), disc: 0, maxQty: null };
+    retItems[idx] = { id: retItems[idx].id, pid: p.id, name: p.name, code: p.code || '', unit: p.unit || 'قطعة', qty: retItems[idx].qty || 1, price: await retGetPrice(p), disc: 0, maxQty: null };
     retRenderItems();
     retUpdateSummary();
 }
