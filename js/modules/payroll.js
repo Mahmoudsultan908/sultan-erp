@@ -137,6 +137,13 @@ function prlOpenModal(x) {
                 <div class="mod-form-group"><label>أيام العمل بالشهر</label>
                     <input type="number" id="prlWorkDays" class="mod-form-input" value="${x?.work_days_per_month ?? 30}" min="1" max="31" step="1">
                     <div style="font-size:11px;color:var(--inv-muted-light);margin-top:3px">بيتحسب منها سعر يوم الغياب = الراتب الأساسي ÷ أيام العمل</div></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="mod-form-group"><label>موعد دوام مخصص (اختياري)</label>
+                        <input type="time" id="prlShiftStart" class="mod-form-input" value="${x?.shift_start_time ? String(x.shift_start_time).slice(0,5) : ''}"></div>
+                    <div class="mod-form-group"><label>فترة سماح مخصصة بالدقايق (اختياري)</label>
+                        <input type="number" id="prlGraceMinutes" class="mod-form-input" min="0" step="1" value="${x?.grace_minutes ?? ''}"></div>
+                </div>
+                <div style="font-size:11px;color:var(--inv-muted-light);margin:-6px 0 6px">لو سيبتهم فاضيين، هيتطبّق عليه موعد الدوام العام من شاشة "الحضور والانصراف"</div>
                 <div class="mod-form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                     <input type="checkbox" id="prlIsActive" ${x?.is_active !== false ? 'checked' : ''}> نشط
                 </label></div>
@@ -167,6 +174,8 @@ window.prlSave = async function () {
         is_active: document.getElementById('prlIsActive').checked,
         notes: document.getElementById('prlNotes').value.trim() || null,
         work_days_per_month: parseInt(document.getElementById('prlWorkDays').value, 10) || 30,
+        shift_start_time: document.getElementById('prlShiftStart').value || null,
+        grace_minutes: document.getElementById('prlGraceMinutes').value !== '' ? parseInt(document.getElementById('prlGraceMinutes').value, 10) : null,
     };
 
     const btn = document.querySelector('#prlModal .mod-btn-primary');
