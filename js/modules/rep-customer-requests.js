@@ -56,16 +56,20 @@ function rcrRenderPage(c) {
     <div class="mod-table-wrap">
         <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📋 آخر الطلبات المراجَعة</div>
         <table class="mod-table"><thead><tr>
-            <th style="width:70px">النوع</th><th>المندوب</th><th>الاسم المقترح</th><th>التليفون</th><th>الحالة</th><th>التاريخ</th>
+            <th style="width:70px">النوع</th><th>المندوب</th><th>الاسم المقترح</th><th style="width:130px">التليفون</th><th>المجموعة</th><th>الحالة</th><th>التاريخ</th>
         </tr></thead><tbody>
-            ${reviewed.map(r => `<tr>
+            ${reviewed.map(r => {
+                const grp = RCR_GROUPS.find(g => g.id === r.customer?.group_id);
+                return `<tr>
                 <td>${r.request_type==='new'?'🆕 جديد':'✏️ تعديل'}</td>
                 <td>${r.source==='sultano' ? '🌐 سلطانو' : '🚗 '+(r.rep?.name||'—')}</td>
                 <td>${r.proposed_name||'—'}</td>
-                <td dir="ltr" style="color:var(--inv-muted)">${r.proposed_phone||'—'}</td>
+                <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${r.proposed_phone||'—'}</span></td>
+                <td style="color:var(--inv-muted);font-size:12px">${grp ? grp.name + (grp.price_levels?.name ? ' — ' + grp.price_levels.name : '') : '—'}</td>
                 <td>${r.status==='approved'?'<span style="color:var(--inv-green);font-weight:700">✅ معتمد</span>':'<span style="color:var(--inv-red);font-weight:700">❌ مرفوض</span>'}</td>
                 <td style="color:var(--inv-muted)">${r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'—'}</td>
-            </tr>`).join('')}
+            </tr>`;
+            }).join('')}
         </tbody></table>
     </div>` : ''}`;
 }
