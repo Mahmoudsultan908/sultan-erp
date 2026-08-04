@@ -91,7 +91,7 @@ function corRenderOrdersPage(c) {
     <div class="mod-table-wrap" style="margin-bottom:20px">
         <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">⏳ طلبات في انتظار المراجعة (${pending.length})</div>
         <table class="mod-table"><thead><tr>
-            <th>رقم الطلب</th><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>ملاحظات</th><th>التاريخ</th><th style="width:190px"></th>
+            <th>رقم الطلب</th><th>العميل</th><th>التليفون</th><th style="width:80px">عدد الأصناف</th><th>الإجمالي</th><th>ملاحظات</th><th>التاريخ</th><th style="width:230px"></th>
         </tr></thead>
         <tbody>${pending.map(corRowHTML).join('')}</tbody></table>
     </div>` : `<div class="empty-state" style="margin-bottom:20px"><span>✅</span>مفيش طلبات سلطانو معلّقة دلوقتي</div>`}
@@ -100,18 +100,22 @@ function corRenderOrdersPage(c) {
     <div class="mod-table-wrap">
         <div style="padding:14px 18px 0;font-weight:800;font-size:14px;color:var(--inv-navy)">📋 آخر الطلبات المراجَعة</div>
         <table class="mod-table"><thead><tr>
-            <th>رقم الطلب</th><th>العميل</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th>
+            <th>رقم الطلب</th><th>العميل</th><th>التليفون</th><th style="width:80px">عدد الأصناف</th><th>الإجمالي</th><th>ملاحظات</th><th>الحالة</th><th>التاريخ</th><th style="width:60px"></th>
         </tr></thead><tbody>
             ${reviewed.map(o => `<tr>
                 <td>${o.order_no || '—'}</td>
                 <td>${o.customers?.name || '—'}</td>
+                <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${o.customers?.phone || '—'}</span></td>
+                <td style="text-align:center">${(o.customer_order_items || []).length}</td>
                 <td>${corFmt(o.total)}</td>
+                <td style="font-size:12px;color:var(--inv-muted)">${o.notes || '—'}</td>
                 <td>${o.converted_sale_id ? `
                     <select class="mod-form-input" style="margin:0;padding:4px 8px;font-size:12px;width:auto" onchange="corUpdateDeliveryStatus('${o.id}',this.value)">
                         ${['preparing','delivering','delivered'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${COR_STATUS_LABELS[s]}</option>`).join('')}
                     </select>
                 ` : '<span style="color:var(--inv-red);font-weight:700">❌ مرفوض</span>'}</td>
                 <td style="color:var(--inv-muted)">${o.created_at ? new Date(o.created_at).toLocaleDateString('ar-EG') : '—'}</td>
+                <td style="text-align:center"><button class="cc-edit" onclick="corShowOrderDetail('${o.id}')">👁️ عرض</button></td>
             </tr>`).join('')}
         </tbody></table>
     </div>` : ''}`;
@@ -119,21 +123,58 @@ function corRenderOrdersPage(c) {
 
 function corRowHTML(o) {
     const items = o.customer_order_items || [];
-    const itemsSummary = items.map(it => `${it.products?.name || '—'} × ${corFmt(it.qty)}`).join('، ');
     return `<tr data-cor-id="${o.id}">
         <td>${o.order_no || '—'}</td>
-        <td>${o.customers?.name || '—'}<div style="font-size:11px;color:var(--inv-muted)" dir="ltr">${o.customers?.phone || ''}</div></td>
-        <td style="font-size:12px;max-width:260px">${itemsSummary || '—'}</td>
+        <td>${o.customers?.name || '—'}</td>
+        <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${o.customers?.phone || '—'}</span></td>
+        <td style="text-align:center">${items.length}</td>
         <td>${corFmt(o.total)}</td>
         <td style="font-size:12px;color:var(--inv-muted)">${o.notes || '—'}</td>
         <td style="color:var(--inv-muted)">${o.created_at ? new Date(o.created_at).toLocaleString('ar-EG') : '—'}</td>
         <td style="white-space:nowrap">
+            <button class="cc-edit" onclick="corShowOrderDetail('${o.id}')">👁️ عرض</button>
             <button class="cc-edit" style="background:#DCFCE7;color:#166534" onclick="corApproveOrder('${o.id}')">✅ اعتماد/مراجعة</button>
             <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red);margin-right:4px" onclick="corRejectOrder('${o.id}')">❌ رفض</button>
             <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold);margin-right:4px" title="إرسال إشعار لهذا العميل" onclick="corQuickNotify('${o.customer_id}', '${(o.customers?.name || '').replace(/'/g, "\\'")}')">🔔</button>
         </td>
     </tr>`;
 }
+
+window.corShowOrderDetail = function (id) {
+    const o = COR_ORDERS.find(x => x.id === id);
+    if (!o) return;
+    const items = o.customer_order_items || [];
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'corDetailModal';
+    modal.innerHTML = `
+    <div class="mod-modal" style="max-width:560px">
+        <div class="mod-modal-header"><h3>📦 تفاصيل الطلب ${o.order_no || ''}</h3>
+            <button class="mod-modal-close" onclick="document.getElementById('corDetailModal').remove()">&times;</button></div>
+        <div class="mod-modal-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:14px">
+                <div>العميل: <strong>${o.customers?.name || '—'}</strong></div>
+                <div>التليفون: <strong dir="ltr">${o.customers?.phone || '—'}</strong></div>
+                <div style="grid-column:1/-1">العنوان: <strong>${o.customers?.address || '—'}</strong></div>
+                <div style="grid-column:1/-1">التاريخ: <strong>${o.created_at ? new Date(o.created_at).toLocaleString('ar-EG') : '—'}</strong></div>
+                ${o.notes ? `<div style="grid-column:1/-1">ملاحظات: <strong>${o.notes}</strong></div>` : ''}
+            </div>
+            <table class="mod-table"><thead><tr>
+                <th>الصنف</th><th style="width:70px">الوحدة</th><th style="width:70px">الكمية</th><th style="width:90px">السعر</th><th style="width:100px">الإجمالي</th>
+            </tr></thead><tbody>
+                ${items.map(it => `<tr>
+                    <td>${it.products?.name || '—'} <small style="color:var(--inv-muted-light)">${it.products?.code || ''}</small></td>
+                    <td style="text-align:center;color:var(--inv-muted)">${it.products?.unit || '—'}</td>
+                    <td style="text-align:center">${corFmt(it.qty)}</td>
+                    <td>${corFmt(it.unit_price)}</td>
+                    <td style="font-weight:700">${corFmt((Number(it.qty)||0) * (Number(it.unit_price)||0))}</td>
+                </tr>`).join('') || `<tr><td colspan="5" class="empty-state" style="padding:16px"><span>📭</span>الطلب ده مالوش أصناف</td></tr>`}
+            </tbody></table>
+            <div style="text-align:left;font-weight:800;font-size:15px;margin-top:12px">الإجمالي: ${corFmt(o.total)} ج.م</div>
+        </div>
+    </div>`;
+    document.body.appendChild(modal);
+};
 
 window.corApproveOrder = function (id) {
     const o = COR_ORDERS.find(x => x.id === id);
