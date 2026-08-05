@@ -15,8 +15,9 @@
    من الأول، فمفيش أي تعديل تاني مطلوب في الراوتر أو القائمة الجانبية)
    ════════════════════════════════════════════════════════════ */
 
-let _corTab = 'orders'; // 'orders' | 'registrations' | 'banners' | 'notifications'
+let _corTab = 'orders'; // 'orders' | 'registrations' | 'banners' | 'notifications' | 'carts'
 let COR_NOTIFY_CUSTOMERS = []; // عملاء مفعّلين الإشعارات فعلياً (لهم push_subscriptions)
+let COR_CARTS = [];
 let COR_ORDERS = [];
 let COR_BANNERS = [];
 let COR_CATS = [];
@@ -48,6 +49,7 @@ async function renderCustomerOrdersLink(c) {
         <button class="mod-btn ${_corTab==='registrations'?'mod-btn-primary':''}" onclick="corSwitchTab('registrations')">👤 تسجيل عملاء سلطانو</button>
         <button class="mod-btn ${_corTab==='banners'?'mod-btn-primary':''}" onclick="corSwitchTab('banners')">🖼️ بانرات سلطانو</button>
         <button class="mod-btn ${_corTab==='notifications'?'mod-btn-primary':''}" onclick="corSwitchTab('notifications')">🔔 إرسال إشعار</button>
+        <button class="mod-btn ${_corTab==='carts'?'mod-btn-primary':''}" onclick="corSwitchTab('carts')">🛒 سلال حالية</button>
     </div>
     <div id="corBody"></div>`;
     await corRenderTab();
@@ -59,6 +61,7 @@ async function corRenderTab() {
     if (_corTab === 'orders') await corRenderOrders(body);
     else if (_corTab === 'banners') await corRenderBanners(body);
     else if (_corTab === 'notifications') await corRenderNotifications(body);
+    else if (_corTab === 'carts') await corRenderCarts(body);
     else await renderRepCustomerRequests(body);
 }
 
@@ -471,7 +474,113 @@ window.corSendNotification = async function() {
 };
 
 // ════════════════════════════════════════════════════════════
-// إشعار "طلب/عميل جديد من سلطانو" جنب تبويب "🔗 طلبات العملاء" فى
+// سلال العملاء الحيّة في سلطانو (customer_carts) — نسخة مباشرة بتتحدّث
+// من تطبيق سلطانو كل ما العميل يغيّر سلته. الهدف: لو عميل تعطّل معاه
+// إرسال الطلب (مشكلة نت غالباً)، الأدمن يشوف بالظبط اللي في سلته
+// ويكمّلها من عنده — نفس آلية تحويل عرض السعر (_pendingQuoteConversion)
+// اللي corApproveOrder بتستخدمها بالظبط.
+// ════════════════════════════════════════════════════════════
+async function corRenderCarts(c) {
+    c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل السلال الحالية...</div>';
+    try {
+        const { data, error } = await sb.from('customer_carts')
+            .select('*, customers(name,phone)')
+            .order('updated_at', { ascending: false });
+        if (error) throw error;
+        COR_CARTS = data || [];
+        corRenderCartsPage(c);
+    } catch (err) {
+        c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
+    }
+}
+
+function corRenderCartsPage(c) {
+    if (!COR_CARTS.length) {
+        c.innerHTML = '<div class="empty-state"><span>🛒</span>مفيش عملاء حاطّين حاجة في سلتهم دلوقتي</div>';
+        return;
+    }
+    c.innerHTML = `
+    <div style="font-size:13px;color:var(--inv-muted);margin-bottom:14px">سلة كل عميل بتتحدّث تلقائي من سلطانو أول ما يضيف/يشيل صنف — لو حد اتعطّل معاه إرسال الطلب، اضغط "✅ إكمال الطلب" وكمّلها من هنا.</div>
+    <div class="mod-table-wrap">
+        <table class="mod-table"><thead><tr>
+            <th>العميل</th><th>التليفون</th><th style="width:80px">عدد الأصناف</th><th>الإجمالي</th><th>آخر تحديث</th><th style="width:220px"></th>
+        </tr></thead><tbody>
+            ${COR_CARTS.map(cart => {
+                const items = cart.items || [];
+                const total = items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.price)||0), 0);
+                const minsAgo = Math.max(0, Math.round((Date.now() - new Date(cart.updated_at).getTime()) / 60000));
+                return `<tr>
+                    <td>${cart.customers?.name || '—'}</td>
+                    <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${cart.customers?.phone || '—'}</span></td>
+                    <td style="text-align:center">${items.length}</td>
+                    <td>${corFmt(total)}</td>
+                    <td style="color:var(--inv-muted)">${minsAgo < 60 ? `من ${minsAgo} دقيقة` : new Date(cart.updated_at).toLocaleString('ar-EG')}</td>
+                    <td style="white-space:nowrap">
+                        <button class="cc-edit" onclick="corShowCartDetail('${cart.customer_id}')">👁️ عرض</button>
+                        <button class="cc-edit" style="background:#DCFCE7;color:#166534;margin-right:4px" onclick="corCompleteCart('${cart.customer_id}')">✅ إكمال الطلب</button>
+                    </td>
+                </tr>`;
+            }).join('')}
+        </tbody></table>
+    </div>`;
+}
+
+function corShowCartDetail(customerId) {
+    const cart = COR_CARTS.find(x => x.customer_id === customerId);
+    if (!cart) return;
+    const items = cart.items || [];
+    const total = items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.price)||0), 0);
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'corCartModal';
+    modal.innerHTML = `
+    <div class="mod-modal" style="max-width:520px">
+        <div class="mod-modal-header"><h3>🛒 سلة ${cart.customers?.name || ''}</h3>
+            <button class="mod-modal-close" onclick="document.getElementById('corCartModal').remove()">&times;</button></div>
+        <div class="mod-modal-body">
+            <table class="mod-table"><thead><tr>
+                <th>الصنف</th><th style="width:70px">الوحدة</th><th style="width:70px">الكمية</th><th style="width:90px">السعر</th><th style="width:100px">الإجمالي</th>
+            </tr></thead><tbody>
+                ${items.map(it => `<tr>
+                    <td>${it.name || '—'}</td>
+                    <td style="text-align:center;color:var(--inv-muted)">${it.unit || '—'}</td>
+                    <td style="text-align:center">${corFmt(it.qty)}</td>
+                    <td>${corFmt(it.price)}</td>
+                    <td style="font-weight:700">${corFmt((Number(it.qty)||0)*(Number(it.price)||0))}</td>
+                </tr>`).join('') || `<tr><td colspan="5" class="empty-state" style="padding:16px"><span>📭</span>السلة فاضية</td></tr>`}
+            </tbody></table>
+            <div style="text-align:left;font-weight:800;font-size:15px;margin-top:12px">الإجمالي: ${corFmt(total)} ج.م</div>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('corCartModal').remove()">إغلاق</button>
+            <button class="mod-btn mod-btn-primary" onclick="document.getElementById('corCartModal').remove();corCompleteCart('${customerId}')">✅ إكمال الطلب</button>
+        </div>
+    </div>`;
+    document.body.appendChild(modal);
+}
+window.corShowCartDetail = corShowCartDetail;
+
+window.corCompleteCart = async function (customerId) {
+    const cart = COR_CARTS.find(x => x.customer_id === customerId);
+    if (!cart) return;
+    const items = cart.items || [];
+    if (!items.length) { alert('⚠️ السلة دي فاضية'); return; }
+    // ★ نمسح السلة من سلطان دلوقتي عشان الشاشة هنا متفضلش وارية "معلّقة" —
+    //   ملحوظة: سلة العميل نفسها على موبايله مش هتتمسح تلقائياً (البرنامج
+    //   عندنا معندوش وسيلة يبعتله تحديث فوري)، فلو دخل سلطانو تاني هيلاقيها
+    //   لسه فيها نفس الأصناف — طبيعي، مش خطر تكرار حقيقي، بس بلاش تتفاجئ.
+    try { await sb.rpc('fn_sultano_clear_cart', { p_customer_id: customerId }); } catch {}
+    window._pendingQuoteConversion = {
+        kind: 'cart',
+        customerId,
+        items: items.map(it => ({
+            pid: it.product_id, name: it.name || '', code: '',
+            qty: Number(it.qty) || 0, price: Number(it.price) || 0, disc: 0, free: 0,
+            unit: it.unit || '', stock: 0,
+        })),
+    };
+    loadMod(document.querySelector('[data-mod="sales"]'), 'sales');
+};
 // القائمة الجانبية — بند 8، تقرير 2026-07-21. نفس فكرة repLinkBadge
 // (rep-management.js) بالظبط: عداد واحد بيجمع الطلبات الجديدة +
 // طلبات تسجيل عملاء سلطانو المعلّقة من بعد آخر مرة فتحت الصفحة دي،
