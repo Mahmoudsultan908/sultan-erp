@@ -421,7 +421,8 @@ function purRenderItems() {
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.price||0}" min="0" step="0.01"
-                    oninput="purItems[${idx}].price=parseFloat(this.value)||0;purUpdateRowTotal(${idx});purUpdateSummary()" onkeydown="purRowKey(event,${idx},'price')">
+                    oninput="purItems[${idx}].price=parseFloat(this.value)||0;purUpdateRowTotal(${idx});purUpdateSummary()"
+                    onchange="purCheckPriceChange(${idx})" onkeydown="purRowKey(event,${idx},'price')">
             </td>
             <td>
                 <input type="number" class="inv-cell-input is-num" value="${it.disc||0}" min="0" max="100" step="0.1"
@@ -463,6 +464,67 @@ function purUpdateRowTotal(idx) {
     if (!el) return;
     const lineTotal = (it.qty||0) * (it.price||0) * (1 - (it.disc||0)/100);
     el.innerHTML = purFmt(lineTotal);
+}
+
+// لما المستخدم يخرج من خانة سعر الشراء (سواء فاتورة جديدة أو وضع تعديل) وكان
+// السعر اللي كتبه مختلف عن سعر الشراء المسجّل حالياً في بيانات الصنف، بنسأله
+// فوراً: يحدّث سعر الصنف بشكل دائم، ولا التغيير ده خاص بالفاتورة دي بس؟
+// it._priceAskedFor بيمنع تكرار نفس السؤال لو خرج ودخل الخانة من غير ما يغيّر
+// القيمة تاني.
+function purCheckPriceChange(idx) {
+    const it = purItems[idx];
+    if (!it || !it.pid) return;
+    const prod = PUR_DB.products.find(p => p.id === it.pid);
+    if (!prod) return;
+    const newPrice = Number(it.price) || 0;
+    const masterPrice = Number(prod.purchase_price) || 0;
+    if (newPrice <= 0 || newPrice === masterPrice) return;
+    if (it._priceAskedFor === newPrice) return;
+    it._priceAskedFor = newPrice;
+    purShowPriceConfirmModal(idx, prod, newPrice, masterPrice);
+}
+
+function purShowPriceConfirmModal(idx, prod, newPrice, masterPrice) {
+    document.getElementById('purPriceConfirmModal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'purPriceConfirmModal';
+    m.className = 'mod-modal-bg active';
+    m.innerHTML = `
+    <div class="mod-modal" style="max-width:420px">
+        <div class="mod-modal-header"><h3>💰 تغيير سعر شراء الصنف</h3></div>
+        <div class="mod-modal-body">
+            <p style="margin:0 0 12px;line-height:1.7">
+                سعر شراء <strong>${prod.name}</strong> في الفاتورة دي
+                (<strong style="color:var(--inv-green)">${purFmt(newPrice)} ج.م</strong>)
+                مختلف عن السعر المسجّل حالياً في بيانات الصنف
+                (<strong>${purFmt(masterPrice)} ج.م</strong>).
+            </p>
+            <p style="margin:0;color:var(--inv-muted);font-size:13px">
+                تحب تحدّث سعر شراء الصنف بشكل دائم في بيانات الصنف، ولا التغيير ده يفضل خاص بالفاتورة دي بس؟
+            </p>
+        </div>
+        <div class="mod-modal-footer">
+            <button class="inv-btn inv-btn-print" onclick="purResolvePriceConfirm(${idx}, false)">📄 هذه الفاتورة فقط</button>
+            <button class="inv-btn inv-btn-save" onclick="purResolvePriceConfirm(${idx}, true)" style="background:linear-gradient(135deg,#16A34A,#22C55E)">🔄 تحديث دائم</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+}
+
+async function purResolvePriceConfirm(idx, updateMaster) {
+    document.getElementById('purPriceConfirmModal')?.remove();
+    if (!updateMaster) return;
+    const it = purItems[idx];
+    if (!it || !it.pid) return;
+    const newPrice = Number(it.price) || 0;
+    try {
+        await sb.from('products').update({ purchase_price: newPrice }).eq('id', it.pid);
+        const prod = PUR_DB.products.find(p => p.id === it.pid);
+        if (prod) prod.purchase_price = newPrice;
+        purToast('✅ تم تحديث سعر شراء الصنف بشكل دائم', 'success');
+    } catch (err) {
+        purToast('❌ تعذّر تحديث سعر شراء الصنف: ' + err.message, 'error');
+    }
 }
 
 function purCalcNet() {

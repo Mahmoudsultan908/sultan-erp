@@ -77,7 +77,9 @@ function buildLayout() {
         <div class="nav-group" onclick="navToggleGroup(this)"><span class="nav-group-heading"><span class="ng-icon">🧾</span><span class="ng-label">المبيعات والمشتريات</span></span><span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
         <div class="nav-item" data-mod="sales" onclick="loadMod(this, 'sales')">🧾 فاتورة المبيعات</div>
+        <div class="nav-item" data-mod="pos" onclick="loadMod(this, 'pos')">🛒 نقطة بيع سريعة</div>
         <div class="nav-item" data-mod="purchases" onclick="loadMod(this, 'purchases')">📥 فاتورة المشتريات</div>
+        <div class="nav-item" data-mod="purchase-price-bulk" onclick="loadMod(this, 'purchase-price-bulk')">💲 تعديل الأسعار الجماعية</div>
         <div class="nav-item" data-mod="returns" onclick="loadMod(this, 'returns')">↩️ المرتجعات</div>
         <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">🚗 مندوب سلطان <span id="repLinkBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء <span id="crmOverdueBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
@@ -428,8 +430,10 @@ const titles = {
         'expenses': 'لوحة تحكم المصروفات',
         'payroll': 'الموظفون والرواتب',
         'sales': 'فاتورة مبيعات جديدة',
+        'pos': 'نقطة بيع سريعة',
         'quotations': 'عروض الأسعار',
         'purchases': 'فاتورة مشتريات جديدة',
+        'purchase-price-bulk': 'تعديل الأسعار الجماعية',
         'purchase-orders': 'أوامر الشراء',
         'purchase-suggestions': 'اقتراح أمر شراء',
         'private-chat': 'محادثة خاصة',
@@ -472,8 +476,10 @@ async function _dispatchRender(modName, c) {
     if (modName === 'expenses' && typeof renderExpenses === 'function') await renderExpenses(c);
     if (modName === 'payroll' && typeof renderPayroll === 'function') await renderPayroll(c);
     if (modName === 'sales' && typeof renderSales === 'function') await renderSales(c);
+    if (modName === 'pos' && typeof renderPos === 'function') await renderPos(c);
     if (modName === 'quotations' && typeof renderQuotations === 'function') await renderQuotations(c);
     if (modName === 'purchases' && typeof renderPurchases === 'function') await renderPurchases(c);
+    if (modName === 'purchase-price-bulk' && typeof renderPurchasePriceBulk === 'function') await renderPurchasePriceBulk(c);
     if (modName === 'purchase-orders' && typeof renderPurchaseOrders === 'function') await renderPurchaseOrders(c);
     if (modName === 'purchase-suggestions' && typeof renderPurchaseSuggestions === 'function') await renderPurchaseSuggestions(c);
     if (modName === 'private-chat' && typeof renderPrivateChat === 'function') await renderPrivateChat(c);
