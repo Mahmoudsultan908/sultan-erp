@@ -93,7 +93,7 @@ async function cdcLoadAndCompute(c) {
     const activitySince = new Date(Date.now() - 400 * 86400000).toISOString();
 
     const [{ data: customers }, { data: saleItems }, { data: creditSales }, { data: payments }, { data: recentSales }, { data: reps }] = await Promise.all([
-        sb.from('customers').select('id,name,code,phone,balance,credit_limit,is_active,debt_locked,primary_rep_id').eq('is_active', true).order('name'),
+        sb.from('customers').select('id,name,code,phone,balance,credit_limit,is_active,debt_locked,primary_rep_id,payment_due_date').eq('is_active', true).order('name'),
         sb.from('sale_items').select('qty,unit_price,line_total,cost_price_snapshot,sales!inner(customer_id,created_at,status)').eq('sales.status', 'confirmed').gte('sales.created_at', since),
         sb.from('sales').select('customer_id,total,due_date,created_at').eq('status', 'confirmed').eq('payment_type', 'credit'),
         sb.from('customer_payments').select('customer_id,amount,discount').eq('status', 'confirmed'),
@@ -112,11 +112,17 @@ async function cdcLoadAndCompute(c) {
         a.cost += qty * (Number(si.cost_price_snapshot) || 0);
     });
 
+    // استحقاق الدفع المحدد يدوي على العميل نفسه (صفحة العملاء) — بديل
+    // للفواتير اللي اتسجلت من غير تاريخ استحقاق خاص بيها، قبل ما نلجأ
+    // لتقدير الـ15 يوم العام
+    const custDueMap = {};
+    (customers || []).forEach(c => { if (c.payment_due_date) custDueMap[c.id] = c.payment_due_date; });
+
     const creditByCust = {}; // customer_id -> [{total, _due}]
     (creditSales || []).forEach(s => {
         if (!s.customer_id) return;
         const list = creditByCust[s.customer_id] || (creditByCust[s.customer_id] = []);
-        list.push({ total: Number(s.total) || 0, _due: s.due_date || cdcEstimateDueDate(s.created_at) });
+        list.push({ total: Number(s.total) || 0, _due: s.due_date || custDueMap[s.customer_id] || cdcEstimateDueDate(s.created_at) });
     });
 
     const paidByCust = {};

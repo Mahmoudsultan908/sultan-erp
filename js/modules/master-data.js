@@ -101,6 +101,7 @@ function custRenderPage(c) {
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
                 <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>التصنيف</th><th>المجموعة</th><th>المندوب</th><th>آخر تفاعل</th>
+                <th title="استحقاق الدفع اللي محدده يدوي على العميل نفسه — بيُستخدم كبديل لو نسيت تحط تاريخ استحقاق في فاتورة معينة">استحقاق الدفع</th>
                 <th style="text-align:left">الحد الائتماني</th><th style="text-align:left">الرصيد</th><th style="text-align:center">إجراءات</th>
             </tr></thead><tbody id="custMgTbody"></tbody></table>
         </div>`;
@@ -118,8 +119,8 @@ function custRenderRows() {
     }
     if (!rows.length) {
         tbody.innerHTML = _mgCustList.length
-            ? `<tr><td colspan="10" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين للبحث/الفلتر الحالي</td></tr>`
-            : `<tr><td colspan="10" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`;
+            ? `<tr><td colspan="11" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين للبحث/الفلتر الحالي</td></tr>`
+            : `<tr><td colspan="11" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`;
         return;
     }
 
@@ -131,6 +132,7 @@ function custRenderRows() {
         const bal = Number(x.balance)||0;
         const srcBadge = typeof custSourceBadge === 'function' ? custSourceBadge(x.source) : '';
         const lastInt = _mgCustLastIntMap[x.id];
+        const dueOverdue = x.payment_due_date && bal > 0 && new Date(x.payment_due_date) < new Date(new Date().toDateString());
         return `<tr>
             <td><strong>${x.name}</strong>${srcBadge ? `<div style="margin-top:2px">${srcBadge}</div>` : ''}</td>
             <td dir="ltr" style="text-align:right">${x.phone||'—'}</td>
@@ -139,6 +141,7 @@ function custRenderRows() {
             <td>${grp?.name||'—'}</td>
             <td>${rep?`🚗 ${rep.name}`:'—'}</td>
             <td style="font-size:12px;color:var(--inv-muted-light)">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
+            <td style="font-size:12px;${dueOverdue?'color:var(--inv-red);font-weight:700':'color:var(--inv-muted-light)'}">${x.payment_due_date ? new Date(x.payment_due_date).toLocaleDateString('ar-EG') : '—'}</td>
             <td style="text-align:left">${x.credit_limit>0?mdFmt(x.credit_limit):'—'}</td>
             <td style="text-align:left;font-weight:700;color:${bal>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(bal)}</td>
             <td style="text-align:center;white-space:nowrap">
@@ -215,6 +218,8 @@ function custOpenModal(x) {
                             <option value="check" ${x?.preferred_payment_method==='check'?'selected':''}>شيك</option>
                         </select></div>
                 </div>
+                <div class="mod-form-group"><label>استحقاق الدفع <small style="color:var(--inv-muted-light);font-weight:400">(بديل لو نسيت تحدد تاريخ استحقاق في فاتورة معينة — بيتاخد بيه القرار في مركز قرار العملاء)</small></label>
+                    <input type="date" id="custPaymentDueDate" class="mod-form-input" value="${x?.payment_due_date||''}"></div>
                 <div style="background:var(--inv-red-bg);border:1px solid #FECACA;border-radius:8px;padding:10px 14px;margin-top:4px">
                     <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--inv-red);cursor:pointer">
                         <input type="checkbox" id="custDebtLocked" ${x?.debt_locked?'checked':''} style="width:17px;height:17px">
@@ -251,6 +256,7 @@ window.custSave = async function() {
         preferred_payment_method: document.getElementById('custPayMethod').value || null,
         default_rep_id: document.getElementById('custDefaultRep')?.value || null,
         debt_locked: !!document.getElementById('custDebtLocked')?.checked,
+        payment_due_date: document.getElementById('custPaymentDueDate').value || null,
     };
 
     const btn = document.querySelector('#custMgModal .mod-btn-primary');
@@ -277,6 +283,16 @@ window.custSave = async function() {
                     if (error) throw error;
                 }
                 console.warn('⚠️ عمود customers.default_rep_id غير موجود بعد — شغّل customers_default_rep_migration.sql.');
+            } else if (/payment_due_date/i.test(err.message||'')) {
+                const { payment_due_date, ...payloadNoDue } = payload;
+                if (_mgCustEditingId) {
+                    const { error } = await sb.from('customers').update(payloadNoDue).eq('id', _mgCustEditingId);
+                    if (error) throw error;
+                } else {
+                    const { error } = await sb.from('customers').insert({ ...payloadNoDue, balance: 0, created_by: currentUser?.id || null });
+                    if (error) throw error;
+                }
+                console.warn('⚠️ عمود customers.payment_due_date غير موجود بعد.');
             } else {
                 throw err;
             }
@@ -341,7 +357,9 @@ function suppRenderPage(c) {
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>المورد</th><th>الهاتف</th><th>الكود</th><th style="text-align:left">المستحق عليه لنا</th><th style="text-align:center">إجراءات</th>
+                <th>المورد</th><th>الهاتف</th><th>الكود</th>
+                <th title="استحقاق الدفع اللي محدده يدوي على المورد نفسه — بيُستخدم كبديل لو نسيت تحط تاريخ استحقاق في فاتورة معينة">استحقاق الدفع</th>
+                <th style="text-align:left">المستحق عليه لنا</th><th style="text-align:center">إجراءات</th>
             </tr></thead><tbody id="suppMgTbody"></tbody></table>
         </div>`;
     suppRenderRows();
@@ -351,18 +369,23 @@ function suppRenderRows() {
     const tbody = document.getElementById('suppMgTbody');
     if (!tbody) return;
     let rows = flexSearch(_mgSuppList, _mgSuppSearch, ['name','phone']);
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><span>🏭</span>لا يوجد موردون بعد — ابدأ بإضافة أول مورد</td></tr>`; return; }
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><span>🏭</span>لا يوجد موردون بعد — ابدأ بإضافة أول مورد</td></tr>`; return; }
 
-    tbody.innerHTML = rows.map(x => `<tr>
+    tbody.innerHTML = rows.map(x => {
+        const bal = Number(x.balance) || 0;
+        const dueOverdue = x.payment_due_date && bal > 0 && new Date(x.payment_due_date) < new Date(new Date().toDateString());
+        return `<tr>
         <td><strong>${x.name}</strong></td>
         <td dir="ltr" style="text-align:right">${x.phone||'—'}</td>
         <td>${x.code||'—'}</td>
-        <td style="text-align:left;font-weight:700;color:${Number(x.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(x.balance)}</td>
+        <td style="font-size:12px;${dueOverdue?'color:var(--inv-red);font-weight:700':'color:var(--inv-muted-light)'}">${x.payment_due_date ? new Date(x.payment_due_date).toLocaleDateString('ar-EG') : '—'}</td>
+        <td style="text-align:left;font-weight:700;color:${bal>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(bal)}</td>
         <td style="text-align:center;white-space:nowrap">
             <button class="cc-edit" onclick="suppOpenEdit('${x.id}')">✏️</button>
             <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="supShowStatement('${x.id}')">📄 كشف حساب</button>
         </td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
 }
 window.suppMgSearch = function(v) { _mgSuppSearch = v; suppRenderRows(); };
 
@@ -388,6 +411,8 @@ function suppOpenModal(x) {
                 </div>
                 <div class="mod-form-group"><label>العنوان</label>
                     <input type="text" id="suppAddress" class="mod-form-input" value="${x?.address||''}"></div>
+                <div class="mod-form-group"><label>استحقاق الدفع <small style="color:var(--inv-muted-light);font-weight:400">(بديل لو نسيت تحدد تاريخ استحقاق في فاتورة شراء معينة — بيتاخد بيه القرار في مركز قرار الموردين)</small></label>
+                    <input type="date" id="suppPaymentDueDate" class="mod-form-input" value="${x?.payment_due_date||''}"></div>
                 ${x ? `<div style="background:#F8FAFC;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--inv-muted);margin-top:6px">
                     💡 المستحق الحالي (${mdFmt(x.balance||0)} ج.م) لا يُعدَّل من هنا — يتغيّر تلقائياً من فواتير الشراء والدفع فقط.
                 </div>` : ''}
@@ -410,17 +435,36 @@ window.suppSave = async function() {
         phone: document.getElementById('suppPhone').value.trim() || null,
         code: document.getElementById('suppCode').value.trim() || null,
         address: document.getElementById('suppAddress').value.trim() || null,
+        payment_due_date: document.getElementById('suppPaymentDueDate').value || null,
     };
 
     const btn = document.querySelector('#suppMgModal .mod-btn-primary');
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
     try {
-        if (_mgSuppEditingId) {
-            const { error } = await sb.from('suppliers').update(payload).eq('id', _mgSuppEditingId);
-            if (error) throw error;
-        } else {
-            const { error } = await sb.from('suppliers').insert({ ...payload, balance: 0, created_by: currentUser?.id || null });
-            if (error) throw error;
+        try {
+            if (_mgSuppEditingId) {
+                const { error } = await sb.from('suppliers').update(payload).eq('id', _mgSuppEditingId);
+                if (error) throw error;
+            } else {
+                const { error } = await sb.from('suppliers').insert({ ...payload, balance: 0, created_by: currentUser?.id || null });
+                if (error) throw error;
+            }
+        } catch (err) {
+            // ★ لو عمود payment_due_date لسه مش موجود، نعيد المحاولة من غيره
+            //   بدل ما نمنع حفظ المورد بالكامل
+            if (/payment_due_date/i.test(err.message||'')) {
+                const { payment_due_date, ...payloadNoDue } = payload;
+                if (_mgSuppEditingId) {
+                    const { error } = await sb.from('suppliers').update(payloadNoDue).eq('id', _mgSuppEditingId);
+                    if (error) throw error;
+                } else {
+                    const { error } = await sb.from('suppliers').insert({ ...payloadNoDue, balance: 0, created_by: currentUser?.id || null });
+                    if (error) throw error;
+                }
+                console.warn('⚠️ عمود suppliers.payment_due_date غير موجود بعد.');
+            } else {
+                throw err;
+            }
         }
         document.getElementById('suppMgModal').remove();
         renderSuppliersManage(document.getElementById('app-content'));

@@ -87,7 +87,7 @@ async function sdcLoadAndCompute(c) {
     const activitySince = new Date(Date.now() - 400 * 86400000).toISOString();
 
     const [{ data: suppliers }, { data: purchaseItems }, { data: creditPurchases }, { data: payments }, { data: recentPurchases }, { data: products }] = await Promise.all([
-        sb.from('suppliers').select('id,name,code,phone,balance,is_active').eq('is_active', true).order('name'),
+        sb.from('suppliers').select('id,name,code,phone,balance,is_active,payment_due_date').eq('is_active', true).order('name'),
         sb.from('purchase_items').select('qty,line_total,purchases!inner(supplier_id,created_at,status)').eq('purchases.status', 'confirmed').gte('purchases.created_at', since),
         sb.from('purchases').select('supplier_id,total,due_date,created_at').eq('status', 'confirmed').eq('payment_type', 'credit'),
         sb.from('supplier_payments').select('supplier_id,amount').eq('status', 'confirmed'),
@@ -102,11 +102,17 @@ async function sdcLoadAndCompute(c) {
         valueAgg[sid] = (valueAgg[sid] || 0) + (Number(pi.line_total) || 0);
     });
 
+    // استحقاق الدفع المحدد يدوي على المورد نفسه (صفحة الموردين) — بديل
+    // لفواتير الشراء اللي اتسجلت من غير تاريخ استحقاق خاص بيها، قبل ما
+    // نلجأ لتقدير الـ15 يوم العام
+    const suppDueMap = {};
+    (suppliers || []).forEach(s => { if (s.payment_due_date) suppDueMap[s.id] = s.payment_due_date; });
+
     const creditBySupp = {}; // supplier_id -> [{total, _due}]
     (creditPurchases || []).forEach(p => {
         if (!p.supplier_id) return;
         const list = creditBySupp[p.supplier_id] || (creditBySupp[p.supplier_id] = []);
-        list.push({ total: Number(p.total) || 0, _due: p.due_date || sdcEstimateDueDate(p.created_at) });
+        list.push({ total: Number(p.total) || 0, _due: p.due_date || suppDueMap[p.supplier_id] || sdcEstimateDueDate(p.created_at) });
     });
 
     const paidBySupp = {};
