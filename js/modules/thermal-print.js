@@ -59,13 +59,38 @@ async function printThermalReceipt(type, data) {
     win.document.write(html);
     win.document.close();
     win.focus();
-    setTimeout(() => {
-        try {
-            const h = win.document.body.scrollHeight || win.document.documentElement.scrollHeight;
-            if (h) win.resizeTo(420, Math.min(h + 150, 2200));
-        } catch {}
-        win.print();
-    }, 400);
+
+    // ★ كان فيه setTimeout(400) ثابت بس قبل ما نقيس الارتفاع ونطبع — على
+    //   أجهزة كاشير أبطأ من جهاز تطوير عادي، شعار الشركة (صورة base64 في
+    //   الهيدر) ممكن يكون لسه بيترندر لحظة الـ400ms، فالارتفاع المقاس
+    //   بيطلع أقصر من الحقيقي، وأي حاجة بعده (زي صندوق الإجماليات في آخر
+    //   الإيصال) بتتقص وقت الطباعة الفعلية. دلوقتي بننتظر كل الصور جوه
+    //   نافذة الطباعة تخلص تحميل فعلاً (أو 1.5 ثانية أقصى حد لكل صورة كسقف
+    //   أمان) قبل ما نقيس ونطبع.
+    const waitForImages = () => {
+        const imgs = Array.from(win.document.images || []);
+        if (!imgs.length) return Promise.resolve();
+        return Promise.all(imgs.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+                img.addEventListener('load', resolve, { once: true });
+                img.addEventListener('error', resolve, { once: true });
+                setTimeout(resolve, 1500);
+            });
+        }));
+    };
+
+    waitForImages().then(() => {
+        // فريمين إضافيين بعد تحميل الصور عشان نضمن إن الـ layout استقر
+        // فعلاً قبل القياس (مش بس إن الصورة "خلصت تحميل" كـ event)
+        win.requestAnimationFrame(() => win.requestAnimationFrame(() => {
+            try {
+                const h = win.document.body.scrollHeight || win.document.documentElement.scrollHeight;
+                if (h) win.resizeTo(420, Math.min(h + 150, 2200));
+            } catch {}
+            win.print();
+        }));
+    });
 }
 
 // ════════════════════════════════════════════════════════════
