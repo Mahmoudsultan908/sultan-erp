@@ -63,6 +63,15 @@ async function renderSettings(container) {
                 <input type="number" id="set-sultano-min-order" class="ob-input" style="max-width:250px" value="${get('sultanoo_min_order_amount','0')}" min="0" step="10">
                 <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">لو منطقة العميل ليها حد أدنى خاص بيها (من شاشة "إدارة المناطق")، بيتطبّق هو بدل الحد العام ده.</p>
                 <p style="font-size:12px;color:var(--inv-muted-light);margin-top:14px">الحد الأقصى لكمية أي صنف في الطلب = رصيد المخزون المتاح منه تلقائياً، إلا لو الصنف ليه حد أقصى خاص (من شاشة الأصناف) فبيتطبّق هو بدل رصيد المخزون.</p>
+
+                <label class="ob-label" style="display:flex;align-items:center;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--inv-divider)">
+                    <input type="checkbox" id="set-loyalty-enabled" ${get('sultanoo_loyalty_enabled','false')===true||get('sultanoo_loyalty_enabled')==='true' ? 'checked':''} style="width:auto">
+                    🎁 تفعيل نظام نقاط الولاء
+                </label>
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">لو متفعّل، العميل بيكسب نقاط تلقائيًا لما طلبه يوصل "تم التسليم"، وبيشوف رصيده في تطبيق سلطانو. الاستبدال يدوي حاليًا (من شاشة العميل).</p>
+                <label class="ob-label" style="margin-top:14px">نقطة لكل كام جنيه</label>
+                <input type="number" id="set-loyalty-rate" class="ob-input" style="max-width:250px" value="${get('sultanoo_loyalty_points_per_egp','0.1')}" min="0" step="0.01">
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">مثلاً 0.1 = نقطة واحدة لكل 10 ج.م. تقدر تغيّرها في أي وقت من غير ما يتأثر رصيد النقاط اللي اتكسبت قبل كده.</p>
             </div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
@@ -90,6 +99,8 @@ async function renderSettings(container) {
                 { key: 'daily_sales_target', value: document.getElementById('set-daily-sales-target').value },
                 { key: 'monthly_target_profit_margin', value: document.getElementById('set-monthly-target-margin').value },
                 { key: 'sultanoo_min_order_amount', value: document.getElementById('set-sultano-min-order').value },
+                { key: 'sultanoo_loyalty_enabled', value: document.getElementById('set-loyalty-enabled').checked },
+                { key: 'sultanoo_loyalty_points_per_egp', value: document.getElementById('set-loyalty-rate').value },
             ];
             try {
                 for (const e of entries) {
@@ -134,7 +145,7 @@ const SETT_BACKUP_TABLES = [
     'treasuries','treasury_transfers','balance_transfers','employees','employee_evaluations',
     'archive_documents','customer_interactions','role_permissions','van_stock','employee_incentives',
     'customer_orders','customer_order_items','banners','attendance_records',
-    'system_settings','app_settings',
+    'system_settings','app_settings','loyalty_points_ledger',
 ];
 
 window.settBackupNow = async () => {

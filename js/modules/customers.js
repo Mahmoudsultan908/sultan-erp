@@ -42,6 +42,7 @@ window.custShowStatement = async function(customerId) {
             <div class="mod-modal-header"><h3>📄 كشف حساب — ${cust.name}</h3>
                 <div style="display:flex;align-items:center;gap:10px">
                     <button class="cc-edit" style="background:${custThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold)" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
+                    <button class="cc-edit" onclick="custRedeemLoyalty('${cust.id}', ${Number(cust.loyalty_points_balance) || 0})">🎁 نقاط: ${Number(cust.loyalty_points_balance) || 0}</button>
                     <button class="mod-modal-close" onclick="custCloseModal('custStmtModal')">&times;</button>
                 </div></div>
             <div class="mod-modal-body" id="custStmtBody">
@@ -500,6 +501,31 @@ window.custGoEditProfile = function(customerId) {
     window._pendingCustHubTab = 'manage';
     custCloseModal('custStmtModal');
     document.querySelector('[data-mod="customers-hub"]')?.click();
+};
+
+// استبدال يدوي لنقاط الولاء (V1 — مفيش خصم أوتوماتيكي على الفاتورة لسه،
+// العميل بيطلب الاستبدال واتساب والأونر/الموظف بيسجّله هنا). بيستخدم
+// fn_loyalty_redeem_points من loyalty_points_migration.sql — الدالة
+// بتسجّل سطر سالب فى loyalty_points_ledger وتنقص customers.loyalty_points_balance
+window.custRedeemLoyalty = async function(customerId, currentBalance) {
+    if (currentBalance <= 0) { alert('العميل ده مفيش عنده نقاط لسه'); return; }
+    const input = prompt(`رصيد النقاط الحالي: ${currentBalance}\nعدد النقاط اللي هتتستبدل دلوقتي؟`, '');
+    if (!input) return;
+    const points = Number(input);
+    if (!points || points <= 0) { alert('❌ عدد نقاط غير صالح'); return; }
+    if (points > currentBalance) { alert('❌ العدد أكبر من رصيد العميل الحالي'); return; }
+    const reason = prompt('سبب الاستبدال (اختياري):', '') || 'استبدال يدوي';
+    try {
+        const { error } = await sb.rpc('fn_loyalty_redeem_points', {
+            p_customer_id: customerId, p_points: points, p_reason: reason,
+        });
+        if (error) throw error;
+        alert('✅ تم الاستبدال بنجاح');
+        custCloseModal('custStmtModal');
+        custShowStatement(customerId);
+    } catch (err) {
+        alert('❌ خطأ فى الاستبدال: ' + err.message);
+    }
 };
 
 // أيقونة الانتقال المباشر جنب كل حركة فى الكشف — بتاخد نفس فكرة
