@@ -24,15 +24,17 @@ function vlToday() { return new Date().toISOString().split('T')[0]; }
 async function renderVanStockLoad(container) {
     container.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل بيانات المخازن والمندوبين...</div>';
     try {
-        const [{ data: warehouses }, { data: products }, { data: stock }, { data: reps }] = await Promise.all([
+        const [{ data: warehouses }, { data: products }, { data: stock }, { data: reps }, { data: companies }] = await Promise.all([
             sb.from('warehouses').select('*').order('name'),
-            sb.from('products').select('id,name,code,unit').eq('is_active', true).order('name'),
+            sb.from('products').select('id,name,code,unit,company_id').eq('is_active', true).order('name'),
             sb.from('inventory_stock').select('warehouse_id,product_id,qty'),
             sb.from('sales_reps').select('id,name,phone').eq('is_active', true).order('name'),
+            sb.from('product_companies').select('*').order('name'),
         ]);
         VL_DB.warehouses = warehouses || [];
         VL_DB.products = products || [];
         VL_DB.reps = reps || [];
+        VL_DB.companies = companies || [];
         VL_DB.stockMap = {};
         (stock || []).forEach(r => { VL_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0; });
 
@@ -309,6 +311,7 @@ function vlAddSuggested() {
 // اختيار أصناف متعددة (بحث + تحديد) — نفس نمط invOpenMultiPick فى sales.js
 // ════════════════════════════════════════════════════════════
 let _vlMultiHideZero = true;
+let _vlMultiCompanyFilter = '';
 function vlOpenMultiPick() {
     if (!vlWarehouseId) { alert('اختر المخزن أولاً'); return; }
     document.getElementById('vlMultiModal')?.remove();
@@ -321,6 +324,11 @@ function vlOpenMultiPick() {
             <button class="mod-modal-close" onclick="vlCloseMultiPick()">✕</button></div>
         <div class="mod-modal-body">
             <input type="text" class="mod-form-input" id="vlMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="vlRenderMultiPickList(this.value)">
+            ${(VL_DB.companies||[]).length ? `
+            <select class="mod-form-input" id="vlMultiCompanyFilter" style="margin-top:9px" onchange="vlMultiFilterByCompany(this.value)">
+                <option value="">كل الشركات</option>
+                ${VL_DB.companies.map(co => `<option value="${co.id}" ${_vlMultiCompanyFilter===co.id?'selected':''}>${co.name}</option>`).join('')}
+            </select>` : ''}
             <label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:var(--inv-text-soft);cursor:pointer">
                 <input type="checkbox" id="vlMultiHideZero" ${_vlMultiHideZero ? 'checked' : ''} onchange="vlMultiToggleHideZero(this.checked)">
                 إخفاء الأصناف بدون رصيد بالمخزن
@@ -334,6 +342,7 @@ function vlOpenMultiPick() {
     </div>`;
     document.body.appendChild(m);
     _vlMultiSelected = {};
+    _vlMultiCompanyFilter = '';
     vlRenderMultiPickList('');
     setTimeout(() => document.getElementById('vlMultiSearch')?.focus(), 50);
 }
@@ -345,10 +354,15 @@ function vlMultiToggleHideZero(checked) {
     _vlMultiHideZero = checked;
     vlRenderMultiPickList(document.getElementById('vlMultiSearch')?.value || '');
 }
+function vlMultiFilterByCompany(companyId) {
+    _vlMultiCompanyFilter = companyId || '';
+    vlRenderMultiPickList(document.getElementById('vlMultiSearch')?.value || '');
+}
 function vlRenderMultiPickList(val) {
     const box = document.getElementById('vlMultiPickList');
     if (!box) return;
     let list = flexSearch(VL_DB.products, val, ['name','code']);
+    if (_vlMultiCompanyFilter) list = list.filter(p => p.company_id === _vlMultiCompanyFilter);
     if (_vlMultiHideZero) list = list.filter(p => vlGetStock(p.id) > 0);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--inv-muted-light)">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {

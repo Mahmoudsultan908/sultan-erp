@@ -52,6 +52,7 @@ async function purLoadData() {
         { data: lastPur },
         { data: counterRow },
         { data: treasuries },
+        { data: companies },
     ] = await Promise.all([
         sb.from('products').select('*').eq('is_active', true).order('name'),
         sb.from('suppliers').select('*').eq('is_active', true).order('name'),
@@ -60,12 +61,14 @@ async function purLoadData() {
         sb.from('purchases').select('invoice_no').order('created_at', { ascending: false }).limit(1),
         sb.from('app_settings').select('value').eq('key', 'purchase_counter').maybeSingle(),
         sb.from('treasuries').select('*').eq('is_active', true).order('is_default', { ascending: false }),
+        sb.from('product_companies').select('*').order('name'),
     ]);
 
     PUR_DB.products = products || [];
     PUR_DB.suppliers = suppliers || [];
     PUR_DB.warehouses = warehouses || [];
     PUR_DB.treasuries = treasuries || [];
+    PUR_DB.companies = companies || [];
     PUR_DB.stockMap = {};
     (stockRows || []).forEach(r => { PUR_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0; });
 
@@ -772,6 +775,7 @@ function purOnCode(idx, val) {
 //   في ملفات تانية (زي returns.js) ولا مع invOpenMultiPick في sales.js،
 //   بنفس منطق purGetBuyPrice المستخدم في باقي الفاتورة.
 let _purMultiSelected = {}; // { productId: qty }
+let _purMultiCompanyFilter = '';
 function purOpenMultiPick() {
     document.getElementById('purMultiModal')?.remove();
     const m = document.createElement('div');
@@ -783,6 +787,11 @@ function purOpenMultiPick() {
             <button class="mod-modal-close" onclick="purCloseMultiPick()">✕</button></div>
         <div class="mod-modal-body">
             <input type="text" class="mod-form-input" id="purMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="purRenderMultiPickList(this.value)">
+            ${(PUR_DB.companies||[]).length ? `
+            <select class="mod-form-input" id="purMultiCompanyFilter" style="margin-top:9px" onchange="purMultiFilterByCompany(this.value)">
+                <option value="">كل الشركات</option>
+                ${PUR_DB.companies.map(co => `<option value="${co.id}" ${_purMultiCompanyFilter===co.id?'selected':''}>${co.name}</option>`).join('')}
+            </select>` : ''}
             <div id="purMultiPickList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
         </div>
         <div class="mod-modal-footer">
@@ -792,6 +801,7 @@ function purOpenMultiPick() {
     </div>`;
     document.body.appendChild(m);
     _purMultiSelected = {};
+    _purMultiCompanyFilter = '';
     purRenderMultiPickList('');
     setTimeout(()=>document.getElementById('purMultiSearch')?.focus(), 50);
 }
@@ -799,10 +809,15 @@ function purCloseMultiPick() {
     document.getElementById('purMultiModal')?.remove();
     _purMultiSelected = {};
 }
+function purMultiFilterByCompany(companyId) {
+    _purMultiCompanyFilter = companyId || '';
+    purRenderMultiPickList(document.getElementById('purMultiSearch')?.value || '');
+}
 function purRenderMultiPickList(val) {
     const box = document.getElementById('purMultiPickList');
     if (!box) return;
-    const list = flexSearch(PUR_DB.products, val, ['name','code']);
+    let list = flexSearch(PUR_DB.products, val, ['name','code']);
+    if (_purMultiCompanyFilter) list = list.filter(p => p.company_id === _purMultiCompanyFilter);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--inv-muted-light)">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
         const sel = _purMultiSelected[p.id];
