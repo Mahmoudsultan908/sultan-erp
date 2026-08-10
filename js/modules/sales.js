@@ -64,7 +64,7 @@ async function invFetchAllRows(table, select) {
 }
 
 async function invLoadData() {
-    let products, customers, warehouses, stockRows, lastSale, invCounterRow, priceLevels, productPrices, customerGroups;
+    let products, customers, warehouses, stockRows, lastSale, invCounterRow, priceLevels, productPrices, customerGroups, companies;
     let liveLoadFailed = false;
 
     try {
@@ -79,11 +79,12 @@ async function invLoadData() {
             invFetchAllRows('product_prices', 'product_id, price, price_levels(code)'),
             sb.from('customer_groups').select('id, price_levels(code)'),
             sb.from('treasuries').select('*').eq('is_active', true).order('is_default', { ascending: false }),
+            sb.from('product_companies').select('*').order('name'),
         ]);
         [
             { data: products }, { data: customers }, { data: warehouses }, { data: stockRows },
             { data: lastSale }, { data: invCounterRow }, { data: priceLevels }, { data: productPrices }, { data: customerGroups },
-            { data: treasuries },
+            { data: treasuries }, { data: companies },
         ] = results;
         // فشل شبكي حقيقي (أوفلاين) بيرجّع صفوف كلها null بدل ما يرمي استثناء —
         // لو الصنف الأساسي (products) فاضي تماماً، نعتبرها فشلة ونرجع للكاش
@@ -118,6 +119,7 @@ async function invLoadData() {
     INV_DB.warehouses = warehouses || [];
     INV_DB.priceLevels = priceLevels || [];
     INV_DB.treasuries = treasuries || [];
+    INV_DB.companies = companies || [];
 
     // كاش للمراجعة الأوفلاين (offline.js) — قراءة فقط، بيتحدّث تلقائياً كل ما شاشة المبيعات تفتح أونلاين
     // (بس لو البيانات دي جاية أونلاين فعلاً، مش رجّاعة من الكاش نفسه)
@@ -986,6 +988,7 @@ function invOnCode(idx, val) {
 //   المستخدم في باقي الفاتورة.
 let _invMultiSelected = {}; // { productId: qty }
 let _invMultiHideZero = true;
+let _invMultiCompanyFilter = '';
 function invOpenMultiPick() {
     document.getElementById('invMultiModal')?.remove();
     const m = document.createElement('div');
@@ -997,6 +1000,11 @@ function invOpenMultiPick() {
             <button class="mod-modal-close" onclick="invCloseMultiPick()">✕</button></div>
         <div class="mod-modal-body">
             <input type="text" class="mod-form-input" id="invMultiSearch" placeholder="بحث بالاسم / الكود..." autocomplete="off" oninput="invRenderMultiPickList(this.value)">
+            ${(INV_DB.companies||[]).length ? `
+            <select class="mod-form-input" id="invMultiCompanyFilter" style="margin-top:9px" onchange="invMultiFilterByCompany(this.value)">
+                <option value="">كل الشركات</option>
+                ${INV_DB.companies.map(co => `<option value="${co.id}" ${_invMultiCompanyFilter===co.id?'selected':''}>${co.name}</option>`).join('')}
+            </select>` : ''}
             <label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:var(--inv-text-soft);cursor:pointer">
                 <input type="checkbox" id="invMultiHideZero" ${_invMultiHideZero ? 'checked' : ''} onchange="invMultiToggleHideZero(this.checked)">
                 إخفاء الأصناف بدون رصيد
@@ -1010,6 +1018,7 @@ function invOpenMultiPick() {
     </div>`;
     document.body.appendChild(m);
     _invMultiSelected = {};
+    _invMultiCompanyFilter = '';
     invRenderMultiPickList('');
     setTimeout(()=>document.getElementById('invMultiSearch')?.focus(), 50);
 }
@@ -1021,10 +1030,15 @@ function invMultiToggleHideZero(checked) {
     _invMultiHideZero = checked;
     invRenderMultiPickList(document.getElementById('invMultiSearch')?.value || '');
 }
+function invMultiFilterByCompany(companyId) {
+    _invMultiCompanyFilter = companyId || '';
+    invRenderMultiPickList(document.getElementById('invMultiSearch')?.value || '');
+}
 function invRenderMultiPickList(val) {
     const box = document.getElementById('invMultiPickList');
     if (!box) return;
     let list = flexSearch(INV_DB.products, val, ['name','code']);
+    if (_invMultiCompanyFilter) list = list.filter(p => p.company_id === _invMultiCompanyFilter);
     if (_invMultiHideZero) list = list.filter(p => invGetStock(p.id) > 0);
     if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--inv-muted-light)">لا توجد نتائج</div>'; return; }
     box.innerHTML = list.slice(0, 200).map(p => {
