@@ -324,10 +324,12 @@ window.colSave = async function() {
     const amount = parseFloat(document.getElementById('colAmount').value);
     const discount = parseFloat(document.getElementById('colDiscount')?.value) || 0;
     const ref = document.getElementById('colRef').value.trim();
-    const treasuryId = document.getElementById('colTreasuryId').value || null;
+    const selectedTreasuryId = document.getElementById('colTreasuryId')?.value || '';
+    const treasuryId = selectedTreasuryId || _colTreasuries.find(t => t.is_default)?.id || null;
     if (!custId) return alert('اختر العميل');
     if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
     if (discount < 0) return alert('قيمة الخصم غير صحيحة');
+    if (!treasuryId) return alert('لا توجد خزنة متاحة للتحصيل. اختر خزنة أو أنشئ خزنة افتراضية أولاً.');
 
     const btn = document.querySelector('#colModal .mod-btn-primary');
     btn.innerText = 'جاري الحفظ...'; btn.disabled = true;

@@ -26,6 +26,7 @@
 
 let _invsPartners = [];
 let _invsHistory = [];
+let _invsTreasuries = [];
 let _invsPreview = null;
 let _invsStmtPartner = null, _invsStmtAllMoves = [], _invsStmtMoves = [], _invsStmtFrom = '', _invsStmtTo = '';
 
@@ -34,12 +35,14 @@ function invsFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFra
 async function renderInvestors(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل البيانات...</div>';
     try {
-        const [{ data: partners }, { data: history }] = await Promise.all([
+        const [{ data: partners }, { data: history }, { data: treasuries }] = await Promise.all([
             sb.from('capital_partners').select('*').order('partner_type', { ascending: false }).order('name'),
             sb.from('investor_profit_snapshots_v2').select('*').order('period_month', { ascending: false }),
+            sb.from('treasuries').select('id,name,is_default').eq('is_active', true).order('name'),
         ]);
         _invsPartners = partners || [];
         _invsHistory = history || [];
+        _invsTreasuries = treasuries || [];
 
         const now = new Date();
         const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -243,6 +246,13 @@ window.invsOpenTxModal = function(partnerId) {
                 <div class="mod-form-group"><label>المبلغ (ج.م) *</label>
                     <input type="number" id="invsTxAmount" class="mod-form-input" placeholder="0.00" step="0.01" dir="ltr" min="0.01">
                 </div>
+                <div class="mod-form-group"><label>الخزنة *</label>
+                    <select id="invsTxTreasury" class="mod-form-input">
+                        <option value="">اختر الخزنة</option>
+                        ${_invsTreasuries.map(t => `<option value="${t.id}" ${t.is_default ? 'selected' : ''}>${t.name}${t.is_default ? ' (افتراضية)' : ''}</option>`).join('')}
+                    </select>
+                    <small style="color:var(--inv-muted-light)">لا يمكن اعتماد حركة رأس المال بدون تحديد الخزنة التي استلمت أو دفعت المبلغ.</small>
+                </div>
                 <div class="mod-form-group"><label>التاريخ *</label>
                     <input type="date" id="invsTxDate" class="mod-form-input" value="${new Date().toISOString().slice(0,10)}">
                 </div>
@@ -262,20 +272,28 @@ window.invsSaveTx = async function() {
     const partner_id = document.getElementById('invsTxPartnerId').value;
     const tx_type = document.getElementById('invsTxType').value;
     const amount = parseFloat(document.getElementById('invsTxAmount').value);
+    const treasury_id = document.getElementById('invsTxTreasury').value || null;
     const tx_date = document.getElementById('invsTxDate').value;
     const note = document.getElementById('invsTxNote').value.trim() || null;
     if (!amount || amount <= 0) return alert('أدخل مبلغاً صحيحاً');
     if (!tx_date) return alert('اختار التاريخ');
+    if (!treasury_id) return alert('اختر الخزنة أولاً');
     if (tx_type === 'profit_payout') {
         const p = _invsPartners.find(x => x.id === partner_id);
-        if (p && amount > Number(p.accrued_profit_balance) && !confirm(`المبلغ أكبر من الأرباح المتراكمة المستحقة (${invsFmt(p.accrued_profit_balance)} ج.م). متأكد عايز تكمل؟`)) return;
+        if (p && amount > Number(p.accrued_profit_balance)) return alert(`المبلغ أكبر من الأرباح المتراكمة المستحقة (${invsFmt(p.accrued_profit_balance)} ج.م)`);
     }
 
     const btn = document.querySelector('#invsTxModal .mod-btn-primary');
     btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
     try {
-        const { error } = await sb.from('capital_partner_transactions').insert({
-            partner_id, tx_type, amount, tx_date, note, created_by: currentUser?.id || null,
+        const { error } = await sb.rpc('fn_post_capital_partner_transaction', {
+            p_partner_id: partner_id,
+            p_tx_date: tx_date,
+            p_tx_type: tx_type,
+            p_amount: amount,
+            p_treasury_id: treasury_id,
+            p_note: note,
+            p_created_by: currentUser?.id || null,
         });
         if (error) throw error;
         invsCloseModal('invsTxModal');
@@ -626,17 +644,18 @@ window.invsShowStatement = async function (partnerId) {
 
         const moves = [];
         (txs || []).forEach(t => {
-            if (t.tx_type === 'contribution') moves.push({ date: t.tx_date, desc: `إيداع رأس مال${t.note ? ' — ' + t.note : ''}`, capital_delta: Number(t.amount), profit_delta: 0 });
-            else if (t.tx_type === 'withdrawal') moves.push({ date: t.tx_date, desc: `سحب رأس مال${t.note ? ' — ' + t.note : ''}`, capital_delta: -Number(t.amount), profit_delta: 0 });
-            else if (t.tx_type === 'profit_payout') moves.push({ date: t.tx_date, desc: `صرف من الأرباح المتراكمة${t.note ? ' — ' + t.note : ''}`, capital_delta: 0, profit_delta: -Number(t.amount) });
+            const treasuryName = _invsTreasuries.find(x => x.id === t.treasury_id)?.name || 'غير محددة';
+            if (t.tx_type === 'contribution') moves.push({ date: t.tx_date, desc: `إيداع رأس مال${t.note ? ' — ' + t.note : ''}`, treasury: treasuryName, capital_delta: Number(t.amount), profit_delta: 0 });
+            else if (t.tx_type === 'withdrawal') moves.push({ date: t.tx_date, desc: `سحب رأس مال${t.note ? ' — ' + t.note : ''}`, treasury: treasuryName, capital_delta: -Number(t.amount), profit_delta: 0 });
+            else if (t.tx_type === 'profit_payout') moves.push({ date: t.tx_date, desc: `صرف من الأرباح المتراكمة${t.note ? ' — ' + t.note : ''}`, treasury: treasuryName, capital_delta: 0, profit_delta: -Number(t.amount) });
         });
         (lines || []).forEach(l => {
             const period = l.investor_profit_snapshots_v2?.period_month;
             const monthLabel = period ? new Date(period).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long' }) : '—';
             if (l.payout_mode === 'cash') {
-                moves.push({ date: period, desc: `نصيب أرباح ${monthLabel} — نقدي (افتراض إنه اتصرف فورًا، بدون أثر على أي رصيد)`, capital_delta: 0, profit_delta: 0 });
+                moves.push({ date: period, desc: `نصيب أرباح ${monthLabel} — نقدي (افتراض إنه اتصرف فورًا، بدون أثر على أي رصيد)`, treasury: 'غير محددة', capital_delta: 0, profit_delta: 0 });
             } else if (Number(l.net_payable) > 0) {
-                moves.push({ date: period, desc: `نصيب أرباح ${monthLabel} (متراكم)`, capital_delta: 0, profit_delta: Number(l.net_payable) });
+                moves.push({ date: period, desc: `نصيب أرباح ${monthLabel} (متراكم)`, treasury: '—', capital_delta: 0, profit_delta: Number(l.net_payable) });
             }
         });
         moves.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -653,7 +672,7 @@ window.invsShowStatement = async function (partnerId) {
         const capitalSeed = Number(p.capital_balance) - totalCapitalMoves;
         const profitSeed = Number(p.accrued_profit_balance) - totalProfitMoves;
         if (Math.abs(capitalSeed) > 0.01 || Math.abs(profitSeed) > 0.01) {
-            moves.unshift({ date: p.join_date, desc: 'رصيد مبدئي وقت تسجيل الشريك', capital_delta: capitalSeed, profit_delta: profitSeed });
+            moves.unshift({ date: p.join_date, desc: 'رصيد مبدئي وقت تسجيل الشريك', treasury: '—', capital_delta: capitalSeed, profit_delta: profitSeed });
         }
 
         let capitalRunning = 0, profitRunning = 0;
@@ -685,7 +704,7 @@ function invsStmtRecomputeAndRender() {
         filtered = filtered.filter(m => new Date(m.date).getTime() <= toTime);
     }
     const periodMoves = from
-        ? [{ date: from, desc: 'الرصيد الافتتاحي لبداية الفترة', capital_delta: 0, profit_delta: 0, capitalBalance: openingCapital, profitBalance: openingProfit }, ...filtered]
+        ? [{ date: from, desc: 'الرصيد الافتتاحي لبداية الفترة', treasury: '—', capital_delta: 0, profit_delta: 0, capitalBalance: openingCapital, profitBalance: openingProfit }, ...filtered]
         : filtered;
     _invsStmtMoves = periodMoves;
 
@@ -706,18 +725,19 @@ function invsStmtRecomputeAndRender() {
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>التاريخ</th><th>البيان</th>
+                <th>التاريخ</th><th>البيان</th><th>الخزنة</th>
                 <th style="text-align:left">حركة رأس المال</th><th style="text-align:left">رصيد رأس المال</th>
                 <th style="text-align:left">حركة الأرباح</th><th style="text-align:left">رصيد الأرباح</th>
             </tr></thead><tbody>
                 ${periodMoves.length ? periodMoves.map(m => `<tr>
                     <td>${new Date(m.date).toLocaleDateString('ar-EG')}</td>
                     <td>${m.desc}</td>
+                    <td style="font-size:12px;color:${m.treasury === 'غير محددة' ? 'var(--inv-red)' : 'var(--inv-muted)'}">${m.treasury || '—'}</td>
                     <td style="text-align:left;color:${m.capital_delta > 0 ? 'var(--inv-green)' : m.capital_delta < 0 ? 'var(--inv-red)' : 'var(--inv-muted-light)'}">${m.capital_delta ? invsFmt(m.capital_delta) : '—'}</td>
                     <td style="text-align:left;font-weight:700">${invsFmt(m.capitalBalance)}</td>
                     <td style="text-align:left;color:${m.profit_delta > 0 ? 'var(--inv-green)' : m.profit_delta < 0 ? 'var(--inv-red)' : 'var(--inv-muted-light)'}">${m.profit_delta ? invsFmt(m.profit_delta) : '—'}</td>
                     <td style="text-align:left;font-weight:700;color:var(--inv-gold)">${invsFmt(m.profitBalance)}</td>
-                </tr>`).join('') : `<tr><td colspan="6" class="empty-state">لا توجد حركات فى الفترة دي</td></tr>`}
+                </tr>`).join('') : `<tr><td colspan="7" class="empty-state">لا توجد حركات فى الفترة دي</td></tr>`}
             </tbody></table>
         </div>`;
 }
@@ -735,6 +755,7 @@ window.invsStmtExportExcel = function () {
     repExportExcel(`كشف_حساب_${_invsStmtPartner?.name || 'شريك'}`, _invsStmtMoves.map(m => ({
         'التاريخ': new Date(m.date).toLocaleDateString('ar-EG'),
         'البيان': m.desc,
+        'الخزنة': m.treasury || '—',
         'حركة رأس المال': m.capital_delta,
         'رصيد رأس المال': m.capitalBalance,
         'حركة الأرباح': m.profit_delta,

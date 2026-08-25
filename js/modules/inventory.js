@@ -37,7 +37,7 @@ function stkCountSwitchTab(tab) {
 async function invRenderStockView(root) {
     root.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل المخزون...</div>`;
     try {
-        const [{ data: stock }, { data: warehouses }, { data: companies }, { data: purchaseItems }, { data: saleItems }] = await Promise.all([
+        const [{ data: stock }, { data: warehouses }, { data: companies }, { data: purchaseItems }, { data: saleItems }, { data: vanStock }] = await Promise.all([
             sb.from('inventory_stock')
                 .select('qty, warehouse_id, product_id, products(name, code, unit, purchase_price, reorder_point, company_id, product_categories(name))')
                 .order('qty', { ascending: true }),
@@ -48,6 +48,7 @@ async function invRenderStockView(root) {
             // "المباع منذ آخر شراء" بيبقى تراكمي من تاريخ آخر فاتورة شراء بس
             sb.from('purchase_items').select('product_id, qty, purchases!inner(created_at, status)').eq('purchases.status', 'confirmed'),
             sb.from('sale_items').select('product_id, qty, sales!inner(created_at, status)').eq('sales.status', 'confirmed'),
+            sb.from('van_stock').select('qty, rep_id, products(name, code, purchase_price, company_id)'),
         ]);
 
         const fmt = (n) => Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -55,6 +56,10 @@ async function invRenderStockView(root) {
         (warehouses || []).forEach(w => whMap[w.id] = w.name);
         const coMap = {};
         (companies || []).forEach(co => coMap[co.id] = co.name);
+        const mainStockValue = (stock || []).reduce((sum, s) => sum + (Number(s.qty) || 0) * Number(s.products?.purchase_price || 0), 0);
+        const vanStockValue = (vanStock || []).reduce((sum, s) => sum + (Number(s.qty) || 0) * Number(s.products?.purchase_price || 0), 0);
+        const companyStockValue = mainStockValue + vanStockValue;
+        const vanStockQty = (vanStock || []).reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
 
         // آخر شراء لكل صنف (أحدث تاريخ)
         const lastPurchase = {}; // product_id -> { date, qty }
@@ -179,6 +184,12 @@ async function invRenderStockView(root) {
                         <div class="dash-kpi-lbl">راكد (بدون بيع 15+ يوم)</div>
                     </div>
                 </div>
+            </div>
+            <div class="mod-alert-banner info" style="margin-bottom:16px;display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+                <strong>إجمالي قيمة المخزون بالشركة:</strong> <span id="inv-company-total">${fmt(companyStockValue)} ج.م</span>
+                <span>المخزن الرئيسي: <b>${fmt(mainStockValue)} ج.م</b></span>
+                <span>سيارات المندوبين: <b>${fmt(vanStockValue)} ج.م</b> (${fmt(vanStockQty)} وحدة)</span>
+                <small style="color:var(--inv-muted)">فلتر المخزن في الجدول يخص صفوف المخزن الرئيسي؛ الإجمالي هنا يشمل السيارات.</small>
             </div>
 
             <!-- فلاتر -->
