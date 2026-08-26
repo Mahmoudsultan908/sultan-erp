@@ -21,6 +21,44 @@ let _mgCustReps = [];
 let _mgCustLastIntMap = {};
 let _mgCustSearch = '';
 let _mgCustEditingId = null;
+// حالة الأجل للمتابعة فقط — لا تغيّر الرصيد ولا تعتمد على حركة محاسبية.
+function mdCustDueBucket(x, now = new Date()) {
+    const balance = Number(x?.balance) || 0;
+    if (balance <= 0) return 'settled';
+    if (!x?.payment_due_date) return 'no_due';
+    const due = new Date(`${String(x.payment_due_date).slice(0, 10)}T00:00:00`);
+    if (Number.isNaN(due.getTime())) return 'no_due';
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.floor((due - today) / 86400000);
+    if (days < -30) return 'overdue_31';
+    if (days < -7) return 'overdue_8_30';
+    if (days < 0) return 'overdue_1_7';
+    if (days === 0) return 'due_today';
+    if (days <= 7) return 'due_7';
+    return 'future';
+}
+
+function mdCustDueLabel(key) {
+    return {
+        settled: ['مسدد / بدون رصيد', 'var(--inv-green)', 'var(--inv-green-light)'],
+        overdue_31: ['متأخر أكثر من 30 يوم', 'var(--inv-red)', 'var(--inv-red-bg)'],
+        overdue_8_30: ['متأخر 8–30 يوم', 'var(--inv-red)', 'var(--inv-red-bg)'],
+        overdue_1_7: ['متأخر 1–7 أيام', '#C2410C', '#FFF7ED'],
+        due_today: ['مستحق اليوم', '#B45309', '#FEF3C7'],
+        due_7: ['مستحق خلال 7 أيام', '#B45309', '#FEF3C7'],
+        future: ['أجل قادم', '#2563EB', '#EFF6FF'],
+        no_due: ['بدون تاريخ أجل', '#64748B', '#F1F5F9'],
+    }[key] || ['غير محدد', '#64748B', '#F1F5F9'];
+}
+
+function mdCustPaymentPlan(x) {
+    const amount = Number(x?.daily_payment_target) || 0;
+    if (amount <= 0) return { amount: 0, periods: null, label: '—' };
+    const schedule = x?.payment_schedule || 'daily';
+    const labels = { daily: 'يومي', weekly: 'أسبوعي', monthly: 'شهري' };
+    const periods = Math.ceil(Math.max(Number(x?.balance) || 0, 0) / amount);
+    return { amount, periods, label: `${mdFmt(amount)} / ${labels[schedule] || 'يومي'}` };
+}
 
 async function renderCustomersManage(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل العملاء...</div>';
@@ -70,6 +108,12 @@ function custRenderPage(c) {
     const totalDebt = _mgCustList.reduce((s,x)=>s+(Number(x.balance)>0?Number(x.balance):0),0);
     const totalCredit = _mgCustList.reduce((s,x)=>s+(Number(x.balance)<0?Math.abs(Number(x.balance)):0),0);
     const debtors = _mgCustList.filter(x => Number(x.balance) > 0);
+    const overdueCustomers = debtors.filter(x => mdCustDueBucket(x).startsWith('overdue_'));
+    const overdueCount = overdueCustomers.length;
+    const overdueAmount = overdueCustomers.reduce((s,x)=>s+(Number(x.balance)||0),0);
+    const dueSoonCount = debtors.filter(x => ['due_today', 'due_7'].includes(mdCustDueBucket(x))).length;
+    const noDueCount = debtors.filter(x => mdCustDueBucket(x) === 'no_due').length;
+    const overLimitCount = debtors.filter(x => Number(x.credit_limit) > 0 && Number(x.balance) > Number(x.credit_limit)).length;
 
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
@@ -85,24 +129,62 @@ function custRenderPage(c) {
             <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${_mgCustList.length}</div><div class="mod-card-lbl">إجمالي العملاء</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${mdFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⏰</div><div class="mod-card-val">${mdFmt(overdueAmount)}</div><div class="mod-card-lbl">رصيد أجله المسجل متأخر (${overdueCount})</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#B45309">📅</div><div class="mod-card-val">${dueSoonCount}</div><div class="mod-card-lbl">مستحق خلال 7 أيام</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#F1F5F9;color:#64748B">❔</div><div class="mod-card-val">${noDueCount}</div><div class="mod-card-lbl">عليهم رصيد بلا أجل</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:#FFF7ED;color:#C2410C">🚫</div><div class="mod-card-val">${overLimitCount}</div><div class="mod-card-lbl">متجاوزون الحد الائتماني</div></div>
         </div>
 
         <div class="mod-card" style="margin-bottom:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
             <div style="flex:1;min-width:200px">
                 <input type="text" id="custMgSearch" class="mod-form-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="custMgSearch(this.value)">
             </div>
+            <select id="custMgRegion" class="mod-form-input" style="margin:0;min-width:150px" onchange="custRenderRows()">
+                <option value="all">كل المناطق</option>
+                ${_mgCustRegions.map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}
+            </select>
+            <select id="custMgRep" class="mod-form-input" style="margin:0;min-width:150px" onchange="custRenderRows()">
+                <option value="all">كل المناديب</option>
+                <option value="none">بدون مندوب</option>
+                ${_mgCustReps.map(r=>`<option value="${r.id}">🚗 ${r.name}</option>`).join('')}
+            </select>
+            <select id="custMgPay" class="mod-form-input" style="margin:0;min-width:130px" onchange="custRenderRows()">
+                <option value="all">كل طرق الدفع المفضلة</option>
+                <option value="credit">آجل</option>
+                <option value="cash">نقدي</option>
+                <option value="check">شيك</option>
+                <option value="none">غير محدد</option>
+            </select>
+            <select id="custMgDue" class="mod-form-input" style="margin:0;min-width:160px" onchange="custRenderRows()">
+                <option value="all">كل حالات الأجل</option>
+                <option value="overdue_31">متأخر أكثر من 30 يوم</option>
+                <option value="overdue_8_30">متأخر 8–30 يوم</option>
+                <option value="overdue_1_7">متأخر 1–7 أيام</option>
+                <option value="due_today">مستحق اليوم</option>
+                <option value="due_7">مستحق خلال 7 أيام</option>
+                <option value="future">أجل قادم</option>
+                <option value="no_due">عليه رصيد بلا أجل</option>
+                <option value="settled">مسدد / بدون رصيد</option>
+            </select>
+            <select id="custMgGroupBy" class="mod-form-input" style="margin:0;min-width:145px" onchange="custRenderRows()">
+                <option value="none">بدون تجميع</option>
+                <option value="region">تجميع حسب المنطقة</option>
+                <option value="due">تجميع حسب الأجل</option>
+            </select>
             <select id="custMgBalOp" class="mod-form-input" style="margin:0;min-width:130px" onchange="custRenderRows()">
                 <option value="">فلتر الرصيد: الكل</option>
                 <option value="gt">أكبر من</option>
                 <option value="lt">أصغر من</option>
             </select>
             <input type="number" id="custMgBalVal" class="mod-form-input" style="margin:0;min-width:120px" placeholder="مبلغ..." dir="ltr" oninput="custRenderRows()">
+            <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft);white-space:nowrap" onclick="custResetFilters()">مسح الفلاتر</button>
         </div>
+        <div style="font-size:12px;color:var(--inv-muted);margin:-6px 0 12px">حالة الأجل في هذه الصفحة مبنية على تاريخ الأجل الافتراضي المسجل على العميل. اعتماد التأخير النهائي يظل من كشف الفواتير وتواريخ استحقاقها.</div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
                 <th>العميل</th><th>الهاتف</th><th>المنطقة</th><th>التصنيف</th><th>المجموعة</th><th>المندوب</th><th>آخر تفاعل</th>
                 <th title="استحقاق الدفع اللي محدده يدوي على العميل نفسه — بيُستخدم كبديل لو نسيت تحط تاريخ استحقاق في فاتورة معينة">استحقاق الدفع</th>
-                <th style="text-align:left">الحد الائتماني</th><th style="text-align:left">الرصيد</th><th style="text-align:center">إجراءات</th>
+                <th>حالة الأجل</th><th>الدفعة المستهدفة</th><th style="text-align:left">الحد الائتماني</th><th style="text-align:left">الرصيد</th><th style="text-align:center">إجراءات</th>
             </tr></thead><tbody id="custMgTbody"></tbody></table>
         </div>`;
     custRenderRows();
@@ -112,6 +194,18 @@ function custRenderRows() {
     const tbody = document.getElementById('custMgTbody');
     if (!tbody) return;
     let rows = flexSearch(_mgCustList, _mgCustSearch, ['name','phone']);
+    const regionFilter = document.getElementById('custMgRegion')?.value || 'all';
+    const repFilter = document.getElementById('custMgRep')?.value || 'all';
+    const payFilter = document.getElementById('custMgPay')?.value || 'all';
+    const dueFilter = document.getElementById('custMgDue')?.value || 'all';
+    const groupBy = document.getElementById('custMgGroupBy')?.value || 'none';
+    rows = rows.filter(x => {
+        if (regionFilter !== 'all' && (x.region_id || '') !== regionFilter) return false;
+        if (repFilter !== 'all' && (repFilter === 'none' ? x.default_rep_id : x.default_rep_id !== repFilter)) return false;
+        if (payFilter !== 'all' && (payFilter === 'none' ? x.preferred_payment_method : x.preferred_payment_method !== payFilter)) return false;
+        if (dueFilter !== 'all' && mdCustDueBucket(x) !== dueFilter) return false;
+        return true;
+    });
     const balOp = document.getElementById('custMgBalOp')?.value;
     const balVal = parseFloat(document.getElementById('custMgBalVal')?.value);
     if (balOp && !isNaN(balVal)) {
@@ -119,11 +213,29 @@ function custRenderRows() {
     }
     if (!rows.length) {
         tbody.innerHTML = _mgCustList.length
-            ? `<tr><td colspan="11" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين للبحث/الفلتر الحالي</td></tr>`
-            : `<tr><td colspan="11" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`;
+            ? `<tr><td colspan="13" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين للبحث/الفلتر الحالي</td></tr>`
+            : `<tr><td colspan="13" class="empty-state"><span>👥</span>لا يوجد عملاء بعد — ابدأ بإضافة أول عميل</td></tr>`;
         return;
     }
 
+    if (groupBy !== 'none') {
+        const groupKey = x => groupBy === 'region'
+            ? (_mgCustRegions.find(r=>r.id===x.region_id)?.name || 'بدون منطقة')
+            : mdCustDueLabel(mdCustDueBucket(x))[0];
+        rows.sort((a,b) => groupKey(a).localeCompare(groupKey(b), 'ar'));
+    }
+    const groupStats = {};
+    if (groupBy !== 'none') {
+        rows.forEach(x => {
+            const key = groupBy === 'region'
+                ? (_mgCustRegions.find(r=>r.id===x.region_id)?.name || 'بدون منطقة')
+                : mdCustDueLabel(mdCustDueBucket(x))[0];
+            const stat = groupStats[key] || (groupStats[key] = { count: 0, balance: 0 });
+            stat.count++;
+            stat.balance += Number(x.balance) || 0;
+        });
+    }
+    let lastGroup = null;
     tbody.innerHTML = rows.map(x => {
         const region = _mgCustRegions.find(r=>r.id===x.region_id);
         const cls = _mgCustClassifications.find(cl=>cl.id===x.classification_id);
@@ -132,8 +244,17 @@ function custRenderRows() {
         const bal = Number(x.balance)||0;
         const srcBadge = typeof custSourceBadge === 'function' ? custSourceBadge(x.source) : '';
         const lastInt = _mgCustLastIntMap[x.id];
-        const dueOverdue = x.payment_due_date && bal > 0 && new Date(x.payment_due_date) < new Date(new Date().toDateString());
-        return `<tr>
+        const dueKey = mdCustDueBucket(x);
+        const dueInfo = mdCustDueLabel(dueKey);
+        const paymentPlan = mdCustPaymentPlan(x);
+        const groupValue = groupBy === 'region'
+            ? (region?.name || 'بدون منطقة')
+            : (groupBy === 'due' ? dueInfo[0] : null);
+        const stat = groupStats[groupValue];
+        const groupRow = groupBy !== 'none' && groupValue !== lastGroup
+            ? `<tr><td colspan="13" style="background:#F8FAFC;color:var(--inv-text-soft);font-weight:800;padding:10px 14px">${groupBy === 'region' ? '📍' : '📅'} ${groupValue}<span style="margin-right:10px;color:var(--inv-muted);font-size:12px;font-weight:600">${stat.count} عميل — إجمالي الرصيد ${mdFmt(stat.balance)}</span></td></tr>` : '';
+        lastGroup = groupValue;
+        return `${groupRow}<tr>
             <td><strong>${x.name}</strong>${srcBadge ? `<div style="margin-top:2px">${srcBadge}</div>` : ''}</td>
             <td dir="ltr" style="text-align:right">${x.phone||'—'}</td>
             <td>${region?.name||'—'}</td>
@@ -141,9 +262,11 @@ function custRenderRows() {
             <td>${grp?.name||'—'}</td>
             <td>${rep?`🚗 ${rep.name}`:'—'}</td>
             <td style="font-size:12px;color:var(--inv-muted-light)">${lastInt ? new Date(lastInt).toLocaleDateString('ar-EG') : '—'}</td>
-            <td style="font-size:12px;${dueOverdue?'color:var(--inv-red);font-weight:700':'color:var(--inv-muted-light)'}">${x.payment_due_date ? new Date(x.payment_due_date).toLocaleDateString('ar-EG') : '—'}</td>
+            <td style="font-size:12px;${dueKey.startsWith('overdue_')?'color:var(--inv-red);font-weight:700':'color:var(--inv-muted-light)'}">${x.payment_due_date ? new Date(`${String(x.payment_due_date).slice(0,10)}T00:00:00`).toLocaleDateString('ar-EG') : '—'}</td>
+            <td><span style="display:inline-block;padding:4px 8px;border-radius:999px;background:${dueInfo[2]};color:${dueInfo[1]};font-size:11px;font-weight:700;white-space:nowrap">${dueInfo[0]}</span></td>
+            <td style="font-size:12px;color:${paymentPlan.amount>0?'var(--inv-text-soft)':'var(--inv-muted-light)'}">${paymentPlan.label}${paymentPlan.periods ? `<div style="font-size:10px;color:var(--inv-muted-light)">نحو ${paymentPlan.periods} فترة</div>` : ''}</td>
             <td style="text-align:left">${x.credit_limit>0?mdFmt(x.credit_limit):'—'}</td>
-            <td style="text-align:left;font-weight:700;color:${bal>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(bal)}</td>
+            <td style="text-align:left;font-weight:700;color:${bal>0?'var(--inv-red)':'var(--inv-green)'}">${mdFmt(bal)}${Number(x.credit_limit)>0 && bal>Number(x.credit_limit) ? '<div style="font-size:10px;color:var(--inv-red);font-weight:700">تجاوز الحد</div>' : ''}</td>
             <td style="text-align:center;white-space:nowrap">
                 <button class="cc-edit" onclick="custOpenEdit('${x.id}')">✏️</button>
                 <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="custShowStatement('${x.id}')">📄 كشف حساب</button>
@@ -153,6 +276,12 @@ function custRenderRows() {
     }).join('');
 }
 window.custMgSearch = function(v) { _mgCustSearch = v; custRenderRows(); };
+window.custResetFilters = function() {
+    _mgCustSearch = '';
+    const defaults = { custMgSearch: '', custMgRegion: 'all', custMgRep: 'all', custMgPay: 'all', custMgDue: 'all', custMgGroupBy: 'none', custMgBalOp: '', custMgBalVal: '' };
+    Object.entries(defaults).forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
+    custRenderRows();
+};
 
 window.custOpenAdd = function() { _mgCustEditingId = null; custOpenModal(null); };
 window.custOpenEdit = function(id) { const x = _mgCustList.find(c=>c.id===id); if (x) { _mgCustEditingId = id; custOpenModal(x); } };
@@ -220,6 +349,18 @@ function custOpenModal(x) {
                 </div>
                 <div class="mod-form-group"><label>استحقاق الدفع <small style="color:var(--inv-muted-light);font-weight:400">(بديل لو نسيت تحدد تاريخ استحقاق في فاتورة معينة — بيتاخد بيه القرار في مركز قرار العملاء)</small></label>
                     <input type="date" id="custPaymentDueDate" class="mod-form-input" value="${x?.payment_due_date||''}"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="mod-form-group"><label>الدفعة المستهدفة (ج.م)</label>
+                        <input type="number" id="custDailyPaymentTarget" class="mod-form-input" value="${x?.daily_payment_target||0}" min="0" step="0.01" placeholder="مثال: 500">
+                        <small style="display:block;color:var(--inv-muted-light);font-size:11px;margin-top:4px">خطة متابعة يدوية فقط، لا تخصم من الرصيد تلقائيًا.</small></div>
+                    <div class="mod-form-group"><label>نظام السداد</label>
+                        <select id="custPaymentSchedule" class="mod-form-input">
+                            <option value="daily" ${(x?.payment_schedule||'daily')==='daily'?'selected':''}>يومي</option>
+                            <option value="weekly" ${x?.payment_schedule==='weekly'?'selected':''}>أسبوعي</option>
+                            <option value="monthly" ${x?.payment_schedule==='monthly'?'selected':''}>شهري</option>
+                        </select>
+                    </div>
+                </div>
                 <div style="background:var(--inv-red-bg);border:1px solid #FECACA;border-radius:8px;padding:10px 14px;margin-top:4px">
                     <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--inv-red);cursor:pointer">
                         <input type="checkbox" id="custDebtLocked" ${x?.debt_locked?'checked':''} style="width:17px;height:17px">
@@ -257,6 +398,8 @@ window.custSave = async function() {
         default_rep_id: document.getElementById('custDefaultRep')?.value || null,
         debt_locked: !!document.getElementById('custDebtLocked')?.checked,
         payment_due_date: document.getElementById('custPaymentDueDate').value || null,
+        daily_payment_target: Math.max(0, parseFloat(document.getElementById('custDailyPaymentTarget').value) || 0),
+        payment_schedule: document.getElementById('custPaymentSchedule').value || 'daily',
     };
 
     const btn = document.querySelector('#custMgModal .mod-btn-primary');
