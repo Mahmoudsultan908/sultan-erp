@@ -72,7 +72,10 @@ async function renderCollections(c) {
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <div><h2 style="font-size:22px;font-weight:800">💵 تحصيل العملاء (سندات قبض)</h2>
             <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">تسجيل المبالغ المحصّلة من العملاء — مرتبطة بالخزنة ورصيد العميل</p></div>
-            <button class="mod-btn mod-btn-primary" onclick="colOpenAdd()">+ تحصيل دفعة جديدة</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="mod-btn" style="background:#EEF2FF;color:#4338CA" onclick="colOpenDailyReport()">📅 متابعة التحصيل اليومي</button>
+                <button class="mod-btn mod-btn-primary" onclick="colOpenAdd()">+ تحصيل دفعة جديدة</button>
+            </div>
         </div>
 
         ${isOfflineData ? `<div style="background:var(--inv-gold-bg);border:1px solid #FCD34D;color:var(--inv-gold);padding:9px 16px;border-radius:9px;margin-bottom:16px;font-size:12.5px">
@@ -171,6 +174,112 @@ function colDebtListHTML(debtCustomers) {
         </div>`).join('')}
     </div>`;
 }
+
+function colDailyDate(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value || '').slice(0, 10);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
+function colDailyAddDay(day, amount) {
+    const d = new Date(`${day}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + amount);
+    return d.toISOString().slice(0, 10);
+}
+
+window.colOpenDailyReport = function () {
+    const today = colDailyDate(new Date());
+    const from = colDailyAddDay(today, -29);
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'colDailyReportModal';
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:980px;width:96vw">
+            <div class="mod-modal-header"><h3>📅 متابعة التحصيل اليومي</h3>
+                <button class="mod-modal-close" onclick="colCloseModal('colDailyReportModal')">&times;</button></div>
+            <div class="mod-modal-body">
+                <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:14px">
+                    <div class="mod-form-group" style="margin:0"><label>من تاريخ</label><input type="date" id="colDailyFrom" class="mod-form-input" value="${from}"></div>
+                    <div class="mod-form-group" style="margin:0"><label>إلى تاريخ</label><input type="date" id="colDailyTo" class="mod-form-input" value="${today}"></div>
+                    <button class="mod-btn mod-btn-primary" onclick="colLoadDailyReport()">🔄 عرض التقرير</button>
+                </div>
+                <div style="font-size:12px;color:var(--inv-muted);margin-bottom:12px">اليوم يُحسب محصّلاً بمجرد تسجيل أي مبلغ نقدي مؤكد للعميل في نفس اليوم. الخصم وحده لا يُحسب تحصيلاً.</div>
+                <div id="colDailyReportBody"><div class="empty-state"><span>⏳</span>جاري تحميل التقرير...</div></div>
+            </div>
+            <div class="mod-modal-footer"><button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="colCloseModal('colDailyReportModal')">إغلاق</button></div>
+        </div>`;
+    document.body.appendChild(modal);
+    colLoadDailyReport();
+};
+
+window.colLoadDailyReport = async function () {
+    const body = document.getElementById('colDailyReportBody');
+    const from = document.getElementById('colDailyFrom')?.value;
+    const to = document.getElementById('colDailyTo')?.value;
+    if (!body || !from || !to || from > to) {
+        if (body) body.innerHTML = '<div style="color:var(--inv-red);padding:12px">اختر فترة صحيحة للتقرير</div>';
+        return;
+    }
+    body.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل التقرير...</div>';
+    try {
+        const [{ data: sales, error: salesErr }, { data: payments, error: paymentsErr }] = await Promise.all([
+            sb.from('sales').select('id,invoice_no,customer_id,total,created_at,due_date,customers(name,balance,payment_schedule,daily_payment_target)').eq('status', 'confirmed').eq('payment_type', 'credit').not('customer_id', 'is', null).gte('created_at', `${from}T00:00:00`).lte('created_at', `${to}T23:59:59`).order('created_at'),
+            sb.from('customer_payments').select('customer_id,amount,created_at').eq('status', 'confirmed').gte('created_at', `${from}T00:00:00`).lte('created_at', `${to}T23:59:59`).order('created_at'),
+        ]);
+        if (salesErr) throw salesErr;
+        if (paymentsErr) throw paymentsErr;
+
+        const paymentDays = {};
+        (payments || []).forEach(p => {
+            if ((Number(p.amount) || 0) <= 0 || !p.customer_id) return;
+            (paymentDays[p.customer_id] || (paymentDays[p.customer_id] = new Set())).add(colDailyDate(p.created_at));
+        });
+        const byCustomer = {};
+        (sales || []).forEach(s => {
+            const customer = s.customers;
+            if (!customer || (customer.payment_schedule && customer.payment_schedule !== 'daily') || (Number(customer.daily_payment_target) || 0) <= 0) return;
+            const row = byCustomer[s.customer_id] || (byCustomer[s.customer_id] = { customer, total: 0, start: to, end: from });
+            const saleDay = colDailyDate(s.created_at);
+            const dueDay = s.due_date ? String(s.due_date).slice(0, 10) : to;
+            row.total += Number(s.total) || 0;
+            if (saleDay < row.start) row.start = saleDay;
+            if (dueDay > row.end) row.end = dueDay;
+        });
+
+        const rows = Object.values(byCustomer).map(row => {
+            const start = row.start < from ? from : row.start;
+            const end = row.end > to ? to : row.end;
+            const missed = [];
+            let days = 0;
+            for (let day = start; day <= end; day = colDailyAddDay(day, 1)) {
+                days++;
+                if (!paymentDays[row.customer.id]?.has(day)) missed.push(day);
+            }
+            return { ...row, start, end, days, collectedDays: days - missed.length, missed };
+        }).filter(row => row.days > 0).sort((a, b) => b.missed.length - a.missed.length || String(a.customer.name).localeCompare(String(b.customer.name), 'ar'));
+
+        const totalMissed = rows.reduce((sum, row) => sum + row.missed.length, 0);
+        body.innerHTML = rows.length ? `
+            <div class="mod-grid" style="margin-bottom:14px">
+                <div class="mod-card"><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">عملاء عليهم تحصيل يومي</div></div>
+                <div class="mod-card"><div class="mod-card-val" style="color:var(--inv-green)">${rows.reduce((s,r)=>s+r.collectedDays,0)}</div><div class="mod-card-lbl">أيام تم فيها التحصيل</div></div>
+                <div class="mod-card"><div class="mod-card-val" style="color:var(--inv-red)">${totalMissed}</div><div class="mod-card-lbl">أيام لم يتم فيها التحصيل</div></div>
+            </div>
+            <div class="mod-table-wrap"><table class="mod-table"><thead><tr><th>العميل</th><th>الفترة</th><th>أيام الفترة</th><th>تم التحصيل</th><th>لم يتم التحصيل</th><th>الدفعة المستهدفة</th><th>الأيام بالتفصيل</th></tr></thead><tbody>
+                ${rows.map(row => `<tr>
+                    <td><strong>${row.customer.name || '—'}</strong></td>
+                    <td style="font-size:11px;white-space:nowrap">${row.start} → ${row.end}</td>
+                    <td style="text-align:center">${row.days}</td>
+                    <td style="text-align:center;color:var(--inv-green);font-weight:700">${row.collectedDays}</td>
+                    <td style="text-align:center;color:${row.missed.length?'var(--inv-red)':'var(--inv-green)'};font-weight:700">${row.missed.length}</td>
+                    <td style="white-space:nowrap">${Number(row.customer.daily_payment_target)>0 ? `${colFmt(row.customer.daily_payment_target)} ج.م` : '—'}</td>
+                    <td style="font-size:11px;color:${row.missed.length?'var(--inv-red)':'var(--inv-muted)'}">${row.missed.length ? row.missed.join('، ') : 'لا توجد أيام فائتة'}</td>
+                </tr>`).join('')}
+            </tbody></table></div>` : '<div class="empty-state"><span>✅</span>لا يوجد عملاء عليهم تحصيل يومي وفواتير آجل مفتوحة داخل الفترة</div>';
+    } catch (err) {
+        body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:14px;border-radius:8px">خطأ أثناء تحميل التقرير: ${err.message}</div>`;
+    }
+};
 
 // ════════════════════════════════════════════════════════════
 // 2) نافذة تحصيل دفعة

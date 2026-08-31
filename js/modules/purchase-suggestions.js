@@ -210,8 +210,64 @@ function psgRenderResult() {
             <input type="date" id="psgExpectedDate" class="mod-form-input">
         </div>
         <div style="font-size:17px;font-weight:800" id="psgTotal">الإجمالي: ${psgFmt(psgComputeTotal())} ج.م</div>
-        <button class="mod-btn mod-btn-primary" onclick="psgSaveOrder()">💾 حفظ كأمر شراء</button>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <button class="mod-btn" onclick="psgExportXls()">📤 تصدير Excel</button>
+            <label class="mod-btn" style="cursor:pointer;margin:0">📥 استيراد Excel<input type="file" accept=".csv,.xlsx,.xls" style="display:none" onchange="psgImportXls(this)"></label>
+            <button class="mod-btn mod-btn-primary" onclick="psgSaveOrder()">💾 حفظ كأمر شراء</button>
+        </div>
     </div>`;
+}
+
+function psgExportXls() {
+    if (!psgRows.length) { alert('⚠️ لا توجد أصناف لتصديرها'); return; }
+    const rows = psgRows.map((r, idx) => ({
+        '#': idx + 1, 'الكود': r.code || '', 'الصنف': r.name || '', 'الوحدة': r.unit || '',
+        'الرصيد الحالي': r.stock, 'مبيعات الفترة': r.sold, 'متوسط الشراء': r.avgPurchase,
+        'الكمية المقترحة': _psgSelected[r.pid] || 0, 'سعر الشراء': r.price,
+        'الإجمالي': (_psgSelected[r.pid] || 0) * r.price,
+    }));
+    rows.push({});
+    rows.push({ '#': '', 'الصنف': 'الإجمالي', 'الإجمالي': psgComputeTotal() });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:5},{wch:14},{wch:30},{wch:10},{wch:13},{wch:13},{wch:14},{wch:15},{wch:13},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws, 'اقتراح أمر شراء');
+    XLSX.writeFile(wb, `اقتراح_أمر_شراء_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function psgImportXls(input) {
+    if (!input?.files?.length) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            const byCode = {}, byName = {};
+            psgRows.forEach(r => { if (r.code) byCode[String(r.code).trim()] = r; byName[r.name.trim()] = r; });
+            let updated = 0, skipped = 0;
+            const val = (row, keys) => { for (const key of keys) if (row[key] !== undefined && row[key] !== '') return row[key]; return ''; };
+            json.forEach(row => {
+                const code = String(val(row, ['الكود', 'كود', 'code'])).trim();
+                const name = String(val(row, ['الصنف', 'اسم الصنف', 'اسم', 'name'])).trim();
+                const r = (code && byCode[code]) || (name && byName[name]);
+                if (!r) { skipped++; return; }
+                const qty = parseFloat(val(row, ['الكمية المقترحة', 'الكمية', 'كمية', 'qty']));
+                const price = parseFloat(val(row, ['سعر الشراء', 'السعر', 'price', 'unit_price']));
+                if (!Number.isNaN(qty)) _psgSelected[r.pid] = Math.max(0, qty);
+                if (!Number.isNaN(price)) r.price = Math.max(0, price);
+                updated++;
+            });
+            if (!updated) { alert('⚠️ لم يتم العثور على أصناف مطابقة في الملف'); return; }
+            const expectedDate = document.getElementById('psgExpectedDate')?.value || '';
+            psgRenderResult();
+            const dateInput = document.getElementById('psgExpectedDate');
+            if (dateInput) dateInput.value = expectedDate;
+            alert(`📥 تم تحديث ${updated} صنف${skipped ? ` (تم تجاهل ${skipped} سطر)` : ''}`);
+        } catch (err) { alert('❌ خطأ في قراءة الملف: ' + err.message); }
+        finally { input.value = ''; }
+    };
+    reader.readAsArrayBuffer(input.files[0]);
 }
 
 function psgRowHTML(r) {
@@ -312,5 +368,5 @@ async function psgSaveOrder() {
 Object.assign(window, {
     renderPurchaseSuggestions,
     psgOnCompanyChange, psgOnSupplierChange, psgOnDaysChange, psgRunSuggest,
-    psgToggleRow, psgSetQty, psgSetPrice, psgSaveOrder,
+    psgToggleRow, psgSetQty, psgSetPrice, psgSaveOrder, psgExportXls, psgImportXls,
 });

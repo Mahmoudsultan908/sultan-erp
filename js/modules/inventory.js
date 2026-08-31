@@ -4,6 +4,7 @@
 // ════════════════════════════════════════════════════════════
 
 let invActiveTab = 'view';
+function stkCountFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 async function renderInventory(container) {
     container.innerHTML = `
@@ -14,6 +15,7 @@ async function renderInventory(container) {
         <div style="display:flex;gap:8px;margin-bottom:16px">
             <button id="inv-tab-view" class="dash-trend-btn active" style="font-size:13px;padding:8px 16px" onclick="stkCountSwitchTab('view')">📦 عرض المخزون</button>
             <button id="inv-tab-count" class="dash-trend-btn" style="font-size:13px;padding:8px 16px" onclick="stkCountSwitchTab('count')">🧮 جرد فعلي</button>
+            <button id="inv-tab-history" class="dash-trend-btn" style="font-size:13px;padding:8px 16px" onclick="stkCountSwitchTab('history')">📋 تقرير التسويات</button>
         </div>
         <div id="inv-tab-content"></div>
     </div>`;
@@ -24,10 +26,12 @@ function stkCountSwitchTab(tab) {
     invActiveTab = tab;
     document.getElementById('inv-tab-view')?.classList.toggle('active', tab === 'view');
     document.getElementById('inv-tab-count')?.classList.toggle('active', tab === 'count');
+    document.getElementById('inv-tab-history')?.classList.toggle('active', tab === 'history');
     const root = document.getElementById('inv-tab-content');
     if (!root) return;
     if (tab === 'view') invRenderStockView(root);
-    else stkCountRenderForm(root);
+    else if (tab === 'count') stkCountRenderForm(root);
+    else stkCountRenderHistory(root);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -232,12 +236,53 @@ async function invRenderStockView(root) {
 }
 
 // ════════════════════════════════════════════════════════════
-// تبويب 2: جرد فعلي (تسوية) — راجع stock_count_reconciliation_migration.sql
-// مفيش أي أثر محاسبي هنا، مجرد تصحيح مباشر لكمية inventory_stock +
-// سجل تدقيق (system_qty وقت الجرد، الكمية المعدودة، الفرق)
+// تبويب 2: جرد فعلي (تسوية)
 // ════════════════════════════════════════════════════════════
 let stkCountWarehouses = [];
 let stkCountRows = []; // { product_id, name, code, unit, system_qty }
+
+async function stkCountRenderHistory(root) {
+    root.innerHTML = '<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل تقرير التسويات...</div>';
+    try {
+        const { data, error } = await sb.from('stock_count_items')
+            .select('count_id,product_id,system_qty,counted_qty,diff,unit_name,unit_cost,products(name,code),stock_counts!inner(warehouse_id,notes,created_at,warehouses(name))')
+            .order('created_at', { foreignTable: 'stock_counts', ascending: false })
+            .limit(1000);
+        if (error) throw error;
+        const rows = data || [];
+        const shortage = rows.reduce((s, r) => s + Math.max(0, -(Number(r.diff) || 0)) * (Number(r.unit_cost) || 0), 0);
+        const surplus = rows.reduce((s, r) => s + Math.max(0, Number(r.diff) || 0) * (Number(r.unit_cost) || 0), 0);
+        const countIds = new Set(rows.map(r => r.count_id));
+        root.innerHTML = `
+            <div class="mod-grid" style="margin-bottom:16px">
+                <div class="mod-card"><div class="mod-card-val">${countIds.size}</div><div class="mod-card-lbl">عمليات الجرد</div></div>
+                <div class="mod-card"><div class="mod-card-val" style="color:var(--inv-red)">${stkCountFmt(shortage)}</div><div class="mod-card-lbl">قيمة عجز الجرد</div></div>
+                <div class="mod-card"><div class="mod-card-val" style="color:var(--inv-green)">${stkCountFmt(surplus)}</div><div class="mod-card-lbl">قيمة زيادة الجرد</div></div>
+                <div class="mod-card"><div class="mod-card-val">${stkCountFmt(surplus - shortage)}</div><div class="mod-card-lbl">صافي أثر التسوية</div></div>
+            </div>
+            <div class="mod-alert-banner info" style="margin-bottom:16px">القيم محسوبة بسعر شراء الصنف وقت الجرد. الجرد القديم قبل إضافة التكلفة يظهر بقيمة صفر لحين وجود تكلفة محفوظة له.</div>
+            <div class="dash-card" style="padding:0;overflow-x:auto"><table class="dash-table" style="margin:0;white-space:nowrap">
+                <thead><tr><th>التاريخ</th><th>المخزن</th><th>الصنف</th><th>رصيد النظام</th><th>المعدود</th><th>الفرق</th><th>تكلفة الوحدة</th><th>قيمة الفرق</th><th>ملاحظات</th></tr></thead>
+                <tbody>${rows.length ? rows.map(r => {
+                    const diff = Number(r.diff) || 0;
+                    const value = Math.abs(diff) * (Number(r.unit_cost) || 0);
+                    return `<tr>
+                        <td style="font-size:12px">${r.stock_counts?.created_at ? new Date(r.stock_counts.created_at).toLocaleString('ar-EG') : '—'}</td>
+                        <td>${r.stock_counts?.warehouses?.name || '—'}</td>
+                        <td><strong>${r.products?.name || '—'}</strong><div style="font-size:11px;color:var(--inv-muted-light)">${r.products?.code || ''}</div></td>
+                        <td>${stkCountFmt(r.system_qty)} ${r.unit_name || ''}</td>
+                        <td>${stkCountFmt(r.counted_qty)} ${r.unit_name || ''}</td>
+                        <td style="font-weight:800;color:${diff < 0 ? 'var(--inv-red)' : diff > 0 ? 'var(--inv-green)' : 'var(--inv-muted)'}">${diff > 0 ? '+' : ''}${stkCountFmt(diff)}</td>
+                        <td>${Number(r.unit_cost) > 0 ? stkCountFmt(r.unit_cost) : '—'}</td>
+                        <td style="font-weight:700;color:${diff < 0 ? 'var(--inv-red)' : diff > 0 ? 'var(--inv-green)' : 'var(--inv-muted)'}">${value > 0 ? stkCountFmt(value) : '—'}</td>
+                        <td style="font-size:11px;color:var(--inv-muted)">${r.stock_counts?.notes || '—'}</td>
+                    </tr>`;
+                }).join('') : '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--inv-muted-light)">لا توجد تسويات مسجلة</td></tr>'}</tbody>
+            </table></div>`;
+    } catch (err) {
+        root.innerHTML = `<div class="dash-error"><div style="font-size:32px">⚠️</div><div>خطأ: ${err.message}</div></div>`;
+    }
+}
 
 async function stkCountRenderForm(root) {
     root.innerHTML = `<div style="text-align:center;padding:40px;color:var(--inv-muted)"><div style="font-size:32px;margin-bottom:8px">⏳</div>جاري تحميل الأصناف...</div>`;
@@ -347,7 +392,7 @@ window.stkCountConfirm = async (warehouseId) => {
         return { product_id: i.dataset.pid, system_qty: row.system_qty, counted_qty: Number(i.value) || 0, unit_name: row.unit };
     });
 
-    if (!confirm(`هيتم تحديث مخزون ${items.length} صنف مباشرة على الكمية اللي دخلتها. متأكد؟`)) return;
+    if (!confirm(`هيتم تسجيل تسوية جرد لـ ${items.length} صنف وتحديث المخزون بالكمية المعدودة. الفرق هيتسجل في حركة الصنف وقيد عجز/زيادة حسب تكلفة الشراء. متأكد؟`)) return;
 
     try {
         await sb.rpc('fn_apply_stock_count', {

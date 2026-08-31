@@ -13,7 +13,7 @@ async function renderVanStockView(root) {
     try {
         const [{ data: stock }, { data: reps }] = await Promise.all([
             sb.from('van_stock')
-                .select('qty, rep_id, product_id, products(name, code, unit, purchase_price, reorder_point, product_categories(name))')
+                .select('qty, rep_id, product_id, products(name, code, unit, purchase_price, retail_price, wholesale_price, reorder_point, product_categories(name))')
                 .order('qty', { ascending: true }),
             sb.from('sales_reps').select('id, name').eq('is_active', true).order('name'),
         ]);
@@ -22,7 +22,9 @@ async function renderVanStockView(root) {
         const repMap = {};
         (reps || []).forEach(r => repMap[r.id] = r.name);
 
-        let filterRep = 'all', filterStatus = 'all', search = '';
+        let filterRep = 'all', filterStatus = 'all', search = '', currentRows = [];
+        const sellPrice = s => Number(s.products?.retail_price) || Number(s.products?.wholesale_price) || 0;
+        const esc = value => String(value ?? '').replace(/[&<>\"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;', "'":'&#39;' }[ch]));
 
         const render = () => {
             let rows = (stock || []).filter(s => {
@@ -39,6 +41,7 @@ async function renderVanStockView(root) {
                 }
                 return true;
             });
+            currentRows = rows;
 
             const totalVal = rows.reduce((sum, s) => sum + (s.qty * Number(s.products?.purchase_price || 0)), 0);
             const lowCount = rows.filter(s => s.qty > 0 && s.qty <= 10).length;
@@ -69,6 +72,13 @@ async function renderVanStockView(root) {
         };
 
         root.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+                <div><h2 style="font-size:22px;font-weight:800;margin:0">🚗 مخزون العربيات</h2><div style="font-size:12px;color:var(--inv-muted);margin-top:3px">تصدير أو طباعة النتائج الظاهرة حسب الفلتر الحالي</div></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="mod-btn" onclick="vrvExportExcel()">📤 تصدير Excel</button>
+                    <button class="mod-btn" onclick="vrvPrintStock()">🖨️ طباعة المخزون</button>
+                </div>
+            </div>
             <!-- KPI -->
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
                 <div class="dash-kpi dash-kpi-blue" style="padding:14px">
@@ -127,6 +137,29 @@ async function renderVanStockView(root) {
         document.getElementById('vrv-search').oninput = (e) => { search = e.target.value; render(); };
         document.getElementById('vrv-rep-filter').onchange = (e) => { filterRep = e.target.value; render(); };
         document.getElementById('vrv-status-filter').onchange = (e) => { filterStatus = e.target.value; render(); };
+        window.vrvExportExcel = function () {
+            if (!currentRows.length) { alert('⚠️ لا توجد نتائج لتصديرها'); return; }
+            const rows = currentRows.map((s, idx) => ({
+                '#': idx + 1, 'الصنف': s.products?.name || '', 'الكود': s.products?.code || '',
+                'المندوب': repMap[s.rep_id] || '', 'الكمية الموجودة': Number(s.qty) || 0,
+                'سعر البيع': sellPrice(s), 'حد الطلب': Number(s.products?.reorder_point) || 0,
+                'الحالة': (Number(s.qty) || 0) <= 0 ? 'فارغ' : (Number(s.qty) || 0) <= 10 ? 'منخفض' : 'جيد',
+                'قيمة الشراء': (Number(s.qty) || 0) * (Number(s.products?.purchase_price) || 0),
+            }));
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(rows);
+            ws['!cols'] = [{wch:5},{wch:30},{wch:14},{wch:20},{wch:16},{wch:13},{wch:12},{wch:10},{wch:15}];
+            XLSX.utils.book_append_sheet(wb, ws, 'مخزون العربيات');
+            XLSX.writeFile(wb, `مخزون_العربيات_${new Date().toISOString().slice(0,10)}.xlsx`);
+        };
+        window.vrvPrintStock = function () {
+            if (!currentRows.length) { alert('⚠️ لا توجد نتائج للطباعة'); return; }
+            const printWin = window.open('', '_blank', 'width=900,height=700');
+            if (!printWin) { alert('اسمح بفتح النوافذ المنبثقة للطباعة'); return; }
+            const date = new Date().toLocaleDateString('ar-EG');
+            printWin.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>مخزون العربيات</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1{font-size:20px;margin:0 0 5px}p{color:#555;font-size:12px;margin:0 0 18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:8px;text-align:right;font-size:12px}th{background:#f1f5f9;font-weight:bold}.num{text-align:center;direction:ltr}@media print{button{display:none}}</style></head><body><h1>تقرير مخزون العربيات</h1><p>التاريخ: ${esc(date)} — عدد الأصناف: ${currentRows.length}</p><table><thead><tr><th>اسم الصنف</th><th>المندوب</th><th>الكمية الموجودة</th><th>سعر البيع</th></tr></thead><tbody>${currentRows.map(s => `<tr><td>${esc(s.products?.name || '—')}</td><td>${esc(repMap[s.rep_id] || '—')}</td><td class="num">${fmt(s.qty)} ${esc(s.products?.unit || 'وحدة')}</td><td class="num">${fmt(sellPrice(s))} ج.م</td></tr>`).join('')}</tbody></table><script>window.onload=function(){window.print();window.close();};<\/script></body></html>`);
+            printWin.document.close();
+        };
         render();
 
     } catch (err) {

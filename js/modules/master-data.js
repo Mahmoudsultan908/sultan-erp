@@ -126,13 +126,13 @@ function custRenderPage(c) {
         </div>
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${_mgCustList.length}</div><div class="mod-card-lbl">إجمالي العملاء</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${mdFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⏰</div><div class="mod-card-val">${mdFmt(overdueAmount)}</div><div class="mod-card-lbl">رصيد أجله المسجل متأخر (${overdueCount})</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FEF3C7;color:#B45309">📅</div><div class="mod-card-val">${dueSoonCount}</div><div class="mod-card-lbl">مستحق خلال 7 أيام</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#F1F5F9;color:#64748B">❔</div><div class="mod-card-val">${noDueCount}</div><div class="mod-card-lbl">عليهم رصيد بلا أجل</div></div>
-            <div class="mod-card"><div class="mod-card-icon" style="background:#FFF7ED;color:#C2410C">🚫</div><div class="mod-card-val">${overLimitCount}</div><div class="mod-card-lbl">متجاوزون الحد الائتماني</div></div>
+            <div class="mod-card" role="button" tabindex="0" title="اضغط لتصفية العملاء" style="cursor:pointer" onclick="custQuickFilter('all')" onkeydown="if(event.key==='Enter'||event.key===' ')custQuickFilter('all')"><div class="mod-card-icon" style="background:#E0E7FF;color:#4F46E5">👥</div><div class="mod-card-val">${_mgCustList.length}</div><div class="mod-card-lbl">إجمالي العملاء</div></div>
+            <div class="mod-card" role="button" tabindex="0" title="اضغط لتصفية العملاء" style="cursor:pointer" onclick="custQuickFilter('debt')" onkeydown="if(event.key==='Enter'||event.key===' ')custQuickFilter('debt')"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⚠️</div><div class="mod-card-val">${mdFmt(totalDebt)}</div><div class="mod-card-lbl">مديونيات العملاء (${debtors.length})</div></div>
+            <div class="mod-card" role="button" tabindex="0" title="اضغط لتصفية العملاء" style="cursor:pointer" onclick="custQuickFilter('credit')" onkeydown="if(event.key==='Enter'||event.key===' ')custQuickFilter('credit')"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">💵</div><div class="mod-card-val">${mdFmt(totalCredit)}</div><div class="mod-card-lbl">أرصدة دائنة (دفعات مقدمة)</div></div>
+            <div class="mod-card" role="button" tabindex="0" title="اضغط لتصفية العملاء" style="cursor:pointer" onclick="custQuickFilter('overdue')" onkeydown="if(event.key==='Enter'||event.key===' ')custQuickFilter('overdue')"><div class="mod-card-icon" style="background:var(--inv-red-bg);color:var(--inv-red)">⏰</div><div class="mod-card-val">${mdFmt(overdueAmount)}</div><div class="mod-card-lbl">رصيد أجله المسجل متأخر (${overdueCount})</div></div>
+            <div class="mod-card" role="button" tabindex="0" title="اضغط لتصفية العملاء" style="cursor:pointer" onclick="custQuickFilter('dueSoon')" onkeydown="if(event.key==='Enter'||event.key===' ')custQuickFilter('dueSoon')"><div class="mod-card-icon" style="background:#FEF3C7;color:#B45309">📅</div><div class="mod-card-val">${dueSoonCount}</div><div class="mod-card-lbl">مستحق خلال 7 أيام</div></div>
+            <div class="mod-card" role="button" tabindex="0" title="اضغط لتصفية العملاء" style="cursor:pointer" onclick="custQuickFilter('noDue')" onkeydown="if(event.key==='Enter'||event.key===' ')custQuickFilter('noDue')"><div class="mod-card-icon" style="background:#F1F5F9;color:#64748B">❔</div><div class="mod-card-val">${noDueCount}</div><div class="mod-card-lbl">عليهم رصيد بلا أجل</div></div>
+            <div class="mod-card" role="button" tabindex="0" title="اضغط لتصفية العملاء" style="cursor:pointer" onclick="custQuickFilter('overLimit')" onkeydown="if(event.key==='Enter'||event.key===' ')custQuickFilter('overLimit')"><div class="mod-card-icon" style="background:#FFF7ED;color:#C2410C">🚫</div><div class="mod-card-val">${overLimitCount}</div><div class="mod-card-lbl">متجاوزون الحد الائتماني</div></div>
         </div>
 
         <div class="mod-card" style="margin-bottom:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
@@ -157,13 +157,16 @@ function custRenderPage(c) {
             </select>
             <select id="custMgDue" class="mod-form-input" style="margin:0;min-width:160px" onchange="custRenderRows()">
                 <option value="all">كل حالات الأجل</option>
+                <option value="overdue_any">كل المتأخرين</option>
                 <option value="overdue_31">متأخر أكثر من 30 يوم</option>
                 <option value="overdue_8_30">متأخر 8–30 يوم</option>
                 <option value="overdue_1_7">متأخر 1–7 أيام</option>
+                <option value="due_soon">مستحق اليوم أو خلال 7 أيام</option>
                 <option value="due_today">مستحق اليوم</option>
                 <option value="due_7">مستحق خلال 7 أيام</option>
                 <option value="future">أجل قادم</option>
                 <option value="no_due">عليه رصيد بلا أجل</option>
+                <option value="over_limit">متجاوز الحد الائتماني</option>
                 <option value="settled">مسدد / بدون رصيد</option>
             </select>
             <select id="custMgGroupBy" class="mod-form-input" style="margin:0;min-width:145px" onchange="custRenderRows()">
@@ -203,7 +206,17 @@ function custRenderRows() {
         if (regionFilter !== 'all' && (x.region_id || '') !== regionFilter) return false;
         if (repFilter !== 'all' && (repFilter === 'none' ? x.default_rep_id : x.default_rep_id !== repFilter)) return false;
         if (payFilter !== 'all' && (payFilter === 'none' ? x.preferred_payment_method : x.preferred_payment_method !== payFilter)) return false;
-        if (dueFilter !== 'all' && mdCustDueBucket(x) !== dueFilter) return false;
+        if (dueFilter !== 'all') {
+            const dueBucket = mdCustDueBucket(x);
+            const dueMatches = dueFilter === 'overdue_any'
+                ? dueBucket.startsWith('overdue_')
+                : dueFilter === 'due_soon'
+                    ? ['due_today', 'due_7'].includes(dueBucket)
+                    : dueFilter === 'over_limit'
+                        ? Number(x.credit_limit) > 0 && (Number(x.balance) || 0) > Number(x.credit_limit)
+                        : dueBucket === dueFilter;
+            if (!dueMatches) return false;
+        }
         return true;
     });
     const balOp = document.getElementById('custMgBalOp')?.value;
@@ -281,6 +294,22 @@ window.custResetFilters = function() {
     const defaults = { custMgSearch: '', custMgRegion: 'all', custMgRep: 'all', custMgPay: 'all', custMgDue: 'all', custMgGroupBy: 'none', custMgBalOp: '', custMgBalVal: '' };
     Object.entries(defaults).forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
     custRenderRows();
+};
+window.custQuickFilter = function(kind) {
+    const defaults = { custMgSearch: '', custMgRegion: 'all', custMgRep: 'all', custMgPay: 'all', custMgDue: 'all', custMgGroupBy: 'none', custMgBalOp: '', custMgBalVal: '' };
+    _mgCustSearch = '';
+    Object.entries(defaults).forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
+    if (kind === 'debt' || kind === 'credit') {
+        const op = document.getElementById('custMgBalOp');
+        const value = document.getElementById('custMgBalVal');
+        if (op) op.value = kind === 'debt' ? 'gt' : 'lt';
+        if (value) value.value = '0';
+    } else if (kind === 'overdue' || kind === 'dueSoon' || kind === 'noDue' || kind === 'overLimit') {
+        const due = document.getElementById('custMgDue');
+        if (due) due.value = kind === 'overdue' ? 'overdue_any' : kind === 'dueSoon' ? 'due_soon' : kind === 'noDue' ? 'no_due' : 'over_limit';
+    }
+    custRenderRows();
+    document.getElementById('custMgTbody')?.closest('.mod-table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 window.custOpenAdd = function() { _mgCustEditingId = null; custOpenModal(null); };

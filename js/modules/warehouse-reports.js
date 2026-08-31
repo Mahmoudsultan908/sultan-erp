@@ -174,6 +174,7 @@ const WR_TYPE_META = {
     sale:            { icon: '🛒', color: 'var(--inv-red)', label: 'بيع' },
     sale_return:     { icon: '↩️', color: 'var(--inv-green)', label: 'مرتجع بيع' },
     purchase_return: { icon: '↩️', color: 'var(--inv-red)', label: 'مرتجع شراء' },
+    stock_count:    { icon: '🧮', color: 'var(--inv-gold)', label: 'تسوية جرد' },
 };
 
 window.wrRunMovement = async function () {
@@ -193,22 +194,31 @@ window.wrRunMovement = async function () {
             { data: saleRows },
             { data: saleRetRows },
             { data: purRetRows },
+            { data: stockCountRows },
             { data: liveStock },
         ] = await Promise.all([
             sb.from('opening_balances').select('qty, warehouse_id, as_of_date').eq('balance_type', 'inventory').eq('product_id', pid),
-            sb.from('purchase_items').select('qty, purchases!inner(warehouse_id, invoice_no, created_at, status)').eq('product_id', pid).eq('purchases.status', 'confirmed'),
-            sb.from('sale_items').select('qty, free_qty, sales!inner(warehouse_id, invoice_no, created_at, status)').eq('product_id', pid).eq('sales.status', 'confirmed'),
+            sb.from('purchase_items').select('qty,units_per_carton_snapshot, purchases!inner(warehouse_id, invoice_no, created_at, status)').eq('product_id', pid).eq('purchases.status', 'confirmed'),
+            sb.from('sale_items').select('qty,unit_type,units_per_carton_snapshot, sales!inner(warehouse_id, invoice_no, created_at, status)').eq('product_id', pid).eq('sales.status', 'confirmed'),
             sb.from('sale_return_items').select('qty, sales_returns!inner(warehouse_id, return_no, created_at, status)').eq('product_id', pid).eq('sales_returns.status', 'confirmed'),
-            sb.from('purchase_return_items').select('qty, purchase_returns!inner(warehouse_id, return_no, created_at, status)').eq('product_id', pid).eq('purchase_returns.status', 'confirmed'),
+            sb.from('purchase_return_items').select('qty,units_per_carton_snapshot, purchase_returns!inner(warehouse_id, return_no, created_at, status)').eq('product_id', pid).eq('purchase_returns.status', 'confirmed'),
+            sb.from('stock_count_items').select('diff, stock_counts!inner(warehouse_id, created_at)').eq('product_id', pid),
             sb.from('inventory_stock').select('warehouse_id, qty').eq('product_id', pid),
         ]);
 
         let moves = [];
         (opening || []).forEach(r => moves.push({ date: r.as_of_date, type: 'opening', ref: 'رصيد افتتاحي', warehouse_id: r.warehouse_id, in: Number(r.qty) || 0, out: 0 }));
-        (purchaseRows || []).forEach(r => { const d = r.purchases; moves.push({ date: d.created_at, type: 'purchase', ref: 'شراء ' + d.invoice_no, warehouse_id: d.warehouse_id, in: Number(r.qty) || 0, out: 0 }); });
-        (saleRows || []).forEach(r => { const d = r.sales; moves.push({ date: d.created_at, type: 'sale', ref: 'بيع ' + d.invoice_no, warehouse_id: d.warehouse_id, in: 0, out: (Number(r.qty) || 0) + (Number(r.free_qty) || 0) }); });
+        const wrSmallestQty = r => (Number(r.qty) || 0) * (r.unit_type === 'purchase_unit' ? (Number(r.units_per_carton_snapshot) || 1) : 1);
+        (purchaseRows || []).forEach(r => { const d = r.purchases; moves.push({ date: d.created_at, type: 'purchase', ref: 'شراء ' + d.invoice_no, warehouse_id: d.warehouse_id, in: (Number(r.qty) || 0) * (Number(r.units_per_carton_snapshot) || 1), out: 0 }); });
+        (saleRows || []).forEach(r => { const d = r.sales; moves.push({ date: d.created_at, type: 'sale', ref: 'بيع ' + d.invoice_no, warehouse_id: d.warehouse_id, in: 0, out: wrSmallestQty(r) }); });
         (saleRetRows || []).forEach(r => { const d = r.sales_returns; moves.push({ date: d.created_at, type: 'sale_return', ref: 'مرتجع بيع ' + d.return_no, warehouse_id: d.warehouse_id, in: Number(r.qty) || 0, out: 0 }); });
-        (purRetRows || []).forEach(r => { const d = r.purchase_returns; moves.push({ date: d.created_at, type: 'purchase_return', ref: 'مرتجع شراء ' + d.return_no, warehouse_id: d.warehouse_id, in: 0, out: Number(r.qty) || 0 }); });
+        (purRetRows || []).forEach(r => { const d = r.purchase_returns; moves.push({ date: d.created_at, type: 'purchase_return', ref: 'مرتجع شراء ' + d.return_no, warehouse_id: d.warehouse_id, in: 0, out: (Number(r.qty) || 0) * (Number(r.units_per_carton_snapshot) || 1) }); });
+        (stockCountRows || []).forEach(r => {
+            const d = r.stock_counts;
+            const diff = Number(r.diff) || 0;
+            if (!d || diff === 0) return;
+            moves.push({ date: d.created_at, type: 'stock_count', ref: 'تسوية جرد', warehouse_id: d.warehouse_id, in: diff > 0 ? diff : 0, out: diff < 0 ? Math.abs(diff) : 0 });
+        });
 
         if (whId) moves = moves.filter(m => m.warehouse_id === whId);
         if (from) moves = moves.filter(m => (m.date || '').slice(0, 10) >= from);
@@ -231,7 +241,7 @@ window.wrRunMovement = async function () {
         </div>
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px">
             💡 الرصيد التراكمي بالجدول بيعكس حركات الفلتر الحالي بس${filtered ? ' — شيل التاريخ لعرض كل الحركة من البداية' : ''}.
-            عمليات "تحويل مخزون" بين المخازن مش متضمّنة هنا حالياً لأن النظام لسه ما بيسجّلش سجل تاريخي لها.
+            عمليات "تحويل مخزون" بين المخازن مش متضمّنة هنا حالياً لأن النظام لسه ما بيسجّلش سجل تاريخي لها. تسويات الجرد تظهر كحركة وارد/منصرف.
         </div>
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>

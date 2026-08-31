@@ -132,7 +132,7 @@ async function renderPurchases(c) {
                     id: Date.now() + Math.random(), pid: it.product_id,
                     name: it.products?.name || '', code: it.products?.code || '',
                     qty: Number(it.qty) || 0, price: Number(it.unit_price) || 0,
-                    disc: Number(it.discount_pct) || 0, free: 0, unit: it.products?.unit || '', upc: 1,
+                    disc: Number(it.discount_pct) || 0, free: Number(it.free_qty) || 0, unit: it.products?.unit || '', upc: 1,
                     // deferred_rate المحفوظ فعلياً دايماً مبلغ ثابت للوحدة (راجع
                     // purSave) بصرف النظر إن كان المستخدم أصلاً اختار % وقت الإدخال —
                     // فبنعيد عرضه هنا كـ "ثابت" دايماً، مش بنحاول نرجّع النسبة الأصلية.
@@ -200,6 +200,7 @@ async function renderPurchases(c) {
                 ${purTotalsCardHTML()}
                 ${purActionsCardHTML()}
                 ${purNotesCardHTML()}
+                ${purExcelCardHTML()}
                 ${purDraftsCardHTML()}
             </div>
         </div>
@@ -374,6 +375,94 @@ function purDraftsCardHTML() {
         <div class="inv-card-title">📋 فواتير معلّقة <span class="inv-draft-badge" id="purDraftCount">0</span><span class="inv-autosave-badge" style="margin-right:auto"><span class="dot"></span> حفظ تلقائي</span></div>
         <div id="purDraftsList"></div>
     </div>`;
+}
+
+function purExcelCardHTML() {
+    return `
+    <div class="inv-card">
+        <div class="inv-card-title">📊 استيراد وتصدير</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+            <button class="inv-btn inv-btn-print" onclick="purExportXls()">📤 تصدير الفاتورة Excel</button>
+            <label class="inv-btn inv-btn-print" style="cursor:pointer;justify-content:center;margin:0">
+                📥 استيراد من Excel
+                <input type="file" accept=".csv,.xlsx,.xls" style="display:none" onchange="purImportXls(this)">
+            </label>
+        </div>
+        <div style="font-size:11px;color:var(--inv-muted);margin-top:6px">الأعمدة المدعومة: الكود أو الصنف، الكمية، سعر الشراء، الخصم، المجاني، المؤجل.</div>
+    </div>`;
+}
+
+function purExportXls() {
+    const filled = purItems.filter(i => i.pid);
+    if (!filled.length) { purToast('⚠️ لا يوجد أصناف للتصدير', 'error'); return; }
+    const rows = filled.map((it, idx) => ({
+        '#': idx + 1,
+        'الكود': it.code || '',
+        'الصنف': it.name || '',
+        'الوحدة': it.unit || '',
+        'الكمية': Number(it.qty) || 0,
+        'مجاني': Number(it.free) || 0,
+        'سعر الشراء': Number(it.price) || 0,
+        'خصم%': Number(it.disc) || 0,
+        'المؤجل': Number(it.deferredRate) || 0,
+        'نوع المؤجل': (it.deferredType || 'percent') === 'fixed' ? 'ثابت' : '%',
+        'الإجمالي': (Number(it.qty) || 0) * (Number(it.price) || 0) * (1 - (Number(it.disc) || 0) / 100),
+    }));
+    rows.push({});
+    rows.push({ '#': '', 'الصنف': 'الصافي', 'الإجمالي': purCalcNet().net });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:5},{wch:14},{wch:30},{wch:10},{wch:10},{wch:9},{wch:13},{wch:8},{wch:10},{wch:12},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws, 'فاتورة مشتريات');
+    const no = purEditingId ? purEditingOldInvoiceNo : 'PUR-' + String(PUR_DB.purchaseNo).padStart(4, '0');
+    XLSX.writeFile(wb, `${no}_فاتورة_مشتريات.xlsx`);
+    purToast('📤 تم تصدير الفاتورة بنجاح', 'success');
+}
+
+function purImportXls(input) {
+    if (!input?.files?.length) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            const imported = [];
+            let skipped = 0;
+            const val = (row, keys) => {
+                for (const key of keys) if (row[key] !== undefined && row[key] !== '') return row[key];
+                return '';
+            };
+            json.forEach(row => {
+                const code = String(val(row, ['الكود', 'كود', 'code', 'Code'])).trim();
+                const name = String(val(row, ['الصنف', 'اسم الصنف', 'اسم', 'name', 'Name'])).trim();
+                const qty = parseFloat(val(row, ['الكمية', 'كمية', 'qty', 'quantity'])) || 0;
+                if (qty <= 0) { skipped++; return; }
+                let p = code ? PUR_DB.products.find(x => String(x.code || '').trim() === code) : null;
+                if (!p && name) p = PUR_DB.products.find(x => (x.name || '').trim() === name) || PUR_DB.products.find(x => (x.name || '').includes(name) || name.includes(x.name || ''));
+                if (!p) { skipped++; return; }
+                const price = parseFloat(val(row, ['سعر الشراء', 'السعر', 'سعر', 'price', 'unit_price'])) || purGetBuyPrice(p);
+                const disc = parseFloat(val(row, ['خصم%', 'خصم', 'discount'])) || 0;
+                const free = parseFloat(val(row, ['مجاني', 'free'])) || 0;
+                const deferred = parseFloat(val(row, ['المؤجل', 'مؤجل', 'deferred'])) || 0;
+                const typeText = String(val(row, ['نوع المؤجل', 'deferred_type'])).trim().toLowerCase();
+                imported.push({ id: Date.now() + imported.length, pid: p.id, name: p.name, code: p.code || code, qty, price, disc, free, unit: p.unit || '', upc: p.units_per_carton || 1, deferredRate: deferred, deferredDate: '', deferredType: typeText === 'ثابت' || typeText === 'fixed' ? 'fixed' : 'percent' });
+            });
+            if (!imported.length) { purToast('⚠️ لم يتم العثور على أصناف مطابقة في الملف', 'error'); return; }
+            if (purItems.some(i => i.pid) && !confirm('الفاتورة تحتوي على أصناف حالياً. هل تريد استبدالها بالأصناف المستوردة؟')) return;
+            purItems = imported;
+            purEnsureNewRow();
+            purRenderItems();
+            purUpdateSummary();
+            purToast(`📥 تم استيراد ${imported.length} صنف${skipped ? ` (تم تجاهل ${skipped} سطر)` : ''}`, 'success');
+        } catch (err) {
+            purToast('❌ خطأ في قراءة الملف: ' + err.message, 'error');
+        } finally {
+            input.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1010,6 +1099,7 @@ async function purSave(andNew) {
                 unit_price: it.price,
                 line_total: lineTotal,
                 discount_pct: it.disc || 0,
+                free_qty: it.free || 0,
                 deferred_rate: deferredPerUnit,
                 deferred_type: it.deferredType || 'percent',
                 deferred_due_date: deferredPerUnit > 0 ? (document.getElementById('purDate')?.value || null) : null,

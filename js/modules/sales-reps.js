@@ -277,82 +277,13 @@ window.repToggleActive = async function (id, newState) {
 };
 
 // ════════════════════════════════════════════════════════════
-// 3) كشف مبيعات مندوب (مودال)
+// 3) كشف حساب مندوب — بيستخدم الشاشة الموحّدة في payroll.js (مرتب +
+//    خصم غياب + سلف + حوافز + عمولة + هدف مع بعض)، عشان يبقى نفس
+//    الرقم في أي مكان تفتحه منه (راجع توحيد الموظفين/المناديب).
 // ════════════════════════════════════════════════════════════
 window.repShowStatement = async function (repId) {
-    const rep = _repList.find(r => r.id === repId);
-    if (!rep) return;
-
-    const modal = document.createElement('div');
-    modal.className = 'mod-modal-bg active';
-    modal.id = 'repStmtModal';
-    modal.innerHTML = `
-        <div class="mod-modal" style="max-width:760px">
-            <div class="mod-modal-header"><h3>📄 كشف مبيعات — ${rep.name}</h3>
-                <button class="mod-modal-close" onclick="document.getElementById('repStmtModal').remove()">&times;</button></div>
-            <div class="mod-modal-body" id="repStmtBody">
-                <div class="empty-state"><span>⏳</span>جاري تجميع الفواتير...</div>
-            </div>
-        </div>`;
-    document.body.appendChild(modal);
-
-    try {
-        const [{ data: sales }, { data: returns }] = await Promise.all([
-            sb.from('sales')
-                .select('invoice_no, total, payment_type, status, created_at, customers(name)')
-                .eq('rep_id', repId).order('created_at', { ascending: false }).limit(200),
-            sb.from('sales_returns')
-                .select('return_no, total, status, created_at, customers(name)')
-                .eq('rep_id', repId).order('created_at', { ascending: false }).limit(200),
-        ]);
-
-        const rows = (sales || []).filter(s => s.status === 'confirmed');
-        const retRows = (returns || []).filter(r => r.status === 'confirmed');
-        const salesTotal = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
-        const returnsTotal = retRows.reduce((s, r) => s + (Number(r.total) || 0), 0);
-        const total = salesTotal - returnsTotal;
-        const commission = total * (Number(rep.commission_pct) || 0) / 100;
-
-        document.getElementById('repStmtBody').innerHTML = `
-            <div class="mod-grid" style="margin-bottom:16px">
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">عدد الفواتير</div>
-                    <div style="font-size:22px;font-weight:800">${rows.length}</div>
-                </div>
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">صافي المبيعات (بعد ${repFmt(returnsTotal)} مرتجعات)</div>
-                    <div style="font-size:22px;font-weight:800;color:var(--inv-text)">${repFmt(total)}</div>
-                </div>
-                <div class="mod-card" style="padding:14px">
-                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">العمولة المستحقة (${Number(rep.commission_pct) || 0}%)</div>
-                    <div style="font-size:22px;font-weight:800;color:var(--inv-green)">${repFmt(commission)}</div>
-                </div>
-            </div>
-            <div class="mod-table-wrap">
-                <table class="mod-table"><thead><tr>
-                    <th>رقم الفاتورة</th><th>العميل</th><th>نوع الدفع</th><th>التاريخ</th><th style="text-align:left">الإجمالي</th>
-                </tr></thead>
-                <tbody>
-                    ${rows.length === 0 && retRows.length === 0 ? `<tr><td colspan="5" class="empty-state"><span>📭</span>لا توجد فواتير مرتبطة بهذا المندوب.</td></tr>` : ''}
-                    ${rows.map(s => `<tr>
-                        <td><span style="background:#F1F5F9;padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace">${s.invoice_no}</span></td>
-                        <td>${s.customers?.name || 'نقدي'}</td>
-                        <td>${s.payment_type === 'cash' ? '💵 نقدي' : '📋 آجل'}</td>
-                        <td style="font-size:12px">${new Date(s.created_at).toLocaleDateString('ar-EG')}</td>
-                        <td style="text-align:left;font-weight:700">${repFmt(s.total)}</td>
-                    </tr>`).join('')}
-                    ${retRows.map(r => `<tr>
-                        <td><span style="background:var(--inv-red-bg);padding:2px 8px;border-radius:5px;font-size:11px;font-family:monospace">${r.return_no}</span></td>
-                        <td>${r.customers?.name || 'نقدي'}</td>
-                        <td>↩️ مرتجع</td>
-                        <td style="font-size:12px">${new Date(r.created_at).toLocaleDateString('ar-EG')}</td>
-                        <td style="text-align:left;font-weight:700;color:var(--inv-red)">-${repFmt(r.total)}</td>
-                    </tr>`).join('')}
-                </tbody></table>
-            </div>`;
-    } catch (err) {
-        document.getElementById('repStmtBody').innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
-    }
+    if (typeof prlShowStatement === 'function') return prlShowStatement('rep', repId);
+    alert('تعذّر فتح كشف الحساب — شاشة "👥 الموظفون" غير محمّلة.');
 };
 
 Object.assign(window, {

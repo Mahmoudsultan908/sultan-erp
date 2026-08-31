@@ -1,20 +1,36 @@
 /* ════════════════════════════════════════════════════════════
    الموظفون والرواتب — payroll.js
-   يصدّر: renderPayroll(container)
+   يصدّر: renderPayroll(container), prlShowStatement(kind, id)
 
    ★ قرار تصميم صريح من صاحب المشروع: المرتبات مش نظام مالي مستقل —
    employees جدول بيانات أساسية بس (زي sales_reps)، بدون أي trigger.
    أي صرف فعلي لموظف (سلفة أو راتب) بيتسجّل كمصروف عادي في جدول
    expenses الموجود بالفعل (نفس مسار fn_expense_status_change المالي)
-   بعمود employee_id الجديد بس اللي بيربط المصروف بموظف — فـ"الباقي من
-   الراتب" = base_salary - مجموع مصروفات الموظف في الشهر. صفر تكرار
+   بعمود employee_id/rep_id اللي بيربط المصروف بشخص — فـ"الباقي من
+   الراتب" = base_salary - مجموع مصروفات الشخص في الشهر. صفر تكرار
    مالي، صفر trigger جديد. راجع employees_payroll_migration.sql.
+
+   توحيد الموظفين/المناديب (2026-08-06): الشاشة دي بقت تعرض كل حد
+   شغال — موظفين عاديين (employees) ومناديب مبيعات (sales_reps) مع
+   بعض في نفس الجدول، كل واحد معلّم بـ kind: 'employee'|'rep'.
+   sales_reps.id هو نفسه auth uid بتاع المندوب (تسجيل دخول تطبيق
+   سلطانو)، فمفيش دمج فعلي للجداول — الدمج على مستوى الشاشة بس
+   (راجع employees_reps_unification_migration.sql). المناديب لازم
+   يتضافوا من "⚙️ الإعدادات ← 👥 المستخدمون" (محتاجين حساب دخول
+   فعلي) — من هنا بس بتتعدّل بياناتهم (مرتب/عمولة/هدف/دوام) ويظهر
+   كشف حسابهم الكامل. كشف الحساب بقى بيجمع تلقائي: مرتب أساسي −
+   خصم غياب − سلف/مصروفات + حوافز + عمولة مبيعات الشهر (مناديب بس)،
+   وبيعرض تحقيق الهدف الشهري (مناديب بس) — بدون أي حساب يدوي.
+   نفس الدالة دي بتتنادى من sales-reps.js (زرار "📄 كشف مبيعات")
+   عشان يبقى مصدر واحد للحقيقة في أي مكان تفتحها منه.
    ════════════════════════════════════════════════════════════ */
 
-let _prlList = [];
-let _prlEditingId = null;
+let _prlList = []; // employees ∪ sales_reps، كل عنصر معلّم بـ kind
+let _prlEditingKey = null; // {kind,id} أو null لإضافة موظف جديد
 let _prlTableMissing = false;
-let _prlLastEvalMap = {}; // employee_id -> { date, avg }
+let _prlLastEvalMap = {}; // employee_id -> { date, avg } — موظفين عاديين بس (تقييم الأداء برّه نطاق المناديب)
+let _prlPriceLevels = [];
+let _prlTreasuries = [];
 
 function prlEvalColor(avg) {
     if (avg >= 9) return { color: 'var(--inv-green)', bg: 'var(--inv-green-light)' };
@@ -25,6 +41,7 @@ function prlEvalColor(avg) {
 }
 
 function prlFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function prlKey(kind, id) { return kind + ':' + id; }
 
 // ════════════════════════════════════════════════════════════
 // 1) القائمة الرئيسية
@@ -33,16 +50,24 @@ async function renderPayroll(c) {
     c.innerHTML = '<div class="empty-state"><span>⏳</span>جاري تحميل الموظفين...</div>';
     _prlTableMissing = false;
     try {
+        let employees = [], reps = [];
         try {
             const { data, error } = await sb.from('employees').select('*').order('name');
             if (error) throw error;
-            _prlList = data || [];
-        } catch (e) {
-            _prlTableMissing = true;
-            _prlList = [];
-        }
+            employees = data || [];
+        } catch (e) { _prlTableMissing = true; }
+        try {
+            const { data, error } = await sb.from('sales_reps').select('*').order('name');
+            if (error) throw error;
+            reps = data || [];
+        } catch (e) { /* بهدوء — لو الجدول مش موجود، الموظفين العاديين لسه بيظهروا */ }
 
-        // آخر تقييم لكل موظف — اختياري، لو جدول employee_evaluations لسه ما اتعملش نتجاهل الخطأ بهدوء
+        _prlList = [
+            ...employees.map(e => ({ ...e, kind: 'employee' })),
+            ...reps.map(r => ({ ...r, kind: 'rep' })),
+        ].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+
+        // آخر تقييم لكل موظف عادي — اختياري، لو جدول employee_evaluations لسه ما اتعملش نتجاهل الخطأ بهدوء
         const evalResult = await sb.from('employee_evaluations')
             .select('employee_id, evaluation_date, attendance_score, quality_score, teamwork_score, initiative_score, compliance_score')
             .then(r => r, () => ({ data: [] }));
@@ -54,6 +79,13 @@ async function renderPayroll(c) {
             }
         });
 
+        const [{ data: levels }, { data: treasuries }] = await Promise.all([
+            sb.from('price_levels').select('id,code,name').order('sort_order').then(r => r, () => ({ data: [] })),
+            sb.from('treasuries').select('id,name').order('name').then(r => r, () => ({ data: [] })),
+        ]);
+        _prlPriceLevels = levels || [];
+        _prlTreasuries = treasuries || [];
+
         prlRenderPage(c);
     } catch (err) {
         c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
@@ -61,43 +93,52 @@ async function renderPayroll(c) {
 }
 
 function prlRenderPage(c) {
-    const activeEmps = _prlList.filter(e => e.is_active !== false);
-    const totalBase = activeEmps.reduce((s, e) => s + (Number(e.base_salary) || 0), 0);
+    const active = _prlList.filter(p => p.is_active !== false);
+    const totalBase = active.reduce((s, p) => s + (Number(p.base_salary) || 0), 0);
+    const repCount = active.filter(p => p.kind === 'rep').length;
 
     c.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-            <div><h2 style="font-size:22px;font-weight:800">👥 الموظفون والرواتب</h2>
-            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">إدارة الموظفين وصرف الرواتب والسلف</p></div>
-            <button class="mod-btn mod-btn-primary" onclick="prlOpenAdd()">+ إضافة موظف</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+            <div><h2 style="font-size:22px;font-weight:800">👥 الموظفون</h2>
+            <p style="font-size:13px;color:var(--inv-muted);margin-top:4px">موظفين ومناديب مع بعض — حضور، مرتب، عمولة وهدف بيتحسبوا تلقائي</p></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="mod-btn" style="background:#EEF2FF;color:#4338CA" onclick="prlGoAddRep()">+ مندوب جديد (يحتاج حساب دخول)</button>
+                <button class="mod-btn mod-btn-primary" onclick="prlOpenAdd()">+ إضافة موظف</button>
+            </div>
         </div>
 
         ${_prlTableMissing ? `<div style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:14px 18px;border-radius:10px;margin-bottom:16px;font-size:13px">⚠️ جدول الموظفين لسه مش موجود — شغّل <code>employees_payroll_migration.sql</code> في Supabase.</div>` : ''}
 
         <div class="mod-grid" style="margin-bottom:16px">
-            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">👥</div><div class="mod-card-val">${activeEmps.length}</div><div class="mod-card-lbl">عدد الموظفين النشطين</div></div>
+            <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-green-light);color:var(--inv-green)">👥</div><div class="mod-card-val">${active.length}</div><div class="mod-card-lbl">إجمالي النشطين (${repCount} مندوب)</div></div>
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">💰</div><div class="mod-card-val">${prlFmt(totalBase)}</div><div class="mod-card-lbl">إجمالي الرواتب الأساسية</div></div>
         </div>
 
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>الموظف</th><th>الوظيفة</th><th>الهاتف</th><th>آخر تقييم</th>
+                <th>الاسم</th><th>النوع</th><th>الهاتف</th><th>تفاصيل</th><th>آخر تقييم</th>
                 <th style="text-align:left">الراتب الأساسي</th><th style="text-align:center">الحالة</th><th style="text-align:center">إجراءات</th>
             </tr></thead>
             <tbody>
-                ${_prlList.length === 0 ? `<tr><td colspan="7" class="empty-state"><span>👥</span>لا يوجد موظفون بعد.</td></tr>` :
-                _prlList.map(e => {
-                    const lastEval = _prlLastEvalMap[e.id];
+                ${_prlList.length === 0 ? `<tr><td colspan="8" class="empty-state"><span>👥</span>لا يوجد موظفون أو مناديب بعد.</td></tr>` :
+                _prlList.map(p => {
+                    const key = prlKey(p.kind, p.id);
+                    const lastEval = p.kind === 'employee' ? _prlLastEvalMap[p.id] : null;
+                    const details = p.kind === 'rep'
+                        ? `عمولة ${Number(p.commission_pct) || 0}% • هدف ${prlFmt(p.daily_sales_target)}/يوم`
+                        : (p.job_title || '—');
                     return `<tr>
-                    <td style="font-weight:600">${e.name}</td>
-                    <td style="color:var(--inv-muted)">${e.job_title || '—'}</td>
-                    <td dir="ltr" style="color:var(--inv-muted)">${e.phone || '—'}</td>
+                    <td style="font-weight:600">${p.name}</td>
+                    <td>${p.kind === 'rep' ? '<span style="color:#4338CA;font-weight:700">🚗 مندوب</span>' : '<span style="color:var(--inv-muted)">👔 موظف</span>'}</td>
+                    <td dir="ltr" style="color:var(--inv-muted)">${p.phone || '—'}</td>
+                    <td style="color:var(--inv-muted);font-size:12.5px">${details}</td>
                     <td style="font-size:12px">${lastEval ? `${new Date(lastEval.date).toLocaleDateString('ar-EG')} <span style="background:${prlEvalColor(lastEval.avg).bg};color:${prlEvalColor(lastEval.avg).color};padding:1px 8px;border-radius:10px;font-weight:700;margin-right:4px">${lastEval.avg.toFixed(1)}</span>` : '<span style="color:var(--inv-muted-light)">—</span>'}</td>
-                    <td style="text-align:left;font-weight:700">${prlFmt(e.base_salary)}</td>
-                    <td style="text-align:center">${e.is_active !== false ? '<span style="color:var(--inv-green);font-weight:600">✅ نشط</span>' : '<span style="color:var(--inv-muted-light);font-weight:600">🚫 غير نشط</span>'}</td>
+                    <td style="text-align:left;font-weight:700">${prlFmt(p.base_salary)}</td>
+                    <td style="text-align:center">${p.is_active !== false ? '<span style="color:var(--inv-green);font-weight:600">✅ نشط</span>' : '<span style="color:var(--inv-muted-light);font-weight:600">🚫 غير نشط</span>'}</td>
                     <td style="text-align:center;white-space:nowrap">
-                        <button class="cc-edit" onclick="prlOpenEdit('${e.id}')">✏️</button>
-                        <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="prlShowStatement('${e.id}')">📄 كشف حساب</button>
-                        ${typeof eevOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FEF9C3;color:#B45309" onclick="eevOpenAdd('${e.id}')" title="تقييم سريع">⭐</button>` : ''}
+                        <button class="cc-edit" onclick="prlOpenEdit('${p.kind}','${p.id}')">✏️</button>
+                        <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="prlShowStatement('${p.kind}','${p.id}')">📄 كشف حساب</button>
+                        ${p.kind === 'employee' && typeof eevOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FEF9C3;color:#B45309" onclick="eevOpenAdd('${p.id}')" title="تقييم سريع">⭐</button>` : ''}
                     </td>
                 </tr>`;
                 }).join('')}
@@ -105,26 +146,37 @@ function prlRenderPage(c) {
         </div>`;
 }
 
-// ════════════════════════════════════════════════════════════
-// 2) إضافة / تعديل موظف
-// ════════════════════════════════════════════════════════════
-window.prlOpenAdd = function () { _prlEditingId = null; prlOpenModal(null); };
-window.prlOpenEdit = function (id) { const e = _prlList.find(x => x.id === id); if (e) { _prlEditingId = id; prlOpenModal(e); } };
+window.prlGoAddRep = function () {
+    alert('إضافة مندوب مبيعات محتاجة حساب دخول فعلي (إيميل/باسورد) — هيتوجّه لك الآن لشاشة "⚙️ الإعدادات"، دوس على تبويب "👥 المستخدمون" وأضف مستخدم بصلاحية "مندوب".');
+    const nav = document.querySelector('[data-mod="settings-hub"]');
+    if (nav) loadMod(nav, 'settings-hub');
+};
 
-function prlOpenModal(x) {
+// ════════════════════════════════════════════════════════════
+// 2) إضافة / تعديل موظف عادي
+// ════════════════════════════════════════════════════════════
+window.prlOpenAdd = function () { _prlEditingKey = null; prlOpenEmployeeModal(null); };
+window.prlOpenEdit = function (kind, id) {
+    const p = _prlList.find(x => x.kind === kind && x.id === id);
+    if (!p) return;
+    _prlEditingKey = { kind, id };
+    if (kind === 'rep') prlOpenRepModal(p); else prlOpenEmployeeModal(p);
+};
+
+function prlOpenEmployeeModal(x) {
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'prlModal';
     modal.innerHTML = `
         <div class="mod-modal" style="max-width:480px">
-            <div class="mod-modal-header"><h3>${x ? '✏️ تعديل موظف' : '👥 إضافة موظف جديد'}</h3>
+            <div class="mod-modal-header"><h3>${x ? '✏️ تعديل موظف' : '👔 إضافة موظف جديد'}</h3>
                 <button class="mod-modal-close" onclick="document.getElementById('prlModal').remove()">&times;</button></div>
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>اسم الموظف *</label>
                     <input type="text" id="prlName" class="mod-form-input" value="${x?.name || ''}"></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>الوظيفة</label>
-                        <input type="text" id="prlJobTitle" class="mod-form-input" value="${x?.job_title || ''}" placeholder="مثال: مندوب مبيعات"></div>
+                        <input type="text" id="prlJobTitle" class="mod-form-input" value="${x?.job_title || ''}" placeholder="مثال: محاسب"></div>
                     <div class="mod-form-group"><label>الهاتف</label>
                         <input type="text" id="prlPhone" class="mod-form-input" value="${x?.phone || ''}" dir="ltr"></div>
                 </div>
@@ -181,8 +233,8 @@ window.prlSave = async function () {
     const btn = document.querySelector('#prlModal .mod-btn-primary');
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
     try {
-        if (_prlEditingId) {
-            const { error } = await sb.from('employees').update(payload).eq('id', _prlEditingId);
+        if (_prlEditingKey) {
+            const { error } = await sb.from('employees').update(payload).eq('id', _prlEditingKey.id);
             if (error) throw error;
         } else {
             const { error } = await sb.from('employees').insert({ ...payload, created_by: currentUser?.id || null });
@@ -197,23 +249,116 @@ window.prlSave = async function () {
 };
 
 // ════════════════════════════════════════════════════════════
-// 3) كشف حساب موظف — الراتب الأساسي مقابل مصروفات الشهر (سلف/صرف)
+// 2ب) تعديل مندوب (بيانات المبيعات + بيانات المرتب/الدوام مع بعض)
 // ════════════════════════════════════════════════════════════
-let _prlStmtEmpId = null;
+function prlOpenRepModal(x) {
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'prlModal';
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:520px">
+            <div class="mod-modal-header"><h3>✏️ تعديل مندوب — ${x.name}</h3>
+                <button class="mod-modal-close" onclick="document.getElementById('prlModal').remove()">&times;</button></div>
+            <div class="mod-modal-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="mod-form-group"><label>الهاتف</label>
+                        <input type="text" id="prlRepPhone" class="mod-form-input" value="${x.phone || ''}" dir="ltr"></div>
+                    <div class="mod-form-group"><label>نسبة العمولة %</label>
+                        <input type="number" id="prlRepCommission" class="mod-form-input" value="${x.commission_pct || 0}" min="0" max="100" step="0.1"></div>
+                </div>
+                <div class="mod-form-group"><label>مستوى السعر اللي يبيع بيه</label>
+                    <select id="prlRepPriceLevel" class="mod-form-input">
+                        <option value="">بدون تحديد (افتراضي النظام)</option>
+                        ${_prlPriceLevels.map(l => `<option value="${l.id}" ${x.price_level_id===l.id?'selected':''}>💰 ${l.name}</option>`).join('')}
+                    </select></div>
+                <hr style="border:none;border-top:1px solid var(--inv-border);margin:14px 0">
+                <div style="font-size:12.5px;font-weight:800;margin-bottom:10px;color:var(--inv-muted)">💰 المرتب والدوام</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="mod-form-group"><label>الراتب الأساسي (ج.م)</label>
+                        <input type="number" id="prlRepBaseSalary" class="mod-form-input" value="${x.base_salary || 0}" min="0" step="0.01"></div>
+                    <div class="mod-form-group"><label>تاريخ التعيين</label>
+                        <input type="date" id="prlRepHireDate" class="mod-form-input" value="${x.hire_date || ''}"></div>
+                </div>
+                <div class="mod-form-group"><label>أيام العمل بالشهر</label>
+                    <input type="number" id="prlRepWorkDays" class="mod-form-input" value="${x.work_days_per_month ?? 30}" min="1" max="31" step="1"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="mod-form-group"><label>موعد دوام مخصص (اختياري)</label>
+                        <input type="time" id="prlRepShiftStart" class="mod-form-input" value="${x.shift_start_time ? String(x.shift_start_time).slice(0,5) : ''}"></div>
+                    <div class="mod-form-group"><label>فترة سماح بالدقايق (اختياري)</label>
+                        <input type="number" id="prlRepGraceMinutes" class="mod-form-input" min="0" step="1" value="${x.grace_minutes ?? ''}"></div>
+                </div>
+                <hr style="border:none;border-top:1px solid var(--inv-border);margin:14px 0">
+                <div style="font-size:12.5px;font-weight:800;margin-bottom:10px;color:var(--inv-muted)">🎯 الأهداف</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="mod-form-group"><label>هدف المبيعات اليومي (ج)</label>
+                        <input type="number" id="prlRepDailyTarget" class="mod-form-input" value="${x.daily_sales_target || 0}" min="0" step="1"></div>
+                    <div class="mod-form-group"><label>هدف الزيارات اليومي</label>
+                        <input type="number" id="prlRepVisitsTarget" class="mod-form-input" value="${x.daily_visits_target || 0}" min="0" step="1"></div>
+                </div>
+                <div class="mod-form-group"><label>🔒 PIN تحميل العربية <small style="color:var(--inv-muted-light);font-weight:400">(اختياري)</small></label>
+                    <input type="text" id="prlRepVanLoadPin" class="mod-form-input" value="${x.van_load_pin || ''}" dir="ltr" maxlength="8"></div>
+                <div class="mod-form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" id="prlRepIsActive" ${x.is_active !== false ? 'checked' : ''}> نشط
+                </label></div>
+                <div class="mod-form-group"><label>ملاحظات</label>
+                    <input type="text" id="prlRepNotes" class="mod-form-input" value="${x.notes || ''}" placeholder="اختياري"></div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('prlModal').remove()">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" onclick="prlSaveRep()">💾 حفظ التعديلات</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+}
+
+window.prlSaveRep = async function () {
+    const payload = {
+        phone: document.getElementById('prlRepPhone').value.trim() || null,
+        commission_pct: parseFloat(document.getElementById('prlRepCommission').value) || 0,
+        price_level_id: document.getElementById('prlRepPriceLevel').value || null,
+        base_salary: parseFloat(document.getElementById('prlRepBaseSalary').value) || 0,
+        hire_date: document.getElementById('prlRepHireDate').value || null,
+        work_days_per_month: parseInt(document.getElementById('prlRepWorkDays').value, 10) || 30,
+        shift_start_time: document.getElementById('prlRepShiftStart').value || null,
+        grace_minutes: document.getElementById('prlRepGraceMinutes').value !== '' ? parseInt(document.getElementById('prlRepGraceMinutes').value, 10) : null,
+        daily_sales_target: parseFloat(document.getElementById('prlRepDailyTarget').value) || 0,
+        daily_visits_target: parseInt(document.getElementById('prlRepVisitsTarget').value) || 0,
+        van_load_pin: document.getElementById('prlRepVanLoadPin').value.trim() || null,
+        is_active: document.getElementById('prlRepIsActive').checked,
+        notes: document.getElementById('prlRepNotes').value.trim() || null,
+    };
+    const btn = document.querySelector('#prlModal .mod-btn-primary');
+    btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
+    try {
+        const { error } = await sb.from('sales_reps').update(payload).eq('id', _prlEditingKey.id);
+        if (error) throw error;
+        document.getElementById('prlModal').remove();
+        renderPayroll(document.getElementById('app-content'));
+    } catch (err) {
+        alert('❌ خطأ: ' + err.message);
+        btn.innerText = '💾 حفظ التعديلات'; btn.disabled = false;
+    }
+};
+
+// ════════════════════════════════════════════════════════════
+// 3) كشف حساب — يشتغل لأي شخص (موظف أو مندوب)، بيجمع كل حاجة تلقائي
+// ════════════════════════════════════════════════════════════
+let _prlStmtKind = null;
+let _prlStmtId = null;
+let _prlStmtPerson = null;
 let _prlStmtMonth = null; // 'YYYY-MM'
 
-window.prlShowStatement = async function (empId) {
-    const emp = _prlList.find(e => e.id === empId);
-    if (!emp) return;
-    _prlStmtEmpId = empId;
+window.prlShowStatement = async function (kind, id) {
+    _prlStmtKind = kind;
+    _prlStmtId = id;
     _prlStmtMonth = new Date().toISOString().slice(0, 7);
 
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'prlStmtModal';
     modal.innerHTML = `
-        <div class="mod-modal" style="max-width:720px">
-            <div class="mod-modal-header"><h3>📄 كشف حساب — ${emp.name}</h3>
+        <div class="mod-modal" style="max-width:760px">
+            <div class="mod-modal-header"><h3 id="prlStmtTitle">📄 كشف حساب</h3>
                 <button class="mod-modal-close" onclick="document.getElementById('prlStmtModal').remove()">&times;</button></div>
             <div class="mod-modal-body" id="prlStmtBody">
                 <div class="empty-state"><span>⏳</span>جاري التحميل...</div>
@@ -224,27 +369,40 @@ window.prlShowStatement = async function (empId) {
 };
 
 async function prlRenderStatement() {
-    const emp = _prlList.find(e => e.id === _prlStmtEmpId);
     const body = document.getElementById('prlStmtBody');
-    if (!emp || !body) return;
+    if (!body) return;
+    try {
+        const table = _prlStmtKind === 'rep' ? 'sales_reps' : 'employees';
+        const { data: person, error } = await sb.from(table).select('*').eq('id', _prlStmtId).single();
+        if (error) throw error;
+        _prlStmtPerson = person;
+        document.getElementById('prlStmtTitle').textContent = `📄 كشف حساب — ${person.name}${_prlStmtKind === 'rep' ? ' 🚗' : ''}`;
+    } catch (err) {
+        body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+        return;
+    }
 
+    const person = _prlStmtPerson;
     const monthStart = _prlStmtMonth + '-01';
     const [y, m] = _prlStmtMonth.split('-').map(Number);
     const monthEnd = new Date(y, m, 0).toISOString().slice(0, 10);
+    const monthStartISO = new Date(y, m - 1, 1).toISOString();
+    const nextMonthStartISO = new Date(y, m, 1).toISOString();
+    const idCol = _prlStmtKind === 'rep' ? 'rep_id' : 'employee_id';
 
     try {
         const [expRes, absRes, incRes] = await Promise.all([
             sb.from('expenses')
                 .select('id, amount, description, expense_date, status, expense_categories(name)')
-                .eq('employee_id', emp.id).eq('status', 'confirmed')
+                .eq(idCol, person.id).eq('status', 'confirmed')
                 .gte('expense_date', monthStart).lte('expense_date', monthEnd)
                 .order('expense_date', { ascending: false }),
             sb.from('attendance_records').select('id, record_date, notes')
-                .eq('employee_id', emp.id).eq('status', 'absent')
+                .eq(idCol, person.id).eq('status', 'absent')
                 .gte('record_date', monthStart).lte('record_date', monthEnd)
                 .order('record_date', { ascending: false }),
             sb.from('employee_incentives').select('id, amount, reason, incentive_date')
-                .eq('employee_id', emp.id)
+                .eq(idCol, person.id)
                 .gte('incentive_date', monthStart).lte('incentive_date', monthEnd)
                 .order('incentive_date', { ascending: false }),
         ]);
@@ -253,22 +411,49 @@ async function prlRenderStatement() {
         const absentDays = absRes.data || [];
         const incentives = incRes.data || [];
 
+        let commission = 0, salesTotal = 0, monthlyTarget = 0;
+        if (_prlStmtKind === 'rep') {
+            const [{ data: sales }, { data: returns }] = await Promise.all([
+                sb.from('sales').select('total').eq('rep_id', person.id).eq('status', 'confirmed')
+                    .gte('created_at', monthStartISO).lt('created_at', nextMonthStartISO),
+                sb.from('sales_returns').select('total').eq('rep_id', person.id).eq('status', 'confirmed')
+                    .gte('created_at', monthStartISO).lt('created_at', nextMonthStartISO),
+            ]);
+            const salesSum = (sales || []).reduce((s, r) => s + (Number(r.total) || 0), 0);
+            const returnsSum = (returns || []).reduce((s, r) => s + (Number(r.total) || 0), 0);
+            salesTotal = salesSum - returnsSum;
+            commission = salesTotal * (Number(person.commission_pct) || 0) / 100;
+            monthlyTarget = (Number(person.daily_sales_target) || 0) * (Number(person.work_days_per_month) || 30);
+        }
+
         const taken = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-        const dailyRate = (Number(emp.base_salary) || 0) / (Number(emp.work_days_per_month) || 30);
+        const dailyRate = (Number(person.base_salary) || 0) / (Number(person.work_days_per_month) || 30);
         const absenceDeduction = absentDays.length * dailyRate;
         const incentivesSum = incentives.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-        const remaining = (Number(emp.base_salary) || 0) - taken - absenceDeduction + incentivesSum;
+        const remaining = (Number(person.base_salary) || 0) - taken - absenceDeduction + incentivesSum + commission;
 
         body.innerHTML = `
             <div class="mod-form-group" style="max-width:200px">
                 <label>الشهر</label>
                 <input type="month" id="prlStmtMonthInput" class="mod-form-input" value="${_prlStmtMonth}" onchange="prlChangeMonth(this.value)">
             </div>
+            ${_prlStmtKind === 'rep' ? `
+            <div class="mod-card" style="padding:14px;margin:12px 0;background:#EEF2FF">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    <div style="font-size:12.5px;color:#4338CA;font-weight:700">🎯 تحقيق الهدف الشهري (مبيعات ${prlFmt(salesTotal)} من هدف ${prlFmt(monthlyTarget)})</div>
+                    <div style="font-size:14px;font-weight:800;color:#4338CA">${monthlyTarget > 0 ? Math.min(999, Math.round(salesTotal / monthlyTarget * 100)) + '%' : '—'}</div>
+                </div>
+            </div>` : ''}
             <div class="mod-grid" style="margin:12px 0 16px">
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">الراتب الأساسي</div>
-                    <div style="font-size:20px;font-weight:800">${prlFmt(emp.base_salary)}</div>
+                    <div style="font-size:20px;font-weight:800">${prlFmt(person.base_salary)}</div>
                 </div>
+                ${_prlStmtKind === 'rep' ? `
+                <div class="mod-card" style="padding:14px">
+                    <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">عمولة (${Number(person.commission_pct) || 0}%)</div>
+                    <div style="font-size:20px;font-weight:800;color:var(--inv-green)">${prlFmt(commission)}</div>
+                </div>` : ''}
                 <div class="mod-card" style="padding:14px">
                     <div style="font-size:11px;color:var(--inv-muted);margin-bottom:4px">مصروف/مسحوب هذا الشهر</div>
                     <div style="font-size:20px;font-weight:800;color:var(--inv-red)">${prlFmt(taken)}</div>
@@ -297,7 +482,7 @@ async function prlRenderStatement() {
                     <th>البند</th><th>البيان</th><th>التاريخ</th><th style="text-align:left">المبلغ</th>
                 </tr></thead>
                 <tbody>
-                    ${rows.length === 0 ? `<tr><td colspan="4" class="empty-state"><span>📭</span>مفيش أي صرف مسجّل للموظف ده الشهر ده.</td></tr>` :
+                    ${rows.length === 0 ? `<tr><td colspan="4" class="empty-state"><span>📭</span>مفيش أي صرف مسجّل الشهر ده.</td></tr>` :
                     rows.map(r => `<tr>
                         <td>${r.expense_categories?.name || '—'}</td>
                         <td style="color:var(--inv-muted)">${r.description || '—'}</td>
@@ -336,7 +521,7 @@ window.prlChangeMonth = function (val) {
 };
 
 // ── نموذج تسجيل الصرف: نفس مسار saveExpense في expenses.js بالحرف
-//    (INSERT عادي في expenses)، بس مع employee_id + مبلغ مقترح = الباقي ──
+//    (INSERT عادي في expenses)، بس مع employee_id/rep_id + مبلغ مقترح = الباقي ──
 let _prlPayoutCategories = [];
 let _prlPayoutCatACIdx = -1;
 
@@ -431,7 +616,8 @@ window.prlSavePayout = async function () {
         const { error } = await sb.from('expenses').insert({
             ref: 'EXP-' + Date.now(),
             category_id: catId,
-            employee_id: _prlStmtEmpId,
+            employee_id: _prlStmtKind === 'employee' ? _prlStmtId : null,
+            rep_id: _prlStmtKind === 'rep' ? _prlStmtId : null,
             amount,
             description: desc,
             expense_date: new Date().toISOString().slice(0, 10),
@@ -443,7 +629,7 @@ window.prlSavePayout = async function () {
         document.getElementById('prlPayoutForm').innerHTML = '';
         await prlRenderStatement();
     } catch (err) {
-        alert('❌ خطأ: ' + err.message + (/employee_id/i.test(err.message||'') ? '\n\nتأكد من تشغيل employees_payroll_migration.sql في Supabase.' : ''));
+        alert('❌ خطأ: ' + err.message + (/employee_id|rep_id/i.test(err.message||'') ? '\n\nتأكد من تشغيل migrations المرتبات في Supabase.' : ''));
         btn.innerText = '💾 تأكيد الصرف'; btn.disabled = false;
     }
 };
@@ -479,7 +665,9 @@ window.prlSaveIncentive = async function () {
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
     try {
         const { error } = await sb.from('employee_incentives').insert({
-            employee_id: _prlStmtEmpId, amount, reason, incentive_date, created_by: currentUser?.id || null,
+            employee_id: _prlStmtKind === 'employee' ? _prlStmtId : null,
+            rep_id: _prlStmtKind === 'rep' ? _prlStmtId : null,
+            amount, reason, incentive_date, created_by: currentUser?.id || null,
         });
         if (error) throw error;
         document.getElementById('prlIncentiveForm').innerHTML = '';
@@ -491,7 +679,7 @@ window.prlSaveIncentive = async function () {
 };
 
 Object.assign(window, {
-    renderPayroll, prlOpenAdd, prlOpenEdit, prlSave, prlShowStatement, prlChangeMonth,
+    renderPayroll, prlOpenAdd, prlOpenEdit, prlSave, prlSaveRep, prlGoAddRep, prlShowStatement, prlChangeMonth,
     prlOpenPayout, prlPayoutCatSearchInput, prlPickPayoutCat, prlPayoutCatACKey, prlPayoutCatACHover, prlSavePayout,
     prlOpenIncentive, prlSaveIncentive,
 });
