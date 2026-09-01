@@ -42,6 +42,9 @@ function prlEvalColor(avg) {
 
 function prlFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function prlKey(kind, id) { return kind + ':' + id; }
+function prlPersonNameKey(name) {
+    return String(name || '').trim().replace(/[\u064B-\u065F\u0670]/g, '').replace(/\s+/g, ' ');
+}
 
 // ════════════════════════════════════════════════════════════
 // 1) القائمة الرئيسية
@@ -62,10 +65,24 @@ async function renderPayroll(c) {
             reps = data || [];
         } catch (e) { /* بهدوء — لو الجدول مش موجود، الموظفين العاديين لسه بيظهروا */ }
 
-        _prlList = [
-            ...employees.map(e => ({ ...e, kind: 'employee' })),
-            ...reps.map(r => ({ ...r, kind: 'rep' })),
-        ].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+        // الموظف والمندوب قد يكونان نفس الشخص في جدولين مختلفين.
+        // نعرضهما كسطر واحد عند تطابق الاسم، مع الاحتفاظ بسجلّي البيانات
+        // منفصلين حتى لا تنقطع المرتبات عن الفواتير القديمة.
+        const people = new Map();
+        (employees || []).filter(e => e.is_active !== false).forEach(e => {
+            people.set(prlPersonNameKey(e.name), { ...e, kind: 'employee' });
+        });
+        (reps || []).filter(r => r.is_active !== false).forEach(r => {
+            const key = prlPersonNameKey(r.name);
+            const existing = people.get(key);
+            if (existing) {
+                existing.repId = r.id;
+                existing.repData = r;
+            } else {
+                people.set(key, { ...r, kind: 'rep' });
+            }
+        });
+        _prlList = [...people.values()].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
 
         // آخر تقييم لكل موظف عادي — اختياري، لو جدول employee_evaluations لسه ما اتعملش نتجاهل الخطأ بهدوء
         const evalResult = await sb.from('employee_evaluations')
@@ -124,9 +141,10 @@ function prlRenderPage(c) {
                 _prlList.map(p => {
                     const key = prlKey(p.kind, p.id);
                     const lastEval = p.kind === 'employee' ? _prlLastEvalMap[p.id] : null;
+                    const rep = p.repData || (p.kind === 'rep' ? p : null);
                     const details = p.kind === 'rep'
                         ? `عمولة ${Number(p.commission_pct) || 0}% • هدف ${prlFmt(p.daily_sales_target)}/يوم`
-                        : (p.job_title || '—');
+                        : `${p.job_title || '—'}${rep ? ` • عمولة ${Number(rep.commission_pct) || 0}% • هدف ${prlFmt(rep.daily_sales_target)}/يوم` : ''}`;
                     return `<tr>
                     <td style="font-weight:600">${p.name}</td>
                     <td>${p.kind === 'rep' ? '<span style="color:#4338CA;font-weight:700">🚗 مندوب</span>' : '<span style="color:var(--inv-muted)">👔 موظف</span>'}</td>
