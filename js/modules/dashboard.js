@@ -78,6 +78,7 @@ async function renderDashboard(container) {
             { data: deferredAuto },
             { data: deferredManual },
             { data: capitalPartners },
+            { data: ledgerLines },
         ] = await Promise.all([
             sb.rpc('get_cash_balance'),
             sb.from('sales').select('total').eq('status','confirmed').gte('created_at', today),
@@ -106,11 +107,11 @@ async function renderDashboard(container) {
                 .order('created_at', { ascending: false })
                 .limit(6),
             sb.from('customers').select('name, balance, credit_limit').gt('balance', 0).order('balance', { ascending: false }).limit(5),
-            // نفس منطق حساب قيمة المخزون المستخدم في js/modules/inventory.js (qty * purchase_price)
-            sb.from('inventory_stock').select('qty, products(purchase_price)'),
+            // قيمة المخزون الفعلية من كل الصفوف (المخزن الرئيسي)
+            dashFetchAllRows('inventory_stock', 'qty, products(purchase_price)', null),
             // بضاعة موجودة فعليًا مع المندوبين على العربيات — من غيرها "قيمة البضاعة"
             // فى تقرير الجرد كانت بتفوّت كل مخزون العربيات وتوريه أقل من الحقيقي
-            sb.from('van_stock').select('qty, products(purchase_price)'),
+            dashFetchAllRows('van_stock', 'qty, products(purchase_price)', null),
             // نفس منطق حساب مديونية العملاء المستخدم في js/modules/customers.js (مجموع الأرصدة الموجبة فقط)
             sb.from('customers').select('balance'),
             // نفس منطق حساب مستحقات الموردين المستخدم في js/modules/suppliers.js (مجموع الأرصدة الموجبة فقط)
@@ -134,6 +135,11 @@ async function renderDashboard(container) {
             // حقيقية على الشركة (أصل)، جزء من صافي المركز المالي زي أي رصيد
             // مدين تاني، راجع فحص "الميزانية العمومية" فى accounting.js لنفس المنطق
             sb.from('capital_partners').select('cumulative_deficit').eq('status', 'active'),
+            // التقرير المالي اليومي يعتمد على أرصدة الأستاذ الموحدة، حتى لا
+            // يختلف عن الميزانية بسبب اختلاف مصدر المخزون أو المؤجلات.
+            dashFetchAllRows('journal_entry_lines', 'account_code, debit, credit, journal_entries!inner(entry_date)', (q) =>
+                q.in('account_code', ['1001','1002','1003','1004','1005','2001','2002'])
+                    .lte('journal_entries.entry_date', today)),
         ]);
 
         // ── تجميع مبيعات آخر 30 يوم يوميًا (تعبئة الأيام الفاضية بصفر) ──
@@ -196,20 +202,30 @@ async function renderDashboard(container) {
         const targetColor = targetPct >= 100 ? 'var(--inv-green)' : targetPct >= 60 ? 'var(--inv-gold)' : 'var(--inv-red)';
 
         // ── تقرير الجرد اليومي (صافي المركز المالي) ──────────────────
-        // قيمة المخزون (مخازن + عربيات المندوبين) + رصيد الخزنة + مديونية العملاء - مستحقات الموردين
-        const stockValue = (allStock || []).reduce((s, r) => s + (Number(r.qty) || 0) * Number(r.products?.purchase_price || 0), 0);
-        const vanStockValue = (allVanStock || []).reduce((s, r) => s + (Number(r.qty) || 0) * Number(r.products?.purchase_price || 0), 0);
-        const customersDebt = (allCustomers || []).reduce((s, c) => s + (Number(c.balance) > 0 ? Number(c.balance) : 0), 0);
-        const suppliersDebt = (allSuppliers || []).reduce((s, sp) => s + (Number(sp.balance) > 0 ? Number(sp.balance) : 0), 0);
-        const deferredReceivable = (deferredAuto || []).reduce((s, r) => s + (Number(r.total_remaining) || 0), 0)
-            + (deferredManual || []).reduce((s, r) => s + ((Number(r.amount) || 0) - (Number(r.received_amount) || 0)), 0);
-        // ★ عجز شركاء رأس المال معروض للمعلومية بس — ماينفعش يتحسب جوه صافي
-        //   المركز المالي: هو مش فلوس حقيقية حد يقدر يحصّلها دلوقتي، هو بس
-        //   آلية محاسبية بتتحصّل تدريجيًا من نصيب الشريك فى أرباح الشهور
-        //   الجاية. لو اتحسب هنا، الرقم بيرجع تقريبًا لقيمة رأس المال
-        //   الأصلي وكأن الخسارة معملتش حاجة — إحساس مطمئن غلط.
+        // مصدر واحد للحساب: أرصدة حسابات الأستاذ الرقابية. هذا يمنع خلط
+        // قيمة الجرد التشغيلي مع رصيد الميزانية، ويُدخل الالتزامات 2002.
+        const ledgerBalances = {};
+        (ledgerLines || []).forEach(line => {
+            const code = line.account_code;
+            ledgerBalances[code] = (ledgerBalances[code] || 0)
+                + (Number(line.debit) || 0) - (Number(line.credit) || 0);
+        });
+        const ledgerCash = ledgerBalances['1001'] || 0;
+        const ownerReceivable = ledgerBalances['1002'] || 0;
+        const customersDebt = ledgerBalances['1003'] || 0;
+        const ledgerStockValue = ledgerBalances['1004'] || 0;
+        const warehouseStockValue = (allStock || []).reduce((sum, row) =>
+            sum + (Number(row.qty) || 0) * (Number(row.products?.purchase_price) || 0), 0);
+        const vanStockValue = (allVanStock || []).reduce((sum, row) =>
+            sum + (Number(row.qty) || 0) * (Number(row.products?.purchase_price) || 0), 0);
+        const stockValue = warehouseStockValue + vanStockValue;
+        const stockReconciliationDiff = stockValue - ledgerStockValue;
+        const deferredReceivable = ledgerBalances['1005'] || 0;
+        const suppliersDebt = Math.max(0, -(ledgerBalances['2001'] || 0));
+        const accruedLiabilities = Math.max(0, -(ledgerBalances['2002'] || 0));
+        // عجز الشركاء/ذمة محمود معلومة منفصلة، ولا تدخل في صافي المركز.
         const partnersDeficit = (capitalPartners || []).reduce((s, p) => s + (Number(p.cumulative_deficit) || 0), 0);
-        const netWorth = stockValue + vanStockValue + cash + customersDebt - suppliersDebt + deferredReceivable;
+        const netWorth = ledgerCash + customersDebt + stockValue + deferredReceivable - suppliersDebt - accruedLiabilities;
 
         const fmt = (n) => Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const fmtDate = (d) => new Date(d).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -334,11 +350,12 @@ async function renderDashboard(container) {
             <div class="dash-row">
                 <div class="dash-card" style="flex:1">
                     <div class="dash-card-header"><span>📋 تقرير الجرد اليومي — صافي المركز المالي</span></div>
-                    <div class="dash-summary-row"><span>📦 قيمة البضاعة (المخازن)</span><span class="dash-s-green">${fmt(stockValue)}</span></div>
-                    <div class="dash-summary-row"><span>🚚 بضاعة عربيات المندوبين</span><span class="dash-s-green">${fmt(vanStockValue)}</span></div>
-                    <div class="dash-summary-row"><span>💰 رصيد الخزنة (كل الخزن)</span><span class="dash-s-green">${fmt(cash)}</span></div>
+                    <div class="dash-summary-row"><span>📦 قيمة البضاعة الفعلية (المخازن + السيارات)</span><span class="dash-s-green">${fmt(stockValue)}</span></div>
+                    ${Math.abs(stockReconciliationDiff) >= 0.01 ? `<div class="dash-summary-row"><span style="color:var(--inv-muted)">⚠️ فرق مطابقة حساب المخزون</span><span style="color:var(--inv-gold)">${fmt(stockReconciliationDiff)}</span></div>` : ''}
+                    <div class="dash-summary-row"><span>💰 رصيد الخزنة (دفتر الأستاذ)</span><span class="dash-s-green">${fmt(ledgerCash)}</span></div>
                     <div class="dash-summary-row"><span>👥 مديونية العملاء (لينا عندهم)</span><span class="dash-s-green">${fmt(customersDebt)}</span></div>
                     <div class="dash-summary-row"><span>🏭 مستحقات الموردين (عندنا ليهم)</span><span class="dash-s-red">- ${fmt(suppliersDebt)}</span></div>
+                    <div class="dash-summary-row"><span>📌 التزامات ومصروفات مستحقة</span><span class="dash-s-red">- ${fmt(accruedLiabilities)}</span></div>
                     <div class="dash-summary-row"><span>⏳ مؤجلات مستحقة من الموردين</span><span class="dash-s-green">${fmt(deferredReceivable)}</span></div>
                     <div class="dash-summary-divider"></div>
                     <div class="dash-summary-row dash-summary-total">
@@ -349,8 +366,12 @@ async function renderDashboard(container) {
                         <span style="color:var(--inv-muted)">🧾 عجز شركاء رأس المال (للمعلومية، مش داخل الإجمالي)</span>
                         <span style="color:var(--inv-gold)">${fmt(partnersDeficit)}</span>
                     </div>` : ''}
+                    ${ownerReceivable > 0 ? `<div class="dash-summary-row">
+                        <span style="color:var(--inv-muted)">👤 ذمة مدينة من المالك (للمعلومية، مش داخل الإجمالي)</span>
+                        <span style="color:var(--inv-gold)">${fmt(ownerReceivable)}</span>
+                    </div>` : ''}
                     <div style="font-size:11px;color:var(--inv-muted-light);margin-top:4px;line-height:1.6">
-                        ⚠️ هذا رقم لحظي (كل الأصول المتاحة والمستحقة ناقص كل المستحق للموردين) وليس "ربح أو خسارة" بالمعنى المحاسبي — لحساب الربح الفعلي يلزم مقارنة فترتين، راجع "ملخص ${monthName}" بجانبه. عجز شركاء رأس المال مش محسوب هنا لإنه مش فلوس متاحة دلوقتي، بيترد تدريجيًا من أرباح الشهور الجاية.
+                        ⚠️ هذا صافي أصول النشاط من دفتر الأستاذ: خزينة + عملاء + مخزون + مؤجلات، ناقص الموردين والالتزامات المستحقة. لا يمثل الربح أو رأس المال، وذمة المالك وعجز الشركاء خارج الإجمالي لمنع تكرار نفس الأثر مرتين.
                     </div>
                 </div>
                 <div class="dash-card" style="flex:1">
