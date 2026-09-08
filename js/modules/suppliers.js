@@ -139,25 +139,26 @@ window.supShowStatement = async function(supplierId) {
             const amt = Number(o.amount) || 0;
             moves.push({ date: o.as_of_date, desc: `رصيد افتتاحي${o.notes ? ' — '+o.notes : ''}`, debit: Math.max(-amt,0), credit: Math.max(amt,0), type: 'opening' });
         });
-        // المؤجلات اليدوية (قديمة قبل تتبع النظام) — تظهر كسطور تخفيض من الرصيد
+        // المؤجلات اليدوية المُستلَمة فقط — تظهر كسطور تخفيض من الرصيد
         (deferredManual||[]).forEach(d => {
-            const remaining = (Number(d.amount)||0) - (Number(d.received_amount)||0);
-            if (remaining > 0.01) {
+            const received = Number(d.received_amount) || 0;
+            if (received > 0.01) {
                 moves.push({
                     date: d.created_at,
-                    desc: `💰 مؤجل يدوي (${supFmt(remaining)} متبقي)${d.notes ? ' — '+d.notes : ''}`,
-                    debit: remaining,
+                    desc: `💰 استلام مؤجل${d.notes ? ' — '+d.notes : ''}`,
+                    debit: received,
                     credit: 0,
                     type: 'deferred-manual'
                 });
             }
         });
-        // المؤجلات التلقائية (من فواتير الشراء) — سطر واحد مجمّع
-        if (deferredAuto && Number(deferredAuto.total_remaining) > 0.01) {
+        // المؤجلات التلقائية المُستلَمة فقط
+        const deferredAutoReceived = (Number(deferredAuto?.total_expected)||0) - (Number(deferredAuto?.total_remaining)||0);
+        if (deferredAutoReceived > 0.01) {
             moves.push({
-                date: new Date().toISOString(), // تظهر في آخر الكشف
-                desc: `💰 مؤجلات تلقائية (${deferredAuto.items_count} فاتورة، متبقي ${supFmt(deferredAuto.total_remaining)})`,
-                debit: Number(deferredAuto.total_remaining),
+                date: new Date().toISOString(),
+                desc: `💰 استلام مؤجلات تلقائية (${supFmt(deferredAutoReceived)})`,
+                debit: deferredAutoReceived,
                 credit: 0,
                 type: 'deferred-auto'
             });
