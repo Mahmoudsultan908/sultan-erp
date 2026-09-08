@@ -58,6 +58,8 @@ window.supShowStatement = async function(supplierId) {
             { data: transfersIn },
             { data: cashRefunds },
             { data: openingBalances },
+            { data: deferredManual },
+            { data: deferredAuto },
             docsResult,
         ] = await Promise.all([
             sb.from('purchases').select('id, invoice_no, total, payment_type, status, created_at')
@@ -79,6 +81,13 @@ window.supShowStatement = async function(supplierId) {
                 .order('created_at', { ascending: true }),
             sb.from('opening_balances').select('id, amount, as_of_date, notes')
                 .eq('supplier_id', supplierId).eq('balance_type', 'supplier').eq('status', 'confirmed'),
+            // المؤجلات اليدوية (قبل تتبع النظام)
+            sb.from('deferred_rebates_manual').select('id, amount, received_amount, due_date, notes, created_at')
+                .eq('supplier_id', supplierId).neq('status', 'cancelled')
+                .order('created_at', { ascending: true }),
+            // المؤجلات التلقائية (من فواتير الشراء)
+            sb.from('deferred_rebates_supplier_summary').select('items_count, total_remaining')
+                .eq('supplier_id', supplierId).maybeSingle(),
             // اختياري — لو جدول archive_documents لسه ما اتعملش، نتجاهل الخطأ بهدوء
             sb.from('archive_documents').select('id,title,file_url,category,created_at')
                 .eq('linked_type', 'supplier').eq('linked_id', supplierId)
@@ -130,6 +139,29 @@ window.supShowStatement = async function(supplierId) {
             const amt = Number(o.amount) || 0;
             moves.push({ date: o.as_of_date, desc: `رصيد افتتاحي${o.notes ? ' — '+o.notes : ''}`, debit: Math.max(-amt,0), credit: Math.max(amt,0), type: 'opening' });
         });
+        // المؤجلات اليدوية (قديمة قبل تتبع النظام) — تظهر كسطور تخفيض من الرصيد
+        (deferredManual||[]).forEach(d => {
+            const remaining = (Number(d.amount)||0) - (Number(d.received_amount)||0);
+            if (remaining > 0.01) {
+                moves.push({
+                    date: d.created_at,
+                    desc: `💰 مؤجل يدوي (${supFmt(remaining)} متبقي)${d.notes ? ' — '+d.notes : ''}`,
+                    debit: remaining,
+                    credit: 0,
+                    type: 'deferred-manual'
+                });
+            }
+        });
+        // المؤجلات التلقائية (من فواتير الشراء) — سطر واحد مجمّع
+        if (deferredAuto && Number(deferredAuto.total_remaining) > 0.01) {
+            moves.push({
+                date: new Date().toISOString(), // تظهر في آخر الكشف
+                desc: `💰 مؤجلات تلقائية (${deferredAuto.items_count} فاتورة، متبقي ${supFmt(deferredAuto.total_remaining)})`,
+                debit: Number(deferredAuto.total_remaining),
+                credit: 0,
+                type: 'deferred-auto'
+            });
+        }
         moves.sort((a,b) => new Date(a.date) - new Date(b.date));
 
         // تبويب "الأصناف" — بند 5، 2026-07-25. إجمالي المشتريات من كل صنف
