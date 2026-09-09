@@ -108,11 +108,20 @@ window.supShowStatement = async function(supplierId) {
             }
         });
         (returns||[]).forEach(r => {
-            if (r.status !== 'confirmed') return;
-            if (r.purchases?.payment_type === 'credit') {
+            if (r.status !== 'confirmed' && r.status !== 'cancelled') return;
+            // تحديد نوع الدفع: نحاول من الفاتورة الأصلية أولاً، ثم من المرتجع نفسه
+            const paymentType = r.purchases?.payment_type || r.payment_type;
+            const isCancelled = r.status === 'cancelled';
+
+            if (paymentType === 'credit' && !isCancelled) {
+                // مرتجع آجل مؤكد — يخصم من رصيد المورد
                 moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no}`, debit: Number(r.total)||0, credit: 0, type: 'return-credit' });
+            } else if (isCancelled) {
+                // مرتجع ملغي — بدون تأثير
+                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no} (ملغي)`, debit: 0, credit: 0, type: 'return-cancelled' });
             } else {
-                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no}`, debit: 0, credit: 0, type: 'return-cash' });
+                // مرتجع نقدي — بدون تأثير على الرصيد
+                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no} (نقدي — بدون أثر على الرصيد)`, debit: 0, credit: 0, type: 'return-cash' });
             }
         });
         (payments||[]).forEach(p => {
