@@ -15,7 +15,7 @@
    من الأول، فمفيش أي تعديل تاني مطلوب في الراوتر أو القائمة الجانبية)
    ════════════════════════════════════════════════════════════ */
 
-let _corTab = 'orders'; // 'orders' | 'registrations' | 'banners' | 'notifications' | 'carts'
+let _corTab = 'orders'; // 'orders' | 'registrations' | 'banners' | 'notifications' | 'carts' | 'settings'
 let COR_NOTIFY_CUSTOMERS = []; // عملاء مفعّلين الإشعارات فعلياً (لهم push_subscriptions)
 let COR_CARTS = [];
 let COR_ORDERS = [];
@@ -50,6 +50,7 @@ async function renderCustomerOrdersLink(c) {
         <button class="mod-btn ${_corTab==='banners'?'mod-btn-primary':''}" onclick="corSwitchTab('banners')">🖼️ بانرات سلطانو</button>
         <button class="mod-btn ${_corTab==='notifications'?'mod-btn-primary':''}" onclick="corSwitchTab('notifications')">🔔 إرسال إشعار</button>
         <button class="mod-btn ${_corTab==='carts'?'mod-btn-primary':''}" onclick="corSwitchTab('carts')">🛒 سلال حالية</button>
+        <button class="mod-btn ${_corTab==='settings'?'mod-btn-primary':''}" onclick="corSwitchTab('settings')">⚙️ إعدادات سلطانو</button>
     </div>
     <div id="corBody"></div>`;
     await corRenderTab();
@@ -62,6 +63,7 @@ async function corRenderTab() {
     else if (_corTab === 'banners') await corRenderBanners(body);
     else if (_corTab === 'notifications') await corRenderNotifications(body);
     else if (_corTab === 'carts') await corRenderCarts(body);
+    else if (_corTab === 'settings') await renderSultanooSettings(body);
     else await renderRepCustomerRequests(body);
 }
 
