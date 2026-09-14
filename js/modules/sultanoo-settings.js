@@ -8,14 +8,14 @@
    ════════════════════════════════════════════════════════════ */
 
 async function renderSultanooSettings(c) {
-    const sb = window.sbClient;
-    if (!sb) { c.innerHTML = '<p class="error-msg">⚠️ غير متصل بقاعدة البيانات</p>'; return; }
+    const sbClient = window.sb;
+    if (!sbClient) { c.innerHTML = '<p class="error-msg">⚠️ غير متصل بقاعدة البيانات</p>'; return; }
 
     showLoadingOverlay('جارٍ تحميل إعدادات سلطانو...');
 
     try {
         // جلب الإعدادات الحالية
-        const { data: settings, error } = await sb
+        const { data: settings, error } = await sbClient
             .from('app_settings')
             .select('key, value')
             .in('key', ['vacation_mode', 'vacation_message', 'category_display_mode']);
@@ -108,8 +108,8 @@ async function renderSultanooSettings(c) {
 }
 
 window.sultanooSaveSettings = async function() {
-    const sb = window.sbClient;
-    if (!sb) { showToast('⚠️ غير متصل بقاعدة البيانات', 'error'); return; }
+    const sbClient = window.sb;
+    if (!sbClient) { showToast('⚠️ غير متصل بقاعدة البيانات', 'error'); return; }
 
     const vacationMode = document.getElementById('sultanooVacationMode').checked;
     const vacationMessage = document.getElementById('sultanooVacationMessage').value.trim();
@@ -126,7 +126,7 @@ window.sultanooSaveSettings = async function() {
         ];
 
         for (const update of updates) {
-            const { error } = await sb
+            const { error } = await sbClient
                 .from('app_settings')
                 .update({
                     value: update.value,
