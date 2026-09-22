@@ -19,6 +19,8 @@ async function renderSultanooSettings(c) {
             .select('key, value')
             .in('key', ['vacation_mode', 'vacation_message', 'category_display_mode']);
 
+        console.log('Sultanoo settings response:', { settings, error });
+
         if (error) throw error;
 
         // تحويل المصفوفة إلى object
@@ -27,9 +29,13 @@ async function renderSultanooSettings(c) {
             settingsObj[s.key] = s.value;
         });
 
+        console.log('Settings object:', settingsObj);
+
         const vacationMode = settingsObj.vacation_mode === true;
         const vacationMessage = settingsObj.vacation_message || '';
         const categoryMode = settingsObj.category_display_mode || 'main';
+
+        console.log('Parsed values:', { vacationMode, vacationMessage, categoryMode });
 
         c.innerHTML = `
         <div class="dash-card" style="max-width:800px;margin:0 auto">
