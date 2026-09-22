@@ -10,7 +10,7 @@
 async function renderSultanooSettings(c) {
     if (typeof sb === 'undefined') { c.innerHTML = '<p class="error-msg">⚠️ غير متصل بقاعدة البيانات</p>'; return; }
 
-    showLoadingOverlay('جارٍ تحميل إعدادات سلطانو...');
+    c.innerHTML = '<div style="text-align:center;padding:40px;color:var(--inv-muted)">⏳ جارٍ تحميل إعدادات سلطانو...</div>';
 
     try {
         // جلب الإعدادات الحالية
@@ -107,8 +107,6 @@ async function renderSultanooSettings(c) {
     } catch (err) {
         console.error('Error loading sultanoo settings:', err);
         c.innerHTML = `<p class="error-msg">⚠️ خطأ في تحميل الإعدادات: ${err.message}</p>`;
-    } finally {
-        hideLoadingOverlay();
     }
 }
 
@@ -119,7 +117,8 @@ window.sultanooSaveSettings = async function() {
     const vacationMessage = document.getElementById('sultanooVacationMessage').value.trim();
     const categoryMode = document.querySelector('input[name="categoryMode"]:checked').value;
 
-    showLoadingOverlay('جارٍ حفظ الإعدادات...');
+    const container = document.getElementById('setHubBody');
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--inv-muted)">⏳ جارٍ حفظ الإعدادات...</div>';
 
     try {
         // تحديث الإعدادات واحدة واحدة
@@ -151,8 +150,10 @@ window.sultanooSaveSettings = async function() {
     } catch (err) {
         console.error('Error saving sultanoo settings:', err);
         showToast('⚠️ خطأ في حفظ الإعدادات: ' + err.message, 'error');
-    } finally {
-        hideLoadingOverlay();
+        // إعادة عرض الصفحة عند الخطأ
+        setTimeout(() => {
+            renderSultanooSettings(document.getElementById('setHubBody'));
+        }, 500);
     }
 };
 
