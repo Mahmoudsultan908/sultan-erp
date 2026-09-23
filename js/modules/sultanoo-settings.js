@@ -7,7 +7,11 @@
    يصدّر: renderSultanooSettings(container)
    ════════════════════════════════════════════════════════════ */
 
+let _sultanooSettingsContainer = null; // بند 2026-09-22: الحاوية الوحيدة اللي
+// بتتعرض جواها الإعدادات دلوقتي هي corBody (customer-orders-review.js)
+
 async function renderSultanooSettings(c) {
+    _sultanooSettingsContainer = c;
     if (typeof sb === 'undefined') { c.innerHTML = '<p class="error-msg">⚠️ غير متصل بقاعدة البيانات</p>'; return; }
 
     c.innerHTML = '<div style="text-align:center;padding:40px;color:var(--inv-muted)">⏳ جارٍ تحميل إعدادات سلطانو...</div>';
@@ -117,7 +121,8 @@ window.sultanooSaveSettings = async function() {
     const vacationMessage = document.getElementById('sultanooVacationMessage').value.trim();
     const categoryMode = document.querySelector('input[name="categoryMode"]:checked').value;
 
-    const container = document.getElementById('setHubBody');
+    const container = _sultanooSettingsContainer || document.getElementById('corBody');
+    if (!container) { showToast('⚠️ تعذّر تحديد مكان عرض الإعدادات — أعد فتح الصفحة', 'error'); return; }
     container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--inv-muted)">⏳ جارٍ حفظ الإعدادات...</div>';
 
     try {
@@ -144,7 +149,7 @@ window.sultanooSaveSettings = async function() {
 
         // إعادة تحميل الصفحة لعرض التحديثات
         setTimeout(() => {
-            renderSultanooSettings(document.getElementById('setHubBody'));
+            renderSultanooSettings(container);
         }, 800);
 
     } catch (err) {
@@ -152,7 +157,7 @@ window.sultanooSaveSettings = async function() {
         showToast('⚠️ خطأ في حفظ الإعدادات: ' + err.message, 'error');
         // إعادة عرض الصفحة عند الخطأ
         setTimeout(() => {
-            renderSultanooSettings(document.getElementById('setHubBody'));
+            renderSultanooSettings(container);
         }, 500);
     }
 };

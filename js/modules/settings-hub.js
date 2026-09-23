@@ -7,8 +7,10 @@
    🔄 استيراد/تصدير عام (renderGeneralImportExport من general-import-export.js)
    🖨️ مركز الطباعة (renderPrintCenter من print-center.js)
    📋 الأرصدة الافتتاحية (renderOpeningBalances من opening-balances.js)
-   📱 إعدادات سلطانو (renderSultanooSettings من sultanoo-settings.js)
    يصدّر: renderSettingsHub(container)
+   (بند 2026-09-22: شيلنا تبويب "سلطانو" من هنا — إعدادات سلطانو بقت
+   مكانها الوحيد تبويب "⚙️ إعدادات سلطانو" في صفحة "ربط برنامج طلبات
+   العملاء" customer-orders-review.js، عشان ما تبقاش مكررة في مكانين)
 
    ★ زرار "اعمل نسخة الآن" فى لوحة التحكم (dashboard.js) بيحط
    window._pendingSetHubTab='general' قبل الانتقال — نفس فكرة باقي
@@ -22,7 +24,6 @@ async function renderSettingsHub(c) {
     c.innerHTML = `
     <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
         <button class="mod-btn ${_setHubTab==='general'?'mod-btn-primary':''}" onclick="setHubSwitchTab('general')">⚙️ عام</button>
-        <button class="mod-btn ${_setHubTab==='sultanoo'?'mod-btn-primary':''}" onclick="setHubSwitchTab('sultanoo')">📱 سلطانو</button>
         <button class="mod-btn ${_setHubTab==='users'?'mod-btn-primary':''}" onclick="setHubSwitchTab('users')">👥 المستخدمون</button>
         <button class="mod-btn ${_setHubTab==='permissions'?'mod-btn-primary':''}" onclick="setHubSwitchTab('permissions')">🔐 الصلاحيات المتقدمة</button>
         <button class="mod-btn ${_setHubTab==='import-export'?'mod-btn-primary':''}" onclick="setHubSwitchTab('import-export')">🔄 استيراد/تصدير عام</button>
@@ -36,8 +37,7 @@ async function renderSettingsHub(c) {
 async function setHubRenderTab() {
     const body = document.getElementById('setHubBody');
     if (!body) return;
-    if (_setHubTab === 'sultanoo') await renderSultanooSettings(body);
-    else if (_setHubTab === 'users') await renderUsersManagement(body);
+    if (_setHubTab === 'users') await renderUsersManagement(body);
     else if (_setHubTab === 'permissions') await renderAdvancedPermissions(body);
     else if (_setHubTab === 'import-export') await renderGeneralImportExport(body);
     else if (_setHubTab === 'print') await renderPrintCenter(body);
