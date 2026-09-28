@@ -10,6 +10,23 @@
 let _sultanooSettingsContainer = null; // بند 2026-09-22: الحاوية الوحيدة اللي
 // بتتعرض جواها الإعدادات دلوقتي هي corBody (customer-orders-review.js)
 
+// بند 2026-09-23: دالة إشعار "شو تووست" مش معرّفة في أي مكان في البرنامج
+// كله (خطأ أصلي موجود قبل أي تعديل من عندنا) — عرّفنا Toast خاص بالملف ده،
+// على نفس نمط invToast/posToast/purToast الموجودين في باقي الشاشات.
+function sultanooToast(msg, type = 'info') {
+    let t = document.getElementById('sultanooSetToast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'sultanooSetToast'; t.className = 'inv-toast';
+        document.body.appendChild(t);
+    }
+    t.className = 'inv-toast ' + type;
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(window._sultanooSetToastT);
+    window._sultanooSetToastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
 async function renderSultanooSettings(c) {
     _sultanooSettingsContainer = c;
     if (typeof sb === 'undefined') { c.innerHTML = '<p class="error-msg">⚠️ غير متصل بقاعدة البيانات</p>'; return; }
@@ -115,14 +132,14 @@ async function renderSultanooSettings(c) {
 }
 
 window.sultanooSaveSettings = async function() {
-    if (typeof sb === 'undefined') { showToast('⚠️ غير متصل بقاعدة البيانات', 'error'); return; }
+    if (typeof sb === 'undefined') { sultanooToast('⚠️ غير متصل بقاعدة البيانات', 'error'); return; }
 
     const vacationMode = document.getElementById('sultanooVacationMode').checked;
     const vacationMessage = document.getElementById('sultanooVacationMessage').value.trim();
     const categoryMode = document.querySelector('input[name="categoryMode"]:checked').value;
 
     const container = _sultanooSettingsContainer || document.getElementById('corBody');
-    if (!container) { showToast('⚠️ تعذّر تحديد مكان عرض الإعدادات — أعد فتح الصفحة', 'error'); return; }
+    if (!container) { sultanooToast('⚠️ تعذّر تحديد مكان عرض الإعدادات — أعد فتح الصفحة', 'error'); return; }
     container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--inv-muted)">⏳ جارٍ حفظ الإعدادات...</div>';
 
     try {
@@ -145,7 +162,7 @@ window.sultanooSaveSettings = async function() {
             if (error) throw error;
         }
 
-        showToast('✅ تم حفظ إعدادات سلطانو بنجاح', 'success');
+        sultanooToast('✅ تم حفظ إعدادات سلطانو بنجاح', 'success');
 
         // إعادة تحميل الصفحة لعرض التحديثات
         setTimeout(() => {
@@ -154,7 +171,7 @@ window.sultanooSaveSettings = async function() {
 
     } catch (err) {
         console.error('Error saving sultanoo settings:', err);
-        showToast('⚠️ خطأ في حفظ الإعدادات: ' + err.message, 'error');
+        sultanooToast('⚠️ خطأ في حفظ الإعدادات: ' + err.message, 'error');
         // إعادة عرض الصفحة عند الخطأ
         setTimeout(() => {
             renderSultanooSettings(container);
