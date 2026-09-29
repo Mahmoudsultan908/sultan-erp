@@ -109,11 +109,11 @@ function corRenderOrdersPage(c) {
         </tr></thead><tbody>
             ${reviewed.map(o => `<tr>
                 <td>${o.order_no || '—'}</td>
-                <td>${o.customers?.name || '—'}</td>
-                <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${o.customers?.phone || '—'}</span></td>
+                <td>${escHtml(o.customers?.name) || '—'}</td>
+                <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${escHtml(o.customers?.phone) || '—'}</span></td>
                 <td style="text-align:center">${(o.customer_order_items || []).length}</td>
                 <td>${corFmt(o.total)}</td>
-                <td style="font-size:12px;color:var(--inv-muted)">${o.notes || '—'}</td>
+                <td style="font-size:12px;color:var(--inv-muted)">${escHtml(o.notes) || '—'}</td>
                 <td>${o.converted_sale_id ? `
                     <select class="mod-form-input" style="margin:0;padding:4px 8px;font-size:12px;width:auto" onchange="corUpdateDeliveryStatus('${o.id}',this.value)">
                         ${['preparing','delivering','delivered'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${COR_STATUS_LABELS[s]}</option>`).join('')}
@@ -130,11 +130,11 @@ function corRowHTML(o) {
     const items = o.customer_order_items || [];
     return `<tr data-cor-id="${o.id}">
         <td>${o.order_no || '—'}</td>
-        <td>${o.customers?.name || '—'}</td>
-        <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${o.customers?.phone || '—'}</span></td>
+        <td>${escHtml(o.customers?.name) || '—'}</td>
+        <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${escHtml(o.customers?.phone) || '—'}</span></td>
         <td style="text-align:center">${items.length}</td>
         <td>${corFmt(o.total)}</td>
-        <td style="font-size:12px;color:var(--inv-muted)">${o.notes || '—'}</td>
+        <td style="font-size:12px;color:var(--inv-muted)">${escHtml(o.notes) || '—'}</td>
         <td style="color:var(--inv-muted)">${o.created_at ? new Date(o.created_at).toLocaleString('ar-EG') : '—'}</td>
         <td style="white-space:nowrap">
             <button class="cc-edit" onclick="corShowOrderDetail('${o.id}')">👁️ عرض</button>
@@ -158,11 +158,11 @@ window.corShowOrderDetail = function (id) {
             <button class="mod-modal-close" onclick="document.getElementById('corDetailModal').remove()">&times;</button></div>
         <div class="mod-modal-body">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:14px">
-                <div>العميل: <strong>${o.customers?.name || '—'}</strong></div>
-                <div>التليفون: <strong dir="ltr">${o.customers?.phone || '—'}</strong></div>
-                <div style="grid-column:1/-1">العنوان: <strong>${o.customers?.address || '—'}</strong></div>
+                <div>العميل: <strong>${escHtml(o.customers?.name) || '—'}</strong></div>
+                <div>التليفون: <strong dir="ltr">${escHtml(o.customers?.phone) || '—'}</strong></div>
+                <div style="grid-column:1/-1">العنوان: <strong>${escHtml(o.customers?.address) || '—'}</strong></div>
                 <div style="grid-column:1/-1">التاريخ: <strong>${o.created_at ? new Date(o.created_at).toLocaleString('ar-EG') : '—'}</strong></div>
-                ${o.notes ? `<div style="grid-column:1/-1">ملاحظات: <strong>${o.notes}</strong></div>` : ''}
+                ${o.notes ? `<div style="grid-column:1/-1">ملاحظات: <strong>${escHtml(o.notes)}</strong></div>` : ''}
             </div>
             <table class="mod-table"><thead><tr>
                 <th>الصنف</th><th style="width:70px">الوحدة</th><th style="width:70px">الكمية</th><th style="width:90px">السعر</th><th style="width:100px">الإجمالي</th>
@@ -404,7 +404,7 @@ function corRenderNotificationsPage(c) {
         <div class="mod-form-group"><label>المستهدَف</label>
             <select id="corNotifyTarget" class="mod-form-input">
                 <option value="all">🔔 كل العملاء المفعّلين (${COR_NOTIFY_CUSTOMERS.length})</option>
-                ${COR_NOTIFY_CUSTOMERS.map(cu => `<option value="${cu.id}">${cu.name}${cu.phone ? ' — ' + cu.phone : ''}</option>`).join('')}
+                ${COR_NOTIFY_CUSTOMERS.map(cu => `<option value="${cu.id}">${escHtml(cu.name)}${cu.phone ? ' — ' + escHtml(cu.phone) : ''}</option>`).join('')}
             </select>
         </div>
         ${!COR_NOTIFY_CUSTOMERS.length ? `<div style="background:var(--inv-gold-bg);color:var(--inv-gold);padding:10px 14px;border-radius:9px;font-size:12.5px;margin-bottom:14px">⚠️ لسه مفيش عملاء فعّلوا الإشعارات من تطبيق سلطانو (شاشة الحساب فيها زرار "🔔 تفعيل الإشعارات").</div>` : ''}
@@ -512,8 +512,8 @@ function corRenderCartsPage(c) {
                 const total = items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.price)||0), 0);
                 const minsAgo = Math.max(0, Math.round((Date.now() - new Date(cart.updated_at).getTime()) / 60000));
                 return `<tr>
-                    <td>${cart.customers?.name || '—'}</td>
-                    <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${cart.customers?.phone || '—'}</span></td>
+                    <td>${escHtml(cart.customers?.name) || '—'}</td>
+                    <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${escHtml(cart.customers?.phone) || '—'}</span></td>
                     <td style="text-align:center">${items.length}</td>
                     <td>${corFmt(total)}</td>
                     <td style="color:var(--inv-muted)">${minsAgo < 60 ? `من ${minsAgo} دقيقة` : new Date(cart.updated_at).toLocaleString('ar-EG')}</td>
@@ -537,14 +537,14 @@ function corShowCartDetail(customerId) {
     modal.id = 'corCartModal';
     modal.innerHTML = `
     <div class="mod-modal" style="max-width:520px">
-        <div class="mod-modal-header"><h3>🛒 سلة ${cart.customers?.name || ''}</h3>
+        <div class="mod-modal-header"><h3>🛒 سلة ${escHtml(cart.customers?.name)}</h3>
             <button class="mod-modal-close" onclick="document.getElementById('corCartModal').remove()">&times;</button></div>
         <div class="mod-modal-body">
             <table class="mod-table"><thead><tr>
                 <th>الصنف</th><th style="width:70px">الوحدة</th><th style="width:70px">الكمية</th><th style="width:90px">السعر</th><th style="width:100px">الإجمالي</th>
             </tr></thead><tbody>
                 ${items.map(it => `<tr>
-                    <td>${it.name || '—'}</td>
+                    <td>${escHtml(it.name) || '—'}</td>
                     <td style="text-align:center;color:var(--inv-muted)">${it.unit || '—'}</td>
                     <td style="text-align:center">${corFmt(it.qty)}</td>
                     <td>${corFmt(it.price)}</td>
