@@ -336,7 +336,7 @@ async function renderReports(container) {
                         <td>${fmt(s.total_expected)}</td>
                         <td class="dash-s-green">${fmt(s.total_received)}</td>
                         <td class="dash-amount" style="color:${s.total_remaining>0?'var(--inv-gold)':'var(--inv-green)'}">${fmt(s.total_remaining)}</td>
-                        <td>${s.total_remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 تسجيل استلام</button>` : ''}</td>
+                        <td>${s.items_count>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 إدارة / استلام</button>` : ''}</td>
                     </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد مؤجلات مسجلة</td></tr>'}
                 </tbody>
             </table>
@@ -449,7 +449,7 @@ async function renderReports(container) {
         modal.id = 'repDefReceiveModal';
         modal.innerHTML = `
         <div class="mod-modal">
-            <div class="mod-modal-header"><h3>💰 مؤجلات معلّقة — ${supplierName}</h3>
+            <div class="mod-modal-header"><h3>💰 إدارة المؤجلات — ${supplierName}</h3>
                 <button class="mod-modal-close" onclick="repDefCloseModal('repDefReceiveModal')">&times;</button></div>
             <div class="mod-modal-body" id="repDefReceiveBody">
                 <div style="text-align:center;padding:20px;color:var(--inv-muted)">⏳ جاري التحميل...</div>
@@ -468,59 +468,12 @@ async function renderReports(container) {
         await repDefLoadInvoiceGroups(supplierId, 'repDefReceiveBody');
     };
 
-    // بند 2026-09-26: بدل عرض كل صنف في فاتورة الشراء في سطر منفصل، بنجمع
-    // كل أصناف نفس الفاتورة في سطر واحد بإجمالي المؤجل بتاعها، وزرار
-    // استلام مستقل لكل فاتورة — يستلم كل بنودها دفعة واحدة. تُستخدم من
-    // هنا (نافذة الاستلام) ومن كشف حساب المورد (suppliers.js) بنفس الشكل.
-    window.repDefLoadInvoiceGroups = async function (supplierId, bodyElId) {
-        const body = document.getElementById(bodyElId);
-        try {
-            const { data: pending, error } = await sb.rpc('fn_list_pending_deferred_rebates', { p_supplier_id: supplierId });
-            if (error) throw error;
-            if (!pending || !pending.length) {
-                body.innerHTML = `<div style="color:var(--inv-muted-light);font-size:12px">لا توجد مؤجلات معلّقة لهذا المورد.</div>`;
-                return;
-            }
-            const groups = {};
-            pending.forEach(p => {
-                const key = p.purchase_id || 'no-invoice';
-                if (!groups[key]) groups[key] = { invoice_no: p.invoice_no || '—', invoice_date: p.invoice_date, invoice_total: p.invoice_total, items: [] };
-                groups[key].items.push(p);
-            });
-            const rows = Object.entries(groups).sort((a, b) => new Date(a[1].invoice_date || 0) - new Date(b[1].invoice_date || 0));
-            body.innerHTML = `
-            <div style="font-size:11px;color:var(--inv-muted);margin-bottom:8px">مؤجل كل فاتورة مجموع كل أصنافها. اضغط "استلام" جنب أي فاتورة عشان يتحول لخصم من حساب المورد فورًا.</div>
-            <table class="mod-table"><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>إجمالي الفاتورة</th><th>إجمالي المؤجل</th><th></th></tr></thead>
-            <tbody>
-                ${rows.map(([pid, g]) => {
-                    const total = g.items.reduce((s, it) => s + (Number(it.remaining_amount) || 0), 0);
-                    const ids = g.items.map(it => it.id).join(',');
-                    return `<tr>
-                        <td><strong>${g.invoice_no}</strong></td>
-                        <td style="font-size:12px">${g.invoice_date ? new Date(g.invoice_date).toLocaleDateString('ar-EG') : '—'}</td>
-                        <td style="text-align:left">${fmt(g.invoice_total)}</td>
-                        <td style="text-align:left;font-weight:700;color:var(--inv-gold)">${fmt(total)}</td>
-                        <td><button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="repDefReceiveInvoice('${ids}','${bodyElId}','${supplierId}')">✅ استلام</button></td>
-                    </tr>`;
-                }).join('')}
-            </tbody></table>`;
-        } catch (err) {
-            body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:12px;border-radius:8px;font-size:12px">خطأ: ${err.message}</div>`;
-        }
-    };
-
-    window.repDefReceiveInvoice = async function (idsCsv, bodyElId, supplierId) {
-        const ids = idsCsv.split(',').filter(Boolean);
-        if (!ids.length) return;
-        if (!confirm('تأكيد استلام مؤجل الفاتورة دي بالكامل؟ هيتحول لخصم فوري من رصيد المورد.')) return;
-        try {
-            const { error } = await sb.rpc('fn_mark_deferred_rebate_received', { p_ids: ids });
-            if (error) throw error;
-            await repDefLoadInvoiceGroups(supplierId, bodyElId);
-            renderDeferred(document.getElementById('rep-content'));
-        } catch (err) {
-            alert('خطأ أثناء تسجيل الاستلام: ' + err.message);
-        }
+    // إدارة مؤجلات الفواتير (استلام جزئي/إلغاء/إعادة فتح/استعادة) اتنقلت لملف
+    // deferred-rebates.js عشان كشف حساب المورد يستخدمها من غير ما يفتح التقارير.
+    // الدالة دي بس بتخلي الإجراءات هناك تحدّث تقرير المؤجلات لو مفتوح.
+    window.repDefRefreshReport = function () {
+        const el = document.getElementById('rep-content');
+        if (el) renderDeferred(el);
     };
 
     renderReportContent(activeReport);

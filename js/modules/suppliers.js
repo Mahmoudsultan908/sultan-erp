@@ -61,6 +61,7 @@ window.supShowStatement = async function(supplierId) {
             { data: openingBalances },
             { data: deferredManual },
             { data: deferredAuto },
+            { data: deferredReceipts },
             docsResult,
         ] = await Promise.all([
             sb.from('purchases').select('id, invoice_no, total, payment_type, status, created_at')
@@ -87,8 +88,12 @@ window.supShowStatement = async function(supplierId) {
                 .eq('supplier_id', supplierId).neq('status', 'cancelled')
                 .order('created_at', { ascending: true }),
             // المؤجلات التلقائية (من فواتير الشراء)
-            sb.from('deferred_rebates_supplier_summary').select('items_count, total_remaining')
+            sb.from('deferred_rebates_supplier_summary').select('items_count, total_expected, total_remaining')
                 .eq('supplier_id', supplierId).maybeSingle(),
+            // سجل استلام/إعادة فتح المؤجلات (بتاريخ كل حركة) — deferred_rebate_receipts
+            sb.from('deferred_rebate_receipts').select('id, kind, amount, event_date, note, purchase_id')
+                .eq('supplier_id', supplierId).in('kind', ['receive', 'reopen'])
+                .order('event_date', { ascending: true }).then(r => r, () => ({ data: [] })),
             // اختياري — لو جدول archive_documents لسه ما اتعملش، نتجاهل الخطأ بهدوء
             sb.from('archive_documents').select('id,title,file_url,category,created_at')
                 .eq('linked_type', 'supplier').eq('linked_id', supplierId)
@@ -165,13 +170,27 @@ window.supShowStatement = async function(supplierId) {
                 });
             }
         });
-        // المؤجلات التلقائية المُستلَمة فقط
+        // المؤجلات التلقائية: الاستلام وإعادة الفتح بتواريخهم الفعلية من سجل الإيصالات،
+        // وأي مستلم قديم قبل تفعيل السجل بيظهر في سطر واحد مجمّع.
         const deferredAutoReceived = (Number(deferredAuto?.total_expected)||0) - (Number(deferredAuto?.total_remaining)||0);
-        if (deferredAutoReceived > 0.01) {
+        const receiptRows = deferredReceipts || [];
+        let receiptsNet = 0;
+        receiptRows.forEach(x => {
+            const amt = Number(x.amount) || 0;
+            if (x.kind === 'receive') {
+                receiptsNet += amt;
+                moves.push({ date: x.event_date, desc: `💰 استلام مؤجل${x.note ? ' — '+x.note : ''}`, debit: amt, credit: 0, type: 'deferred-auto' });
+            } else if (x.kind === 'reopen') {
+                receiptsNet -= amt;
+                moves.push({ date: x.event_date, desc: `↩️ إعادة فتح مؤجل${x.note ? ' — '+x.note : ''}`, debit: 0, credit: amt, type: 'deferred-auto' });
+            }
+        });
+        const legacyReceived = deferredAutoReceived - receiptsNet;
+        if (legacyReceived > 0.01) {
             moves.push({
-                date: new Date().toISOString(),
-                desc: `💰 استلام مؤجلات تلقائية (${supFmt(deferredAutoReceived)})`,
-                debit: deferredAutoReceived,
+                date: receiptRows.length ? receiptRows[0].event_date : new Date().toISOString(),
+                desc: `💰 استلام مؤجلات تلقائية سابقة (${supFmt(legacyReceived)})`,
+                debit: legacyReceived,
                 credit: 0,
                 type: 'deferred-auto'
             });
@@ -456,3 +475,13 @@ function supFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFrac
 
 // راجع custThemeBg فى customers.js — نفس الفكرة بالظبط.
 function supThemeBg(light, dark) { return (typeof window.themeIsDark === 'function' && window.themeIsDark()) ? dark : light; }
+
+// بعد أي إجراء على المؤجلات من داخل كشف الحساب (استلام/إلغاء/إعادة فتح/استعادة):
+// نعيد فتح الكشف عشان الرصيد والحركات يتحدّثوا. راجع deferred-rebates.js (drRun).
+window.supStmtReloadAfterDeferred = function () {
+    const m = document.getElementById('supStmtModal');
+    if (!m || !_supStmtId) return;
+    const id = _supStmtId;
+    m.remove();
+    window.supShowStatement(id);
+};
