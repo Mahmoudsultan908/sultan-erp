@@ -46,10 +46,11 @@ window.supShowStatement = async function(supplierId) {
 
     try {
         // جلب حركات المورد بالتوازي — ★ دلوقتي بتشمل فواتير الشراء النقدية
-        // والمرتجعات كمان (كانوا ناقصين). purchase_returns معندهاش عمود
-        // payment_type بتاعها، فبنجيبه من الفاتورة الأصلية المرتبطة
-        // (purchase_id) لو موجودة — لو المرتجع مش مرتبط بفاتورة، بيتعامل
-        // معه كمعلومة بس من غير أثر على الرصيد (أأمن اختيار من غير تخمين).
+        // والمرتجعات كمان. ★ نوع المرتجع (نقدي/آجل) وهل بيخصم من رصيد المورد
+        // بيتحدد من بيانات المرتجع نفسه (payment_type + affects_supplier_balance)
+        // — مش من الفاتورة الأصلية، ومش بالتخمين — عشان نفس منطق trigger
+        // fn_purchase_return_status_change بالظبط (والمرتجع المستقل purchase_id=null
+        // يتعامل صح).
         const [
             { data: purchases },
             { data: payments },
@@ -66,8 +67,8 @@ window.supShowStatement = async function(supplierId) {
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
             sb.from('supplier_payments').select('ref, amount, status, created_at')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
-            sb.from('purchase_returns').select('id, return_no, total, status, created_at, purchases(payment_type)')
-                .eq('supplier_id', supplierId).order('created_at', { ascending: true }).limit(100),
+            sb.from('purchase_returns').select('id, return_no, total, status, payment_type, affects_supplier_balance, created_at')
+                .eq('supplier_id', supplierId).order('created_at', { ascending: true }).limit(1000),
             // تحويلات رصيد بين موردين + استرداد نقدي من رصيد مورد لخزنة — كانوا
             // ناقصين تمامًا من الكشف (راجع fn_balance_transfer_apply للاتجاهات)
             sb.from('balance_transfers').select('id, to_s:to_supplier_id(name), amount, notes, created_at')
@@ -109,19 +110,22 @@ window.supShowStatement = async function(supplierId) {
         });
         (returns||[]).forEach(r => {
             if (r.status !== 'confirmed' && r.status !== 'cancelled') return;
-            // تحديد نوع الدفع: نحاول من الفاتورة الأصلية أولاً، ثم من المرتجع نفسه
-            const paymentType = r.purchases?.payment_type || r.payment_type;
             const isCancelled = r.status === 'cancelled';
+            const isCash = r.payment_type === 'cash';
+            const reducesBalance = !isCash && r.affects_supplier_balance !== false;
 
-            if (paymentType === 'credit' && !isCancelled) {
-                // مرتجع آجل مؤكد — يخصم من رصيد المورد
-                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no}`, debit: Number(r.total)||0, credit: 0, type: 'return-credit' });
-            } else if (isCancelled) {
+            if (isCancelled) {
                 // مرتجع ملغي — بدون تأثير
                 moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no} (ملغي)`, debit: 0, credit: 0, type: 'return-cancelled' });
-            } else {
+            } else if (reducesBalance) {
+                // مرتجع آجل مؤكد — يخصم من رصيد المورد
+                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no}`, debit: Number(r.total)||0, credit: 0, type: 'return-credit' });
+            } else if (isCash) {
                 // مرتجع نقدي — بدون تأثير على الرصيد
                 moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no} (نقدي — بدون أثر على الرصيد)`, debit: 0, credit: 0, type: 'return-cash' });
+            } else {
+                // مرتجع آجل متعلَّم "لا يخصم من رصيد المورد"
+                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no} (آجل — بدون خصم من رصيد المورد)`, debit: 0, credit: 0, type: 'return-cash' });
             }
         });
         (payments||[]).forEach(p => {
