@@ -33,7 +33,7 @@ function custDetLimitState(balance, limit) {
 // أعمار المديونية بافتراض إن السداد بيغطي الأقدم أول (FIFO) — نفس منطق
 // شاشة "أرصدة العملاء"، وأي جزء بدون فاتورة يتحسب في "+90/افتتاحي".
 function custDetAging(balance, sales, nowMs) {
-    const out = { b30: 0, b60: 0, b90: 0, b90p: 0 };
+    const out = { b30: 0, b60: 0, b90: 0, b90p: 0, opening: 0, source: 'js' };
     let remaining = Number(balance) || 0;
     if (remaining <= 0.005) return out;
     const inv = (sales || []).filter(s => s.status === 'confirmed' && s.payment_type === 'credit').slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -47,6 +47,12 @@ function custDetAging(balance, sales, nowMs) {
     }
     if (remaining > 0.005) out.b90p += remaining;
     return out;
+}
+// صف fn_customer_aging → نفس شكل custDetAging (+ opening = دين افتتاحي غير مؤرَّخ، وsource='db')
+function custDetAgingFromRpc(row) {
+    if (!row) return null;
+    return { b30: Number(row.b0_30) || 0, b60: Number(row.b31_60) || 0, b90: Number(row.b61_90) || 0, b90p: Number(row.b90p) || 0,
+             opening: Number(row.opening_undated) || 0, source: 'db' };
 }
 function custDetPeriodStart(sched, nowMs) {
     const d = new Date(nowMs);
@@ -141,11 +147,11 @@ window.custShowStatement = async function(customerId) {
             { data: openingBalances },
             docsResult,
             interactionsResult,
-            groupRes, clsRes, regRes, repRes,
+            groupRes, clsRes, regRes, repRes, agingRes,
         ] = await Promise.all([
             sb.from('sales').select('id, invoice_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }),
-            sb.from('customer_payments').select('id, ref, amount, status, created_at')
+            sb.from('customer_payments').select('id, ref, amount, discount, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
             sb.from('sales_returns').select('id, return_no, total, payment_type, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
@@ -169,6 +175,8 @@ window.custShowStatement = async function(customerId) {
             cust.classification_id ? sb.from('customer_classifications').select('name').eq('id', cust.classification_id).single().then(r => r, () => ({ data: null })) : Promise.resolve({ data: null }),
             cust.region_id ? sb.from('customer_regions').select('name').eq('id', cust.region_id).single().then(r => r, () => ({ data: null })) : Promise.resolve({ data: null }),
             (cust.default_rep_id || cust.primary_rep_id) ? sb.from('sales_reps').select('name').eq('id', cust.default_rep_id || cust.primary_rep_id).single().then(r => r, () => ({ data: null })) : Promise.resolve({ data: null }),
+            // أعمار المديونية الدقيقة من قاعدة البيانات (fn_customer_aging) — لو فشلت نرجع للحساب المحلي التقريبي
+            sb.rpc('fn_customer_aging', { p_customer_id: customerId }).then(r => r, () => ({ data: null, error: true })),
         ]);
         // ── بطاقة تفاصيل العميل: حد ائتماني/استحقاق/أعمار/دفعة مستهدفة (بند 2026-09-21) ──
         const custDetNow = Date.now(), custDetTodayD = custDetToday();
@@ -177,7 +185,7 @@ window.custShowStatement = async function(customerId) {
             rep: repRes?.data?.name || '', locked: !!cust.debt_locked, limit: Number(cust.credit_limit) || 0,
             due: custDetDueStatus(Number(cust.balance) || 0, cust.payment_due_date, custDetTodayD), dueDate: cust.payment_due_date || '',
             lim: custDetLimitState(Number(cust.balance) || 0, cust.credit_limit),
-            aging: custDetAging(Number(cust.balance) || 0, sales || [], custDetNow),
+            aging: custDetAgingFromRpc(agingRes?.data?.[0]) || custDetAging(Number(cust.balance) || 0, sales || [], custDetNow),
             target: Number(cust.daily_payment_target) || 0, sched: cust.payment_schedule || 'daily',
         };
         {
@@ -211,7 +219,8 @@ window.custShowStatement = async function(customerId) {
         });
         (payments||[]).forEach(p => {
             if (p.status === 'confirmed') {
-                moves.push({ date: p.created_at, desc: `تحصيل ${p.ref||''}`, debit: 0, credit: Number(p.amount)||0, type: 'payment', nav: { kind: 'payment', id: p.id } });
+                const payDisc = Number(p.discount) || 0;  // الرصيد بيتخفض بالمبلغ + الخصم (راجع fn_customer_payment_status_change)
+                moves.push({ date: p.created_at, desc: `تحصيل ${p.ref||''}${payDisc > 0 ? ' (شامل خصم ' + custFmt(payDisc) + ')' : ''}`, debit: 0, credit: (Number(p.amount)||0) + payDisc, type: 'payment', nav: { kind: 'payment', id: p.id } });
             }
         });
         // تحويل رصيد "من" العميل ده لعميل تاني: بيقلل رصيده (دائن) — راجع
@@ -525,12 +534,15 @@ function custStmtTargetCardHtml() {
 function custStmtAgingBarHtml() {
     const balNow = window._custStmtBalNow;
     if (!(balNow > 0.005)) return '';
-    const ag = window._custStmtDetails.aging, tot = ag.b30 + ag.b60 + ag.b90 + ag.b90p;
+    const ag = window._custStmtDetails.aging, opening = Number(ag.opening) || 0;
+    const tot = ag.b30 + ag.b60 + ag.b90 + ag.b90p + opening;
     if (tot <= 0.005) return '';
     const seg = (v, col) => v > 0.005 ? `<div title="${custFmt(v)}" style="width:${v/tot*100}%;background:${col}"></div>` : '';
+    const exact = ag.source === 'db';
     return `<div class="dash-card" style="padding:10px 14px;margin-bottom:14px;font-size:12.5px">
-        أعمار المديونية (FIFO): 0-30 يوم <b>${custFmt(ag.b30)}</b> · 31-60 <b>${custFmt(ag.b60)}</b> · 61-90 <b>${custFmt(ag.b90)}</b> · +90/افتتاحي <b>${custFmt(ag.b90p)}</b>
-        <div style="display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--inv-border);margin-top:6px">${seg(ag.b30,'#059669')}${seg(ag.b60,'#D97706')}${seg(ag.b90,'#EA580C')}${seg(ag.b90p,'#DC2626')}</div>
+        أعمار المديونية (FIFO — السداد بيغطي الأقدم أولاً): 0-30 يوم <b>${custFmt(ag.b30)}</b> · 31-60 <b>${custFmt(ag.b60)}</b> · 61-90 <b>${custFmt(ag.b90)}</b> · ${exact ? '+90' : '+90/افتتاحي'} <b>${custFmt(ag.b90p)}</b>${exact ? ` · افتتاحي غير مؤرَّخ <b>${custFmt(opening)}</b>` : ''}
+        <div style="display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--inv-border);margin-top:6px">${seg(opening,'#64748B')}${seg(ag.b90p,'#DC2626')}${seg(ag.b90,'#EA580C')}${seg(ag.b60,'#D97706')}${seg(ag.b30,'#059669')}</div>
+        ${exact ? '' : '<div style="font-size:11px;color:var(--inv-muted);margin-top:4px">تقدير محلي تقريبي (تعذّر تحميل الحساب الدقيق).</div>'}
     </div>`;
 }
 function custStmtWaButtonHtml() {
@@ -712,10 +724,90 @@ window.custRedeemLoyalty = async function(customerId, currentBalance) {
 
 // أيقونة الانتقال المباشر جنب كل حركة فى الكشف — بتاخد نفس فكرة
 // custGoEditProfile بالظبط (pending flag + كليك على عنصر القائمة الجانبية)
-window.custGoToDoc = function(revType, no) {
-    // بند 2026-09-22: يفتح الفاتورة/المرتجع في صفحة مراجعة الفواتير من غير
-    // ما يقفل كشف الحساب، عشان ترجع لنفس مكانك في الكشف لما تقفل النافذة.
+// ★ معاينة الفاتورة/المرتجع فوق كشف الحساب (للعرض فقط) — الكشف بيفضل مفتوح تحتها.
+//   زرار "فتح في مراجعة الفواتير" هو اللي بيقفل الكشف وينقل لصفحة التعديل.
+window.custGoToDoc = async function(revType, no) {
+    const isReturn = revType === 'sales_return';
+    document.getElementById('custDocPreviewModal')?.remove();
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'custDocPreviewModal';
+    modal.style.zIndex = '10050';
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:760px">
+            <div class="mod-modal-header"><h3>${isReturn ? '↩️ مرتجع بيع' : '🧾 فاتورة بيع'} ${custDetEsc(no)}</h3>
+                <button class="mod-modal-close" onclick="custCloseModal('custDocPreviewModal')">&times;</button></div>
+            <div class="mod-modal-body" id="custDocPreviewBody"><div class="empty-state"><span>⏳</span>جاري التحميل...</div></div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="custOpenInReview('${isReturn ? 'sales_return' : 'sales'}','${custDetEsc(no)}')">✏️ فتح في مراجعة الفواتير (للتعديل)</button>
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="custCloseModal('custDocPreviewModal')">إغلاق</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    const body = document.getElementById('custDocPreviewBody');
+    try {
+        let head, items;
+        if (isReturn) {
+            const { data, error } = await sb.from('sales_returns')
+                .select('id, return_no, total, subtotal, status, payment_type, affects_customer_balance, reason, created_at, sales(invoice_no), sales_reps(name)')
+                .eq('return_no', no).maybeSingle();
+            if (error) throw error;
+            head = data;
+            if (head) {
+                const r = await sb.from('sale_return_items').select('qty, unit_price, line_total, discount_pct, unit_name, products(name, code)').eq('return_id', head.id);
+                if (r.error) throw r.error;
+                items = r.data || [];
+            }
+        } else {
+            const { data, error } = await sb.from('sales')
+                .select('id, invoice_no, total, subtotal, vat_amount, discount, status, payment_type, due_date, source_app, created_at, sales_reps(name)')
+                .eq('invoice_no', no).maybeSingle();
+            if (error) throw error;
+            head = data;
+            if (head) {
+                const r = await sb.from('sale_items').select('qty, unit_price, line_total, discount_pct, free_qty, unit_name, products(name, code)').eq('sale_id', head.id);
+                if (r.error) throw r.error;
+                items = r.data || [];
+            }
+        }
+        if (!head) { body.innerHTML = `<div class="empty-state"><span>🔍</span>مش لاقي المستند ده (${custDetEsc(no)})</div>`; return; }
+        const statusBadge = head.status === 'confirmed' ? custDetBadge('within', 'مؤكد') : head.status === 'cancelled' ? custDetBadge('over', 'ملغي') : custDetBadge('nodue', custDetEsc(head.status || ''));
+        const ptype = head.payment_type === 'credit' ? 'آجل' : 'نقدي';
+        const rows = (items || []).map(it => `<tr>
+            <td>${custDetEsc(it.products?.name) || '—'}${it.products?.code ? ` <small style="color:var(--inv-muted-light)">${custDetEsc(it.products.code)}</small>` : ''}</td>
+            <td style="text-align:center">${custFmt(it.qty)}${it.unit_name ? ' ' + custDetEsc(it.unit_name) : ''}${Number(it.free_qty) > 0 ? ` <small style="color:var(--inv-green)">+${custFmt(it.free_qty)} مجاني</small>` : ''}</td>
+            <td style="text-align:left">${custFmt(it.unit_price)}</td>
+            <td style="text-align:center">${Number(it.discount_pct) > 0 ? custFmt(it.discount_pct) + '%' : '—'}</td>
+            <td style="text-align:left;font-weight:700">${custFmt(it.line_total)}</td></tr>`).join('');
+        body.innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;font-size:13px;margin-bottom:12px">
+                <div>التاريخ: <strong>${custDetEsc(String(head.created_at).slice(0, 16).replace('T', ' '))}</strong></div>
+                <div>الحالة: ${statusBadge}</div>
+                <div>النوع: <strong>${ptype}</strong></div>
+                ${head.sales_reps?.name ? `<div>المندوب: <strong>${custDetEsc(head.sales_reps.name)}</strong></div>` : ''}
+                ${!isReturn && head.due_date ? `<div>الاستحقاق: <strong>${custDetEsc(head.due_date)}</strong></div>` : ''}
+                ${isReturn && head.sales?.invoice_no ? `<div>على فاتورة: <strong>${custDetEsc(head.sales.invoice_no)}</strong></div>` : ''}
+                ${isReturn && head.affects_customer_balance === false ? `<div style="color:var(--inv-gold)">لا يخصم من رصيد العميل</div>` : ''}
+                ${isReturn && head.reason ? `<div style="grid-column:1/-1">السبب: <strong>${custDetEsc(head.reason)}</strong></div>` : ''}
+            </div>
+            <div class="mod-table-wrap"><table class="mod-table"><thead><tr><th>الصنف</th><th style="text-align:center">الكمية</th><th style="text-align:left">السعر</th><th style="text-align:center">خصم</th><th style="text-align:left">الإجمالي</th></tr></thead>
+                <tbody>${rows || '<tr><td colspan="5" class="empty-state">لا توجد أصناف</td></tr>'}</tbody></table></div>
+            <div style="display:flex;justify-content:flex-end;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px">
+                ${head.subtotal != null ? `<span>المجموع: <strong>${custFmt(head.subtotal)}</strong></span>` : ''}
+                ${Number(head.discount) > 0 ? `<span>خصم: <strong>${custFmt(head.discount)}</strong></span>` : ''}
+                ${Number(head.vat_amount) > 0 ? `<span>ضريبة: <strong>${custFmt(head.vat_amount)}</strong></span>` : ''}
+                <span style="font-size:15px">الصافي: <strong>${custFmt(head.total)} ج.م</strong></span>
+            </div>`;
+    } catch (err) {
+        body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:14px;border-radius:10px">خطأ: ${custDetEsc(err.message)}</div>`;
+    }
+};
+// فتح المستند في صفحة مراجعة الفواتير (تعديل/إلغاء) — بيقفل المعاينة والكشف
+window.custOpenInReview = function(revType, no) {
     window._pendingInvoiceReviewSearch = { type: revType, no };
+    custCloseModal('custDocPreviewModal');
+    custCloseModal('custStmtModal');
     document.querySelector('[data-mod="invoice-review"]')?.click();
 };
 window.custGoToPayment = function(paymentId) {
