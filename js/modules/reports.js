@@ -449,14 +449,13 @@ async function renderReports(container) {
         modal.id = 'repDefReceiveModal';
         modal.innerHTML = `
         <div class="mod-modal">
-            <div class="mod-modal-header"><h3>💰 تسجيل استلام مؤجل — ${supplierName}</h3>
+            <div class="mod-modal-header"><h3>💰 مؤجلات معلّقة — ${supplierName}</h3>
                 <button class="mod-modal-close" onclick="repDefCloseModal('repDefReceiveModal')">&times;</button></div>
             <div class="mod-modal-body" id="repDefReceiveBody">
                 <div style="text-align:center;padding:20px;color:var(--inv-muted)">⏳ جاري التحميل...</div>
             </div>
             <div class="mod-modal-footer">
                 <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="repDefCloseModal('repDefReceiveModal')">إغلاق</button>
-                <button class="mod-btn mod-btn-primary" onclick="repDefConfirmReceiveReal('${supplierId}')">✅ تأكيد استلام المحدد</button>
             </div>
         </div>`;
         document.body.appendChild(modal);
@@ -466,38 +465,58 @@ async function renderReports(container) {
             body.innerHTML = `<div style="color:var(--inv-muted-light);font-size:12px">تعذّر تحديد المورد تلقائياً — استخدم جدول "مؤجلات مسجّلة يدوياً" بالأسفل لو المؤجل ده يدوي، أو راجع المطوّر.</div>`;
             return;
         }
+        await repDefLoadInvoiceGroups(supplierId, 'repDefReceiveBody');
+    };
+
+    // بند 2026-09-26: بدل عرض كل صنف في فاتورة الشراء في سطر منفصل، بنجمع
+    // كل أصناف نفس الفاتورة في سطر واحد بإجمالي المؤجل بتاعها، وزرار
+    // استلام مستقل لكل فاتورة — يستلم كل بنودها دفعة واحدة. تُستخدم من
+    // هنا (نافذة الاستلام) ومن كشف حساب المورد (suppliers.js) بنفس الشكل.
+    window.repDefLoadInvoiceGroups = async function (supplierId, bodyElId) {
+        const body = document.getElementById(bodyElId);
         try {
             const { data: pending, error } = await sb.rpc('fn_list_pending_deferred_rebates', { p_supplier_id: supplierId });
             if (error) throw error;
             if (!pending || !pending.length) {
-                body.innerHTML = `<div style="color:var(--inv-muted-light);font-size:12px">لا توجد بنود مؤجلة معلّقة من فواتير شراء لهذا المورد.</div>`;
+                body.innerHTML = `<div style="color:var(--inv-muted-light);font-size:12px">لا توجد مؤجلات معلّقة لهذا المورد.</div>`;
                 return;
             }
+            const groups = {};
+            pending.forEach(p => {
+                const key = p.purchase_id || 'no-invoice';
+                if (!groups[key]) groups[key] = { invoice_no: p.invoice_no || '—', invoice_date: p.invoice_date, invoice_total: p.invoice_total, items: [] };
+                groups[key].items.push(p);
+            });
+            const rows = Object.entries(groups).sort((a, b) => new Date(a[1].invoice_date || 0) - new Date(b[1].invoice_date || 0));
             body.innerHTML = `
-            <div style="font-size:11px;color:var(--inv-muted);margin-bottom:8px">حدد البنود اللي المورد استلمها فعلاً (خصم/استرداد) ثم اضغط "تأكيد استلام المحدد".</div>
-            <table class="mod-table"><thead><tr><th></th><th>الصنف</th><th>الكمية</th><th>المؤجل/وحدة</th><th>الاستحقاق</th><th>المبلغ المتوقع</th></tr></thead>
+            <div style="font-size:11px;color:var(--inv-muted);margin-bottom:8px">مؤجل كل فاتورة مجموع كل أصنافها. اضغط "استلام" جنب أي فاتورة عشان يتحول لخصم من حساب المورد فورًا.</div>
+            <table class="mod-table"><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>إجمالي الفاتورة</th><th>إجمالي المؤجل</th><th></th></tr></thead>
             <tbody>
-                ${pending.map(p => `<tr>
-                    <td><input type="checkbox" class="repDefRecvChk" value="${p.id}"></td>
-                    <td>${p.product_name || '—'}</td>
-                    <td>${p.qty}</td>
-                    <td>${fmt(p.rate)}</td>
-                    <td>${p.due_date || '—'}</td>
-                    <td>${fmt(p.expected_amount)}</td>
-                </tr>`).join('')}
+                ${rows.map(([pid, g]) => {
+                    const total = g.items.reduce((s, it) => s + (Number(it.remaining_amount) || 0), 0);
+                    const ids = g.items.map(it => it.id).join(',');
+                    return `<tr>
+                        <td><strong>${g.invoice_no}</strong></td>
+                        <td style="font-size:12px">${g.invoice_date ? new Date(g.invoice_date).toLocaleDateString('ar-EG') : '—'}</td>
+                        <td style="text-align:left">${fmt(g.invoice_total)}</td>
+                        <td style="text-align:left;font-weight:700;color:var(--inv-gold)">${fmt(total)}</td>
+                        <td><button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="repDefReceiveInvoice('${ids}','${bodyElId}','${supplierId}')">✅ استلام</button></td>
+                    </tr>`;
+                }).join('')}
             </tbody></table>`;
         } catch (err) {
             body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:12px;border-radius:8px;font-size:12px">خطأ: ${err.message}</div>`;
         }
     };
 
-    window.repDefConfirmReceiveReal = async function () {
-        const ids = Array.from(document.querySelectorAll('.repDefRecvChk:checked')).map(el => el.value);
-        if (!ids.length) return alert('حدد بند واحد على الأقل');
+    window.repDefReceiveInvoice = async function (idsCsv, bodyElId, supplierId) {
+        const ids = idsCsv.split(',').filter(Boolean);
+        if (!ids.length) return;
+        if (!confirm('تأكيد استلام مؤجل الفاتورة دي بالكامل؟ هيتحول لخصم فوري من رصيد المورد.')) return;
         try {
             const { error } = await sb.rpc('fn_mark_deferred_rebate_received', { p_ids: ids });
             if (error) throw error;
-            repDefCloseModal('repDefReceiveModal');
+            await repDefLoadInvoiceGroups(supplierId, bodyElId);
             renderDeferred(document.getElementById('rep-content'));
         } catch (err) {
             alert('خطأ أثناء تسجيل الاستلام: ' + err.message);

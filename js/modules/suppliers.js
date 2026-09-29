@@ -314,12 +314,19 @@ function supStmtRecomputeAndRender() {
             </div>
         </div>
 
+        <div id="supStmtDeferredBody"></div>
+
         <div class="ob-tabs" style="margin-bottom:12px">
             <button class="ob-tab ${_supStmtTab==='moves'?'active':''}" onclick="supStmtSwitchTab('moves')">📋 الحركات</button>
             <button class="ob-tab ${_supStmtTab==='items'?'active':''}" onclick="supStmtSwitchTab('items')">📦 الأصناف</button>
         </div>
         <div id="supStmtTabBody">${supStmtMovesTabHtml()}</div>
         ${_supStmtDocsHtml}`;
+    // بند 2026-09-26: مؤجلات معلّقة (لسه معلّقة، مش المُستلَمة اللي فوق في
+    // الحركات) — سطر واحد لكل فاتورة شراء بإجمالي مؤجلها، وزرار استلام
+    // بيحوّلها فورًا لخصم من رصيد المورد. نفس الدالة المشتركة اللي بيستخدمها
+    // تقرير "المؤجلات" (reports.js: repDefLoadInvoiceGroups).
+    if (typeof repDefLoadInvoiceGroups === 'function') repDefLoadInvoiceGroups(_supStmtId, 'supStmtDeferredBody');
 }
 
 window.supStmtApplyDateFilter = function () {
