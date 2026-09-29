@@ -66,9 +66,9 @@ function rcrRenderPage(c) {
                 const rgn = RCR_REGIONS.find(rg => rg.id === r.customer?.region_id);
                 return `<tr>
                 <td>${r.request_type==='new'?'🆕 جديد':'✏️ تعديل'}</td>
-                <td>${r.source==='sultano' ? '🌐 سلطانو' : '🚗 '+(r.rep?.name||'—')}</td>
-                <td>${r.proposed_name||'—'}</td>
-                <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${r.proposed_phone||'—'}</span></td>
+                <td>${r.source==='sultano' ? '🌐 سلطانو' : '🚗 '+(escHtml(r.rep?.name)||'—')}</td>
+                <td>${escHtml(r.proposed_name)||'—'}</td>
+                <td style="text-align:center;color:var(--inv-muted)"><span dir="ltr">${escHtml(r.proposed_phone)||'—'}</span></td>
                 <td style="color:var(--inv-muted);font-size:12px">${rgn?.name || '—'}</td>
                 <td style="color:var(--inv-muted);font-size:12px">${grp ? grp.name + (grp.price_levels?.name ? ' — ' + grp.price_levels.name : '') : '—'}</td>
                 <td>${r.status==='approved'?'<span style="color:var(--inv-green);font-weight:700">✅ معتمد</span>':'<span style="color:var(--inv-red);font-weight:700">❌ مرفوض</span>'}</td>
@@ -84,10 +84,10 @@ function rcrRowHTML(r) {
     const isNew = r.request_type === 'new';
     return `<tr data-rcr-id="${r.id}">
         <td>${isNew ? '🆕 جديد' : '✏️ تعديل'}</td>
-        <td>${r.source==='sultano' ? '🌐 سلطانو' : '🚗 '+(r.rep?.name || '—')}</td>
-        <td><input type="text" class="mod-form-input" id="rcrName-${r.id}" value="${(r.proposed_name||'').replace(/"/g,'&quot;')}" style="min-width:140px"></td>
-        <td><input type="text" class="mod-form-input" id="rcrPhone-${r.id}" value="${(r.proposed_phone||'').replace(/"/g,'&quot;')}" dir="ltr" style="min-width:120px"></td>
-        <td><input type="text" class="mod-form-input" id="rcrAddr-${r.id}" value="${(r.proposed_address||'').replace(/"/g,'&quot;')}" style="min-width:140px"></td>
+        <td>${r.source==='sultano' ? '🌐 سلطانو' : '🚗 '+(escHtml(r.rep?.name) || '—')}</td>
+        <td><input type="text" class="mod-form-input" id="rcrName-${r.id}" value="${escHtml(r.proposed_name)}" style="min-width:140px"></td>
+        <td><input type="text" class="mod-form-input" id="rcrPhone-${r.id}" value="${escHtml(r.proposed_phone)}" dir="ltr" style="min-width:120px"></td>
+        <td><input type="text" class="mod-form-input" id="rcrAddr-${r.id}" value="${escHtml(r.proposed_address)}" style="min-width:140px"></td>
         <td><select id="rcrRegion-${r.id}" class="mod-form-input" style="min-width:130px">
             <option value="">بدون منطقة</option>
             ${RCR_REGIONS.map(rg => `<option value="${rg.id}" ${cur?.region_id === rg.id ? 'selected' : ''}>${rg.name}</option>`).join('')}
@@ -96,7 +96,7 @@ function rcrRowHTML(r) {
             <option value="">بدون مجموعة</option>
             ${RCR_GROUPS.map(g => `<option value="${g.id}" ${cur?.group_id === g.id ? 'selected' : ''}>${g.name}${g.price_levels?.name ? ' — ' + g.price_levels.name : ''}</option>`).join('')}
         </select></td>
-        <td style="font-size:12px;color:var(--inv-muted)">${isNew ? 'عميل جديد — مسجّل بالفعل وباع له المندوب' : `الحالي: ${cur?.name||'—'} / ${cur?.phone||'—'}${cur?cur.balance>0?` (رصيد ${rcrFmt(cur.balance)})`:'':''}`}</td>
+        <td style="font-size:12px;color:var(--inv-muted)">${isNew ? 'عميل جديد — مسجّل بالفعل وباع له المندوب' : `الحالي: ${escHtml(cur?.name)||'—'} / ${escHtml(cur?.phone)||'—'}${cur?cur.balance>0?` (رصيد ${rcrFmt(cur.balance)})`:'':''}`}</td>
         <td style="white-space:nowrap">
             <button class="cc-edit" style="background:#DCFCE7;color:#166534" onclick="rcrApprove('${r.id}')">✅ اعتماد</button>
             <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red);margin-right:4px" onclick="rcrReject('${r.id}')">❌ رفض</button>

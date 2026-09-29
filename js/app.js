@@ -676,6 +676,12 @@ document.addEventListener('keydown', (e) => {
 // واحدة بتفتحلك الشاشة الصح على طول (نفس فكرة الـpending flags
 // المستخدمة في custGoEditProfile وأخواتها عبر الموديولات).
 // ════════════════════════════════════════════════════════════
+// تنظيف نص قبل ما يتحط جوه innerHTML (بيانات جاية من سلطانو/المندوبين مش موثوقة).
+window.escHtml = function (s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+};
+
 function searchEsc(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

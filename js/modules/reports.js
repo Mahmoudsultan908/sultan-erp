@@ -336,7 +336,7 @@ async function renderReports(container) {
                         <td>${fmt(s.total_expected)}</td>
                         <td class="dash-s-green">${fmt(s.total_received)}</td>
                         <td class="dash-amount" style="color:${s.total_remaining>0?'var(--inv-gold)':'var(--inv-green)'}">${fmt(s.total_remaining)}</td>
-                        <td>${s.total_remaining>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 تسجيل استلام</button>` : ''}</td>
+                        <td>${s.items_count>0 ? `<button class="mod-btn" style="padding:5px 10px;font-size:11px;background:var(--inv-green-light);color:var(--inv-green)" onclick="repDefOpenReceive('${(suppliers||[]).find(x=>x.name===s.supplier_name)?.id||''}','${(s.supplier_name||'').replace(/'/g,"\\'")}')">💰 إدارة / استلام</button>` : ''}</td>
                     </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--inv-muted-light)">لا توجد مؤجلات مسجلة</td></tr>'}
                 </tbody>
             </table>
@@ -449,14 +449,13 @@ async function renderReports(container) {
         modal.id = 'repDefReceiveModal';
         modal.innerHTML = `
         <div class="mod-modal">
-            <div class="mod-modal-header"><h3>💰 تسجيل استلام مؤجل — ${supplierName}</h3>
+            <div class="mod-modal-header"><h3>💰 إدارة المؤجلات — ${supplierName}</h3>
                 <button class="mod-modal-close" onclick="repDefCloseModal('repDefReceiveModal')">&times;</button></div>
             <div class="mod-modal-body" id="repDefReceiveBody">
                 <div style="text-align:center;padding:20px;color:var(--inv-muted)">⏳ جاري التحميل...</div>
             </div>
             <div class="mod-modal-footer">
                 <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="repDefCloseModal('repDefReceiveModal')">إغلاق</button>
-                <button class="mod-btn mod-btn-primary" onclick="repDefConfirmReceiveReal('${supplierId}')">✅ تأكيد استلام المحدد</button>
             </div>
         </div>`;
         document.body.appendChild(modal);
@@ -466,42 +465,15 @@ async function renderReports(container) {
             body.innerHTML = `<div style="color:var(--inv-muted-light);font-size:12px">تعذّر تحديد المورد تلقائياً — استخدم جدول "مؤجلات مسجّلة يدوياً" بالأسفل لو المؤجل ده يدوي، أو راجع المطوّر.</div>`;
             return;
         }
-        try {
-            const { data: pending, error } = await sb.rpc('fn_list_pending_deferred_rebates', { p_supplier_id: supplierId });
-            if (error) throw error;
-            if (!pending || !pending.length) {
-                body.innerHTML = `<div style="color:var(--inv-muted-light);font-size:12px">لا توجد بنود مؤجلة معلّقة من فواتير شراء لهذا المورد.</div>`;
-                return;
-            }
-            body.innerHTML = `
-            <div style="font-size:11px;color:var(--inv-muted);margin-bottom:8px">حدد البنود اللي المورد استلمها فعلاً (خصم/استرداد) ثم اضغط "تأكيد استلام المحدد".</div>
-            <table class="mod-table"><thead><tr><th></th><th>الصنف</th><th>الكمية</th><th>المؤجل/وحدة</th><th>الاستحقاق</th><th>المبلغ المتوقع</th></tr></thead>
-            <tbody>
-                ${pending.map(p => `<tr>
-                    <td><input type="checkbox" class="repDefRecvChk" value="${p.id}"></td>
-                    <td>${p.product_name || '—'}</td>
-                    <td>${p.qty}</td>
-                    <td>${fmt(p.rate)}</td>
-                    <td>${p.due_date || '—'}</td>
-                    <td>${fmt(p.expected_amount)}</td>
-                </tr>`).join('')}
-            </tbody></table>`;
-        } catch (err) {
-            body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:12px;border-radius:8px;font-size:12px">خطأ: ${err.message}</div>`;
-        }
+        await repDefLoadInvoiceGroups(supplierId, 'repDefReceiveBody');
     };
 
-    window.repDefConfirmReceiveReal = async function () {
-        const ids = Array.from(document.querySelectorAll('.repDefRecvChk:checked')).map(el => el.value);
-        if (!ids.length) return alert('حدد بند واحد على الأقل');
-        try {
-            const { error } = await sb.rpc('fn_mark_deferred_rebate_received', { p_ids: ids });
-            if (error) throw error;
-            repDefCloseModal('repDefReceiveModal');
-            renderDeferred(document.getElementById('rep-content'));
-        } catch (err) {
-            alert('خطأ أثناء تسجيل الاستلام: ' + err.message);
-        }
+    // إدارة مؤجلات الفواتير (استلام جزئي/إلغاء/إعادة فتح/استعادة) اتنقلت لملف
+    // deferred-rebates.js عشان كشف حساب المورد يستخدمها من غير ما يفتح التقارير.
+    // الدالة دي بس بتخلي الإجراءات هناك تحدّث تقرير المؤجلات لو مفتوح.
+    window.repDefRefreshReport = function () {
+        const el = document.getElementById('rep-content');
+        if (el) renderDeferred(el);
     };
 
     renderReportContent(activeReport);

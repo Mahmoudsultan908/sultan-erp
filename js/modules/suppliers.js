@@ -46,10 +46,11 @@ window.supShowStatement = async function(supplierId) {
 
     try {
         // جلب حركات المورد بالتوازي — ★ دلوقتي بتشمل فواتير الشراء النقدية
-        // والمرتجعات كمان (كانوا ناقصين). purchase_returns معندهاش عمود
-        // payment_type بتاعها، فبنجيبه من الفاتورة الأصلية المرتبطة
-        // (purchase_id) لو موجودة — لو المرتجع مش مرتبط بفاتورة، بيتعامل
-        // معه كمعلومة بس من غير أثر على الرصيد (أأمن اختيار من غير تخمين).
+        // والمرتجعات كمان. ★ نوع المرتجع (نقدي/آجل) وهل بيخصم من رصيد المورد
+        // بيتحدد من بيانات المرتجع نفسه (payment_type + affects_supplier_balance)
+        // — مش من الفاتورة الأصلية، ومش بالتخمين — عشان نفس منطق trigger
+        // fn_purchase_return_status_change بالظبط (والمرتجع المستقل purchase_id=null
+        // يتعامل صح).
         const [
             { data: purchases },
             { data: payments },
@@ -60,14 +61,15 @@ window.supShowStatement = async function(supplierId) {
             { data: openingBalances },
             { data: deferredManual },
             { data: deferredAuto },
+            { data: deferredReceipts },
             docsResult,
         ] = await Promise.all([
             sb.from('purchases').select('id, invoice_no, total, payment_type, status, created_at')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
             sb.from('supplier_payments').select('ref, amount, status, created_at')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
-            sb.from('purchase_returns').select('id, return_no, total, status, created_at, purchases(payment_type)')
-                .eq('supplier_id', supplierId).order('created_at', { ascending: true }).limit(100),
+            sb.from('purchase_returns').select('id, return_no, total, status, payment_type, affects_supplier_balance, created_at')
+                .eq('supplier_id', supplierId).order('created_at', { ascending: true }).limit(1000),
             // تحويلات رصيد بين موردين + استرداد نقدي من رصيد مورد لخزنة — كانوا
             // ناقصين تمامًا من الكشف (راجع fn_balance_transfer_apply للاتجاهات)
             sb.from('balance_transfers').select('id, to_s:to_supplier_id(name), amount, notes, created_at')
@@ -86,8 +88,12 @@ window.supShowStatement = async function(supplierId) {
                 .eq('supplier_id', supplierId).neq('status', 'cancelled')
                 .order('created_at', { ascending: true }),
             // المؤجلات التلقائية (من فواتير الشراء)
-            sb.from('deferred_rebates_supplier_summary').select('items_count, total_remaining')
+            sb.from('deferred_rebates_supplier_summary').select('items_count, total_expected, total_remaining')
                 .eq('supplier_id', supplierId).maybeSingle(),
+            // سجل استلام/إعادة فتح المؤجلات (بتاريخ كل حركة) — deferred_rebate_receipts
+            sb.from('deferred_rebate_receipts').select('id, kind, amount, event_date, note, purchase_id')
+                .eq('supplier_id', supplierId).in('kind', ['receive', 'reopen'])
+                .order('event_date', { ascending: true }).then(r => r, () => ({ data: [] })),
             // اختياري — لو جدول archive_documents لسه ما اتعملش، نتجاهل الخطأ بهدوء
             sb.from('archive_documents').select('id,title,file_url,category,created_at')
                 .eq('linked_type', 'supplier').eq('linked_id', supplierId)
@@ -109,19 +115,22 @@ window.supShowStatement = async function(supplierId) {
         });
         (returns||[]).forEach(r => {
             if (r.status !== 'confirmed' && r.status !== 'cancelled') return;
-            // تحديد نوع الدفع: نحاول من الفاتورة الأصلية أولاً، ثم من المرتجع نفسه
-            const paymentType = r.purchases?.payment_type || r.payment_type;
             const isCancelled = r.status === 'cancelled';
+            const isCash = r.payment_type === 'cash';
+            const reducesBalance = !isCash && r.affects_supplier_balance !== false;
 
-            if (paymentType === 'credit' && !isCancelled) {
-                // مرتجع آجل مؤكد — يخصم من رصيد المورد
-                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no}`, debit: Number(r.total)||0, credit: 0, type: 'return-credit' });
-            } else if (isCancelled) {
+            if (isCancelled) {
                 // مرتجع ملغي — بدون تأثير
                 moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no} (ملغي)`, debit: 0, credit: 0, type: 'return-cancelled' });
-            } else {
+            } else if (reducesBalance) {
+                // مرتجع آجل مؤكد — يخصم من رصيد المورد
+                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no}`, debit: Number(r.total)||0, credit: 0, type: 'return-credit' });
+            } else if (isCash) {
                 // مرتجع نقدي — بدون تأثير على الرصيد
                 moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no} (نقدي — بدون أثر على الرصيد)`, debit: 0, credit: 0, type: 'return-cash' });
+            } else {
+                // مرتجع آجل متعلَّم "لا يخصم من رصيد المورد"
+                moves.push({ date: r.created_at, desc: `مرتجع شراء ${r.return_no} (آجل — بدون خصم من رصيد المورد)`, debit: 0, credit: 0, type: 'return-cash' });
             }
         });
         (payments||[]).forEach(p => {
@@ -161,13 +170,27 @@ window.supShowStatement = async function(supplierId) {
                 });
             }
         });
-        // المؤجلات التلقائية المُستلَمة فقط
+        // المؤجلات التلقائية: الاستلام وإعادة الفتح بتواريخهم الفعلية من سجل الإيصالات،
+        // وأي مستلم قديم قبل تفعيل السجل بيظهر في سطر واحد مجمّع.
         const deferredAutoReceived = (Number(deferredAuto?.total_expected)||0) - (Number(deferredAuto?.total_remaining)||0);
-        if (deferredAutoReceived > 0.01) {
+        const receiptRows = deferredReceipts || [];
+        let receiptsNet = 0;
+        receiptRows.forEach(x => {
+            const amt = Number(x.amount) || 0;
+            if (x.kind === 'receive') {
+                receiptsNet += amt;
+                moves.push({ date: x.event_date, desc: `💰 استلام مؤجل${x.note ? ' — '+x.note : ''}`, debit: amt, credit: 0, type: 'deferred-auto' });
+            } else if (x.kind === 'reopen') {
+                receiptsNet -= amt;
+                moves.push({ date: x.event_date, desc: `↩️ إعادة فتح مؤجل${x.note ? ' — '+x.note : ''}`, debit: 0, credit: amt, type: 'deferred-auto' });
+            }
+        });
+        const legacyReceived = deferredAutoReceived - receiptsNet;
+        if (legacyReceived > 0.01) {
             moves.push({
-                date: new Date().toISOString(),
-                desc: `💰 استلام مؤجلات تلقائية (${supFmt(deferredAutoReceived)})`,
-                debit: deferredAutoReceived,
+                date: receiptRows.length ? receiptRows[0].event_date : new Date().toISOString(),
+                desc: `💰 استلام مؤجلات تلقائية سابقة (${supFmt(legacyReceived)})`,
+                debit: legacyReceived,
                 credit: 0,
                 type: 'deferred-auto'
             });
@@ -310,12 +333,19 @@ function supStmtRecomputeAndRender() {
             </div>
         </div>
 
+        <div id="supStmtDeferredBody"></div>
+
         <div class="ob-tabs" style="margin-bottom:12px">
             <button class="ob-tab ${_supStmtTab==='moves'?'active':''}" onclick="supStmtSwitchTab('moves')">📋 الحركات</button>
             <button class="ob-tab ${_supStmtTab==='items'?'active':''}" onclick="supStmtSwitchTab('items')">📦 الأصناف</button>
         </div>
         <div id="supStmtTabBody">${supStmtMovesTabHtml()}</div>
         ${_supStmtDocsHtml}`;
+    // بند 2026-09-26: مؤجلات معلّقة (لسه معلّقة، مش المُستلَمة اللي فوق في
+    // الحركات) — سطر واحد لكل فاتورة شراء بإجمالي مؤجلها، وزرار استلام
+    // بيحوّلها فورًا لخصم من رصيد المورد. نفس الدالة المشتركة اللي بيستخدمها
+    // تقرير "المؤجلات" (reports.js: repDefLoadInvoiceGroups).
+    if (typeof repDefLoadInvoiceGroups === 'function') repDefLoadInvoiceGroups(_supStmtId, 'supStmtDeferredBody');
 }
 
 window.supStmtApplyDateFilter = function () {
@@ -445,3 +475,13 @@ function supFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFrac
 
 // راجع custThemeBg فى customers.js — نفس الفكرة بالظبط.
 function supThemeBg(light, dark) { return (typeof window.themeIsDark === 'function' && window.themeIsDark()) ? dark : light; }
+
+// بعد أي إجراء على المؤجلات من داخل كشف الحساب (استلام/إلغاء/إعادة فتح/استعادة):
+// نعيد فتح الكشف عشان الرصيد والحركات يتحدّثوا. راجع deferred-rebates.js (drRun).
+window.supStmtReloadAfterDeferred = function () {
+    const m = document.getElementById('supStmtModal');
+    if (!m || !_supStmtId) return;
+    const id = _supStmtId;
+    m.remove();
+    window.supShowStatement(id);
+};
