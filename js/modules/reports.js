@@ -30,6 +30,97 @@ async function plFetchAllRows(table, select, applyFilters) {
     return { data: all, error: null };
 }
 
+// ════════════════════════════════════════════════════════════
+// أدوات شاشتي «كشف حساب عميل / مورد» (أرصدة العملاء والموردين)
+// دوال صافية (من غير DOM ولا Supabase) عشان تتراجع وتتجرب بسهولة.
+// ════════════════════════════════════════════════════════════
+function balRvEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+function balRvToday() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function balRvDate(s) { return s ? new Date(String(s).slice(0, 10) + 'T00:00:00') : null; }
+function balRvDaysBetween(a, b) { return Math.round((a - b) / 86400000); } // a - b بالأيام
+function balRvDateStr(s) { return s ? String(s).slice(0, 10) : ''; }
+function balRvAgo(days) { return days <= 0 ? 'النهارده' : days === 1 ? 'أمس' : 'منذ ' + days + ' يوم'; }
+
+// حالة الاستحقاق: late / soon / ok / nodue / none
+function balRvDueStatus(balance, dueStr, today) {
+    if (!(Number(balance) > 0.005)) return { key: 'none', label: '—', days: 0 };
+    const due = balRvDate(dueStr);
+    if (!due) return { key: 'nodue', label: 'بدون ميعاد', days: 0 };
+    const diff = balRvDaysBetween(today, due); // موجب = متأخر
+    if (diff > 0) return { key: 'late', label: 'متأخر ' + diff + ' يوم', days: diff };
+    if (diff >= -7) return { key: 'soon', label: diff === 0 ? 'يستحق النهارده' : 'خلال ' + (-diff) + ' أيام', days: diff };
+    return { key: 'ok', label: 'قادم', days: diff };
+}
+
+// أعمار المديونية بافتراض إن السداد بيغطي الأقدم أول (FIFO): الرصيد الحالي
+// بيتوزّع على أحدث فواتير الآجل، وأي جزء مالوش فاتورة (رصيد افتتاحي/تحويل)
+// بيتحسب في خانة «+90 / افتتاحي».
+function balRvAging(balance, invoices, nowMs) {
+    const out = { b30: 0, b60: 0, b90: 0, b90p: 0 };
+    let remaining = Number(balance) || 0;
+    if (remaining <= 0.005) return out;
+    const inv = (invoices || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    for (const i of inv) {
+        if (remaining <= 0.005) break;
+        const take = Math.min(Number(i.total) || 0, remaining);
+        if (take <= 0) continue;
+        remaining -= take;
+        const age = Math.floor((nowMs - new Date(i.created_at).getTime()) / 86400000);
+        if (age <= 30) out.b30 += take;
+        else if (age <= 60) out.b60 += take;
+        else if (age <= 90) out.b90 += take;
+        else out.b90p += take;
+    }
+    if (remaining > 0.005) out.b90p += remaining;
+    return out;
+}
+
+// حالة الحد الائتماني: none / nolimit / over / within
+function balRvLimitState(balance, limit) {
+    const bal = Number(balance) || 0, lim = Number(limit) || 0;
+    if (bal <= 0.005) return { key: 'none', over: 0 };
+    if (lim <= 0) return { key: 'nolimit', over: 0 };
+    return bal > lim ? { key: 'over', over: bal - lim } : { key: 'within', over: 0 };
+}
+
+// أولوية المتابعة: 1 عاجل / 2 مهم / 3 عادي / 9 مفيش رصيد
+function balRvPriority(balance, dueKey, limitKey, locked) {
+    if (!(Number(balance) > 0.005)) return 9;
+    if (dueKey === 'late' || limitKey === 'over' || locked) return 1;
+    if ((dueKey === 'nodue' || limitKey === 'nolimit') && Number(balance) >= 1000) return 2;
+    return 3;
+}
+function balRvPriorityLabel(p) { return p === 1 ? '1 عاجل' : p === 2 ? '2 مهم' : p === 3 ? '3 عادي' : '—'; }
+// بداية فترة الدفعة المستهدفة: يومي = بداية النهارده، أسبوعي = آخر ٧ أيام، شهري = أول الشهر
+function balRvPeriodStart(sched, nowMs) {
+    const d = new Date(nowMs);
+    if (sched === 'weekly') return nowMs - 7 * 86400000;
+    if (sched === 'monthly') return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+function balRvSchedLabel(s) { return s === 'weekly' ? 'أسبوعي' : s === 'monthly' ? 'شهري' : 'يومي'; }
+// رابط واتساب من رقم مصري (01xxxxxxxxx أو 201xxxxxxxxx أو +201xxxxxxxxx)
+function balRvWaLink(phone) {
+    let d = String(phone || '').replace(/\D/g, '');
+    if (!d) return '';
+    if (d.startsWith('00')) d = d.slice(2);
+    if (d.startsWith('0')) d = '20' + d.slice(1);
+    else if (!d.startsWith('20')) d = '20' + d;
+    return 'https://wa.me/' + d;
+}
+function balRvBadge(key, text) {
+    const map = {
+        late: ['#FEE4E2', '#B42318'], soon: ['#FFEDD5', '#B54708'], nodue: ['#FEF3C7', '#8A6100'],
+        ok: ['#D1FADF', '#067647'], none: ['#F1F5F9', '#64748B'], over: ['#FEE4E2', '#B42318'],
+        nolimit: ['#FEF3C7', '#8A6100'], within: ['#D1FADF', '#067647'], p1: ['#FEE4E2', '#B42318'],
+        p2: ['#FFEDD5', '#B54708'], p3: ['#F1F5F9', '#475569']
+    };
+    const c = map[key] || map.none;
+    return '<span style="display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;background:' + c[0] + ';color:' + c[1] + ';white-space:nowrap">' + balRvEsc(text) + '</span>';
+}
+
 async function renderReports(container) {
     let activeReport = 'pl';
     let _repDefSuppliers = [];
@@ -202,64 +293,284 @@ async function renderReports(container) {
     }
 
     // ─────────────────────────────────────────
-    // 2) كشف حساب عميل — بيفتح نفس مودال كشف الحساب الغني (بند 5) بدل
-    //    نسخة مبسّطة منفصلة كانت ناقصة (نقدي/تحويلات أرصدة/تبويب أصناف
-    //    ومكسب شهري) وممكن تختلف عن الرقم الحقيقي فى customers.js
+    // 2) كشف حساب عميل — شاشة مراجعة الأرصدة: حالة الاستحقاق، الحد الائتماني،
+    //    أعمار المديونية (FIFO)، آخر تحصيل، وأولوية المتابعة. زرار «كشف حساب»
+    //    لسه بيفتح نفس المودال الغني في customers.js.
     // ─────────────────────────────────────────
     async function renderCustomerStatement(c) {
-        const { data: customers } = await sb.from('customers').select('id,name,phone,balance').order('name');
-        const list = customers || [];
-        let search = '';
+        const today = balRvToday(), nowMs = Date.now();
+        const [custRes, repRes, grpRes, clsRes, regRes] = await Promise.all([
+            sb.from('customers').select('id,name,phone,balance,credit_limit,payment_due_date,debt_locked,default_rep_id,primary_rep_id,group_id,classification_id,region_id,daily_payment_target,payment_schedule').order('name'),
+            sb.from('sales_reps').select('id,name'),
+            sb.from('customer_groups').select('id,name'),
+            sb.from('customer_classifications').select('id,name'),
+            sb.from('customer_regions').select('id,name')
+        ]);
+        if (custRes.error) { c.innerHTML = `<div class="dash-card" style="padding:16px;color:var(--inv-red)">❌ تعذّر تحميل العملاء: ${balRvEsc(custRes.error.message)}</div>`; return; }
+        const nameMap = res => { const m = {}; (res.data || []).forEach(x => { m[x.id] = x.name; }); return m; };
+        const repMap = nameMap(repRes), grpMap = nameMap(grpRes), clsMap = nameMap(clsRes), regMap = nameMap(regRes);
+        const customers = custRes.data || [];
+        const debtorIds = customers.filter(x => Number(x.balance) > 0.005).map(x => x.id);
+        const salesBy = {}, payBy = {};
+        if (debtorIds.length) {
+            const [sRes, pRes] = await Promise.all([
+                plFetchAllRows('sales', 'customer_id,total,created_at', q => q.in('customer_id', debtorIds).eq('status', 'confirmed').eq('payment_type', 'credit').order('created_at', { ascending: false })),
+                plFetchAllRows('customer_payments', 'customer_id,amount,created_at', q => q.in('customer_id', debtorIds).eq('status', 'confirmed').order('created_at', { ascending: false }))
+            ]);
+            (sRes.data || []).forEach(r => { (salesBy[r.customer_id] = salesBy[r.customer_id] || []).push(r); });
+            (pRes.data || []).forEach(r => { (payBy[r.customer_id] = payBy[r.customer_id] || []).push(r); });
+        }
+        const rows = customers.map(cu => {
+            const bal = Number(cu.balance) || 0;
+            const due = balRvDueStatus(bal, cu.payment_due_date, today);
+            const lim = balRvLimitState(bal, cu.credit_limit);
+            const inv = salesBy[cu.id] || [], pays = payBy[cu.id] || [];
+            const target = Number(cu.daily_payment_target) || 0, sched = cu.payment_schedule || 'daily';
+            const from = balRvPeriodStart(sched, nowMs);
+            const collected = pays.reduce((s, p) => new Date(p.created_at).getTime() >= from ? s + (Number(p.amount) || 0) : s, 0);
+            const tState = (!(target > 0) || !(bal > 0.005)) ? 'none' : collected >= target - 0.005 ? 'done' : collected > 0 ? 'part' : 'miss';
+            return {
+                id: cu.id, name: cu.name || '', phone: cu.phone || '',
+                rep: repMap[cu.default_rep_id || cu.primary_rep_id] || '', group: grpMap[cu.group_id] || '',
+                cls: clsMap[cu.classification_id] || '', region: regMap[cu.region_id] || '',
+                bal, limit: Number(cu.credit_limit) || 0, due, dueDate: balRvDateStr(cu.payment_due_date), lim,
+                ag: balRvAging(bal, inv, nowMs), locked: !!cu.debt_locked,
+                lastInv: inv[0] || null, lastPay: pays[0] || null,
+                target, sched, collected, tState,
+                pr: balRvPriority(bal, due.key, lim.key, !!cu.debt_locked)
+            };
+        });
+
+        let search = '', filter = 'debt';
+        const sel = { group: '', cls: '', rep: '', region: '' };
+        const filters = {
+            debt: r => r.bal > 0.005, urgent: r => r.pr === 1, late: r => r.due.key === 'late', over: r => r.lim.key === 'over',
+            nodue: r => r.due.key === 'nodue', nolimit: r => r.lim.key === 'nolimit', locked: r => r.locked && r.bal > 0.005,
+            tmiss: r => r.tState === 'miss' || r.tState === 'part', all: () => true
+        };
+        const sum = (arr, f) => arr.reduce((s, r) => s + f(r), 0);
+        const passSel = r => (!sel.group || r.group === sel.group) && (!sel.cls || r.cls === sel.cls) && (!sel.rep || r.rep === sel.rep) && (!sel.region || r.region === sel.region);
+        const currentRows = () => flexSearch(rows.filter(filters[filter] || filters.debt).filter(passSel), search, ['name', 'phone'])
+            .slice().sort((a, b) => (a.pr - b.pr) || (b.bal - a.bal));
+
+        const debtors = rows.filter(filters.debt);
+        const kpis = [
+            { id: 'debt', label: 'عليهم رصيد', arr: debtors, val: r => r.bal },
+            { id: 'urgent', label: '🔴 عاجل', arr: rows.filter(filters.urgent), val: r => r.bal },
+            { id: 'late', label: 'متأخر عن الميعاد', arr: rows.filter(filters.late), val: r => r.bal },
+            { id: 'over', label: 'فوق الحد الائتماني (قيمة التجاوز)', arr: rows.filter(filters.over), val: r => r.lim.over },
+            { id: 'tmiss', label: 'دفعة مستهدفة لم تتحقق (الناقص)', arr: rows.filter(filters.tmiss), val: r => Math.max(0, r.target - r.collected) },
+            { id: 'nodue', label: 'بدون ميعاد استحقاق', arr: rows.filter(filters.nodue), val: r => r.bal },
+            { id: 'nolimit', label: 'بدون حد ائتماني', arr: rows.filter(filters.nolimit), val: r => r.bal }
+        ];
+        const ageTot = { b30: sum(debtors, r => r.ag.b30), b60: sum(debtors, r => r.ag.b60), b90: sum(debtors, r => r.ag.b90), b90p: sum(debtors, r => r.ag.b90p) };
+        const ageAll = ageTot.b30 + ageTot.b60 + ageTot.b90 + ageTot.b90p;
+        const olderPct = ageAll > 0 ? ((ageTot.b60 + ageTot.b90 + ageTot.b90p) / ageAll * 100) : 0;
+        const uniq = key => Array.from(new Set(rows.map(r => r[key]).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar'));
+        const selHtml = (label, key) => `<select class="ob-input" style="margin:0;width:auto;min-width:130px" onchange="window._csSel('${key}', this.value)"><option value="">${label}: الكل</option>${uniq(key).map(v => `<option value="${balRvEsc(v)}">${balRvEsc(v)}</option>`).join('')}</select>`;
+
+        const renderKpis = () => {
+            const el = document.getElementById('cs-kpis'); if (!el) return;
+            el.innerHTML = kpis.map(k => `<div onclick="window._csFilter('${k.id}')" style="cursor:pointer;background:var(--inv-card);border:1.5px solid ${filter === k.id ? 'var(--inv-gold)' : 'var(--inv-border)'};border-radius:12px;padding:10px 12px">
+                <div style="font-size:12px;color:var(--inv-muted)">${k.label}</div>
+                <div style="font-size:20px;font-weight:800">${k.arr.length}</div>
+                <div style="font-size:12.5px;font-weight:700">${fmt(sum(k.arr, k.val))}</div></div>`).join('');
+        };
+        const targetCell = r => {
+            if (!(r.target > 0)) return '<span style="color:var(--inv-muted)">—</span>';
+            const badge = r.tState === 'done' ? balRvBadge('ok', 'تحققت ✓') : r.tState === 'part' ? balRvBadge('soon', 'جزئي') : r.tState === 'miss' ? balRvBadge('late', 'لم تُحصَّل') : '';
+            return `<b>${fmt(r.target)}</b> <span style="color:var(--inv-muted)">/ ${balRvSchedLabel(r.sched)}</span><div style="margin-top:2px">${badge}</div><div style="font-size:11.5px;color:var(--inv-muted)">المحصّل: ${fmt(r.collected)}</div>`;
+        };
         const renderRows = () => {
-            const rows = flexSearch(list, search, ['name', 'phone']);
-            const body = document.getElementById('cs-list-body');
-            if (!body) return;
-            body.innerHTML = !rows.length ? `<tr><td colspan="3" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين</td></tr>` :
-                rows.map(cu => `<tr>
-                    <td><strong>${cu.name}</strong></td>
-                    <td style="text-align:left;font-weight:700;color:${Number(cu.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${fmt(cu.balance)}</td>
-                    <td style="text-align:center"><button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="custShowStatement('${cu.id}')">📄 كشف حساب</button></td>
-                </tr>`).join('');
+            const body = document.getElementById('cs-list-body'); if (!body) return;
+            const list = currentRows();
+            const countEl = document.getElementById('cs-count'); if (countEl) countEl.textContent = list.length + ' عميل';
+            body.innerHTML = !list.length ? `<tr><td colspan="11" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين</td></tr>` :
+                list.map(r => {
+                    const ag = r.bal > 0.005 ? [['0-30', r.ag.b30], ['31-60', r.ag.b60], ['61-90', r.ag.b90], ['+90', r.ag.b90p]].filter(x => x[1] > 0.005).map(x => `<div>${x[0]}: <b>${fmt(x[1])}</b></div>`).join('') : '';
+                    const lastPay = r.lastPay ? `${balRvDateStr(r.lastPay.created_at)}<div><b>${fmt(r.lastPay.amount)}</b> · ${balRvAgo(Math.max(0, Math.floor((nowMs - new Date(r.lastPay.created_at).getTime()) / 86400000)))}</div>` : (r.bal > 0.005 ? '<span style="color:var(--inv-red)">لم يسدد</span>' : '');
+                    const wa = balRvWaLink(r.phone);
+                    const phone = r.phone ? `<a href="tel:${balRvEsc(r.phone)}" style="color:inherit;text-decoration:none;direction:ltr;unicode-bidi:embed">${balRvEsc(r.phone)}</a>${wa ? ` <a href="${wa}" target="_blank" rel="noopener" title="واتساب" style="text-decoration:none">💬</a>` : ''}` : '<span style="color:var(--inv-muted)">—</span>';
+                    return `<tr>
+                        <td><strong>${balRvEsc(r.name)}</strong>${r.locked ? ' 🔒' : ''}<div style="font-size:11.5px;color:var(--inv-muted)">${r.rep ? '🚗 ' + balRvEsc(r.rep) : ''}${r.region ? ' · 📍 ' + balRvEsc(r.region) : ''}</div></td>
+                        <td style="font-size:12.5px;white-space:nowrap">${phone}</td>
+                        <td style="text-align:center">${r.group ? `<span style="display:inline-block;padding:1px 9px;border-radius:999px;font-size:11.5px;font-weight:700;background:var(--inv-divider);border:1px solid var(--inv-border);color:var(--inv-text-soft)">${balRvEsc(r.group)}</span>` : '<span style="color:var(--inv-muted)">—</span>'}${r.cls ? `<div style="font-size:11px;color:var(--inv-muted);margin-top:2px">${balRvEsc(r.cls)}</div>` : ''}</td>
+                        <td style="text-align:left;font-weight:700;color:${r.bal > 0 ? 'var(--inv-red)' : 'var(--inv-green)'}">${fmt(r.bal)}</td>
+                        <td style="text-align:left;font-size:12px">${r.limit ? fmt(r.limit) : '—'}<div>${r.bal > 0.005 ? balRvBadge(r.lim.key, r.lim.key === 'over' ? 'فوق الحد +' + fmt(r.lim.over) : r.lim.key === 'nolimit' ? 'بدون حد' : 'ضمن الحد') : ''}</div></td>
+                        <td style="text-align:center">${balRvBadge(r.due.key, r.due.label)}<div style="font-size:11.5px;color:var(--inv-muted)">${r.dueDate}</div></td>
+                        <td style="font-size:12px;text-align:left">${ag}</td>
+                        <td style="font-size:12px;text-align:center">${targetCell(r)}</td>
+                        <td style="font-size:12px;text-align:center">${lastPay}</td>
+                        <td style="text-align:center">${balRvBadge('p' + (r.pr > 3 ? 3 : r.pr), balRvPriorityLabel(r.pr))}</td>
+                        <td style="text-align:center"><button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="custShowStatement('${r.id}')">📄 كشف حساب</button></td>
+                    </tr>`;
+                }).join('');
         };
         c.innerHTML = `
-        <div class="dash-card" style="padding:16px;margin-bottom:16px">
-            <input type="text" id="cs-search" class="ob-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="window._csSearch(this.value)">
+        <div class="dash-card" style="padding:16px;margin-bottom:12px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <input type="text" id="cs-search" class="ob-input" style="margin:0;flex:1;min-width:180px" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="window._csSearch(this.value)">
+                <button class="cc-edit" onclick="window._csFilter('all')">كل العملاء</button>
+                <button class="cc-edit" onclick="window._csExport()">📥 Excel</button>
+                <button class="cc-edit" onclick="window._csPrint()">🖨️ طباعة</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${selHtml('المجموعة', 'group')}${selHtml('التصنيف', 'cls')}${selHtml('المندوب', 'rep')}${selHtml('المنطقة', 'region')}<button class="cc-edit" onclick="window._csResetFilters()">↺ مسح الفلاتر</button></div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-top:8px">الأعمار محسوبة على افتراض إن السداد بيغطي الأقدم أول (FIFO). الدفعة المستهدفة: يومي = المحصّل النهارده، أسبوعي = آخر ٧ أيام، شهري = من أول الشهر. الأولوية: 1 عاجل = متأخر أو فوق الحد أو موقوف، 2 مهم = بدون ميعاد/حد ورصيد ≥ ١٬٠٠٠.</div>
         </div>
-        <div class="mod-table-wrap">
-            <table class="mod-table"><thead><tr><th>العميل</th><th style="text-align:left">الرصيد</th><th style="text-align:center">إجراءات</th></tr></thead>
+        <div id="cs-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px"></div>
+        <div class="dash-card" style="padding:10px 14px;margin-bottom:12px;font-size:13px">
+            أعمار المديونية: 0-30 يوم <b>${fmt(ageTot.b30)}</b> · 31-60 <b>${fmt(ageTot.b60)}</b> · 61-90 <b>${fmt(ageTot.b90)}</b> · +90/افتتاحي <b>${fmt(ageTot.b90p)}</b> · الأقدم من 30 يوم: <b style="color:${olderPct > 20 ? 'var(--inv-red)' : 'var(--inv-green)'}">${olderPct.toFixed(1)}%</b>
+        </div>
+        <div style="font-size:12px;color:var(--inv-muted);margin:0 4px 6px" id="cs-count"></div>
+        <div class="mod-table-wrap" id="cs-table-card" style="overflow-x:auto">
+            <table class="mod-table" style="min-width:1250px"><thead><tr><th>العميل</th><th>الهاتف</th><th style="text-align:center">المجموعة</th><th style="text-align:left">الرصيد</th><th style="text-align:left">الحد الائتماني</th><th style="text-align:center">الاستحقاق</th><th style="text-align:left">الأعمار</th><th style="text-align:center">الدفعة المستهدفة</th><th style="text-align:center">آخر تحصيل</th><th style="text-align:center">الأولوية</th><th style="text-align:center">إجراءات</th></tr></thead>
             <tbody id="cs-list-body"></tbody></table>
         </div>`;
         window._csSearch = (v) => { search = v; renderRows(); };
+        window._csFilter = (f) => { filter = f; renderKpis(); renderRows(); };
+        window._csSel = (k, v) => { sel[k] = v; renderRows(); };
+        window._csResetFilters = () => {
+            search = ''; filter = 'debt'; sel.group = sel.cls = sel.rep = sel.region = '';
+            const box = document.getElementById('cs-search'); if (box) box.value = '';
+            c.querySelectorAll && c.querySelectorAll('select.ob-input').forEach(s => { s.value = ''; });
+            renderKpis(); renderRows();
+        };
+        window._csExport = () => repExportExcel('أرصدة_العملاء', currentRows().map(r => ({
+            'العميل': r.name, 'التليفون': r.phone, 'المجموعة': r.group, 'التصنيف': r.cls, 'المنطقة': r.region, 'المندوب': r.rep,
+            'الرصيد': r.bal, 'الحد الائتماني': r.limit, 'تجاوز الحد': r.lim.over,
+            'ميعاد الاستحقاق': r.dueDate, 'حالة الاستحقاق': r.due.label, 'موقوف': r.locked ? 'نعم' : 'لا',
+            '0-30': r.ag.b30, '31-60': r.ag.b60, '61-90': r.ag.b90, '+90/افتتاحي': r.ag.b90p,
+            'الدفعة المستهدفة': r.target || '', 'دورية الهدف': r.target ? balRvSchedLabel(r.sched) : '', 'المحصّل في فترة الهدف': r.target ? r.collected : '',
+            'آخر فاتورة آجل': r.lastInv ? balRvDateStr(r.lastInv.created_at) : '', 'آخر تحصيل': r.lastPay ? balRvDateStr(r.lastPay.created_at) : '',
+            'قيمة آخر تحصيل': r.lastPay ? Number(r.lastPay.amount) : '', 'الأولوية': balRvPriorityLabel(r.pr)
+        })));
+        window._csPrint = () => repPrintReport('أرصدة العملاء', document.getElementById('cs-table-card').outerHTML);
+        renderKpis();
         renderRows();
     }
 
     // ─────────────────────────────────────────
-    // 3) كشف حساب مورد — نفس الفكرة، بيفتح مودال suppliers.js الغني
+    // 3) كشف حساب مورد — نفس الفكرة: ميعاد السداد وحالته، آخر شراء وآخر دفعة،
+    //    وخانة «رقم المورد» لمقارنة رصيد النظام برقم كشف المورد (بتتحفظ على
+    //    الجهاز ده بس). زرار «كشف حساب» لسه بيفتح مودال suppliers.js.
     // ─────────────────────────────────────────
     async function renderSupplierStatement(c) {
-        const { data: suppliers } = await sb.from('suppliers').select('id,name,phone,balance').order('name');
-        const list = suppliers || [];
-        let search = '';
+        const today = balRvToday(), nowMs = Date.now();
+        const supRes = await sb.from('suppliers').select('id,name,phone,balance,payment_due_date').order('name');
+        if (supRes.error) { c.innerHTML = `<div class="dash-card" style="padding:16px;color:var(--inv-red)">❌ تعذّر تحميل الموردين: ${balRvEsc(supRes.error.message)}</div>`; return; }
+        const [pRes, payRes] = await Promise.all([
+            plFetchAllRows('purchases', 'supplier_id,total,payment_type,created_at', q => q.eq('status', 'confirmed').order('created_at', { ascending: false })),
+            plFetchAllRows('supplier_payments', 'supplier_id,amount,created_at', q => q.eq('status', 'confirmed').order('created_at', { ascending: false }))
+        ]);
+        const purBy = {}, payBy = {};
+        (pRes.data || []).forEach(r => { (purBy[r.supplier_id] = purBy[r.supplier_id] || []).push(r); });
+        (payRes.data || []).forEach(r => { (payBy[r.supplier_id] = payBy[r.supplier_id] || []).push(r); });
+
+        const CONF_KEY = 'sultan_sup_confirmed_v1';
+        let confirmed = {};
+        try { confirmed = JSON.parse(localStorage.getItem(CONF_KEY) || '{}') || {}; } catch (e) { confirmed = {}; }
+        const saveConfirmed = () => { try { localStorage.setItem(CONF_KEY, JSON.stringify(confirmed)); } catch (e) { /* التخزين المحلي غير متاح */ } };
+
+        const rows = (supRes.data || []).map(s => {
+            const bal = Number(s.balance) || 0;
+            const due = balRvDueStatus(bal, s.payment_due_date, today);
+            const pr = !(bal > 0.005) ? 9 : due.key === 'late' ? 1 : (due.key === 'nodue' && bal >= 5000) ? 2 : 3;
+            return { id: s.id, name: s.name || '', phone: s.phone || '', bal, due, dueDate: balRvDateStr(s.payment_due_date),
+                lastPur: (purBy[s.id] || [])[0] || null, lastPay: (payBy[s.id] || [])[0] || null, pr };
+        });
+        const diffOf = r => {
+            const v = confirmed[r.id];
+            return (v === undefined || v === '' || v === null || isNaN(Number(v))) ? null : r.bal - Number(v);
+        };
+        let search = '', filter = 'debt';
+        const filters = {
+            debt: r => r.bal > 0.005, late: r => r.due.key === 'late', soon: r => r.due.key === 'soon', nodue: r => r.due.key === 'nodue',
+            diff: r => { const d = diffOf(r); return d !== null && Math.abs(d) > 0.5; }, all: () => true
+        };
+        const sum = (arr, f) => arr.reduce((s, r) => s + f(r), 0);
+        const currentRows = () => flexSearch(rows.filter(filters[filter] || filters.debt), search, ['name', 'phone'])
+            .slice().sort((a, b) => (a.pr - b.pr) || (b.bal - a.bal));
+        const kpis = [
+            { id: 'debt', label: 'مستحق لهم', arr: rows.filter(filters.debt), val: r => r.bal },
+            { id: 'late', label: 'متأخر عن الميعاد', arr: rows.filter(filters.late), val: r => r.bal },
+            { id: 'soon', label: 'يستحق خلال ٧ أيام', arr: rows.filter(filters.soon), val: r => r.bal },
+            { id: 'nodue', label: 'بدون ميعاد سداد', arr: rows.filter(filters.nodue), val: r => r.bal },
+            { id: 'diff', label: 'فرق عن رقم المورد', arr: rows.filter(filters.diff), val: r => Math.abs(diffOf(r) || 0) }
+        ];
+        const renderKpis = () => {
+            const el = document.getElementById('ss-kpis'); if (!el) return;
+            const ks = kpis.map(k => Object.assign({}, k, { arr: k.id === 'diff' ? rows.filter(filters.diff) : k.arr }));
+            el.innerHTML = ks.map(k => `<div onclick="window._ssFilter('${k.id}')" style="cursor:pointer;background:var(--inv-card);border:1.5px solid ${filter === k.id ? 'var(--inv-gold)' : 'var(--inv-border)'};border-radius:12px;padding:10px 12px">
+                <div style="font-size:12px;color:var(--inv-muted)">${k.label}</div>
+                <div style="font-size:20px;font-weight:800">${k.arr.length}</div>
+                <div style="font-size:12.5px;font-weight:700">${fmt(sum(k.arr, k.val))}</div></div>`).join('');
+        };
+        const diffHtml = r => {
+            const d = diffOf(r);
+            if (d === null) return '<span style="color:var(--inv-muted)">—</span>';
+            const a = Math.abs(d);
+            const key = a >= 1000 ? 'late' : a > 0.5 ? 'soon' : 'ok';
+            return balRvBadge(key, (d > 0 ? '+' : d < 0 ? '−' : '') + fmt(a));
+        };
         const renderRows = () => {
-            const rows = flexSearch(list, search, ['name', 'phone']);
-            const body = document.getElementById('ss-list-body');
-            if (!body) return;
-            body.innerHTML = !rows.length ? `<tr><td colspan="3" class="empty-state"><span>🏭</span>لا يوجد موردين مطابقين</td></tr>` :
-                rows.map(s => `<tr>
-                    <td><strong>${s.name}</strong></td>
-                    <td style="text-align:left;font-weight:700;color:${Number(s.balance)>0?'var(--inv-red)':'var(--inv-green)'}">${fmt(s.balance)}</td>
-                    <td style="text-align:center"><button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="supShowStatement('${s.id}')">📄 كشف حساب</button></td>
-                </tr>`).join('');
+            const body = document.getElementById('ss-list-body'); if (!body) return;
+            const list = currentRows();
+            const countEl = document.getElementById('ss-count'); if (countEl) countEl.textContent = list.length + ' مورد';
+            body.innerHTML = !list.length ? `<tr><td colspan="9" class="empty-state"><span>🏭</span>لا يوجد موردين مطابقين</td></tr>` :
+                list.map(r => {
+                    const lp = r.lastPur ? `${balRvDateStr(r.lastPur.created_at)}<div><b>${fmt(r.lastPur.total)}</b> · ${balRvAgo(Math.max(0, Math.floor((nowMs - new Date(r.lastPur.created_at).getTime()) / 86400000)))}</div>` : '—';
+                    const ly = r.lastPay ? `${balRvDateStr(r.lastPay.created_at)}<div><b>${fmt(r.lastPay.amount)}</b></div>` : '—';
+                    const cv = confirmed[r.id];
+                    return `<tr>
+                        <td><strong>${balRvEsc(r.name)}</strong></td>
+                        <td style="font-size:12.5px;white-space:nowrap">${r.phone ? `<a href="tel:${balRvEsc(r.phone)}" style="color:inherit;text-decoration:none;direction:ltr;unicode-bidi:embed">${balRvEsc(r.phone)}</a>${balRvWaLink(r.phone) ? ` <a href="${balRvWaLink(r.phone)}" target="_blank" rel="noopener" title="واتساب" style="text-decoration:none">💬</a>` : ''}` : '<span style="color:var(--inv-muted)">—</span>'}</td>
+                        <td style="text-align:left;font-weight:700;color:${r.bal > 0 ? 'var(--inv-red)' : 'var(--inv-green)'}">${fmt(r.bal)}</td>
+                        <td style="text-align:center">${balRvBadge(r.due.key, r.due.label)}<div style="font-size:11.5px;color:var(--inv-muted)">${r.dueDate}</div></td>
+                        <td style="font-size:12px;text-align:center">${lp}</td>
+                        <td style="font-size:12px;text-align:center">${ly}</td>
+                        <td style="text-align:center">${r.bal > 0.005 ? `<input type="number" step="0.01" class="ob-input" style="margin:0;width:110px" placeholder="رقم المورد" value="${cv === undefined || cv === null ? '' : balRvEsc(cv)}" onchange="window._ssConfirm('${r.id}', this.value)">` : ''}</td>
+                        <td style="text-align:center" id="ss-diff-${r.id}">${r.bal > 0.005 ? diffHtml(r) : ''}</td>
+                        <td style="text-align:center"><button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="supShowStatement('${r.id}')">📄 كشف حساب</button></td>
+                    </tr>`;
+                }).join('');
         };
         c.innerHTML = `
-        <div class="dash-card" style="padding:16px;margin-bottom:16px">
-            <input type="text" id="ss-search" class="ob-input" style="margin:0" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="window._ssSearch(this.value)">
+        <div class="dash-card" style="padding:16px;margin-bottom:12px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <input type="text" id="ss-search" class="ob-input" style="margin:0;flex:1;min-width:180px" placeholder="🔍 بحث بالاسم أو الهاتف..." oninput="window._ssSearch(this.value)">
+                <button class="cc-edit" onclick="window._ssFilter('all')">كل الموردين</button>
+                <button class="cc-edit" onclick="window._ssExport()">📥 Excel</button>
+                <button class="cc-edit" onclick="window._ssPrint()">🖨️ طباعة</button>
+            </div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-top:8px">اكتب رقم كشف المورد في خانة «رقم المورد» وهيظهر الفرق عن رصيد النظام فورًا. الأرقام دي بتتحفظ على الجهاز ده بس (مش في قاعدة البيانات).</div>
         </div>
-        <div class="mod-table-wrap">
-            <table class="mod-table"><thead><tr><th>المورد</th><th style="text-align:left">الرصيد</th><th style="text-align:center">إجراءات</th></tr></thead>
+        <div id="ss-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px"></div>
+        <div style="font-size:12px;color:var(--inv-muted);margin:0 4px 6px" id="ss-count"></div>
+        <div class="mod-table-wrap" id="ss-table-card" style="overflow-x:auto">
+            <table class="mod-table" style="min-width:940px"><thead><tr><th>المورد</th><th>الهاتف</th><th style="text-align:left">الرصيد (النظام)</th><th style="text-align:center">ميعاد السداد</th><th style="text-align:center">آخر شراء</th><th style="text-align:center">آخر دفعة</th><th style="text-align:center">رقم المورد</th><th style="text-align:center">الفرق</th><th style="text-align:center">إجراءات</th></tr></thead>
             <tbody id="ss-list-body"></tbody></table>
         </div>`;
         window._ssSearch = (v) => { search = v; renderRows(); };
+        window._ssFilter = (f) => { filter = f; renderKpis(); renderRows(); };
+        window._ssConfirm = (id, v) => {
+            if (v === '' || v === null || v === undefined) delete confirmed[id]; else confirmed[id] = v;
+            saveConfirmed();
+            const r = rows.find(x => x.id === id);
+            const cell = document.getElementById('ss-diff-' + id);
+            if (r && cell) cell.innerHTML = diffHtml(r);
+            renderKpis();
+        };
+        window._ssExport = () => repExportExcel('أرصدة_الموردين', currentRows().map(r => {
+            const d = diffOf(r);
+            return {
+                'المورد': r.name, 'التليفون': r.phone, 'الرصيد (النظام)': r.bal, 'ميعاد السداد': r.dueDate, 'حالة السداد': r.due.label,
+                'آخر شراء': r.lastPur ? balRvDateStr(r.lastPur.created_at) : '', 'قيمة آخر شراء': r.lastPur ? Number(r.lastPur.total) : '',
+                'آخر دفعة': r.lastPay ? balRvDateStr(r.lastPay.created_at) : '', 'قيمة آخر دفعة': r.lastPay ? Number(r.lastPay.amount) : '',
+                'رقم المورد': confirmed[r.id] === undefined ? '' : Number(confirmed[r.id]), 'الفرق عن رقم المورد': d === null ? '' : d, 'الأولوية': balRvPriorityLabel(r.pr)
+            };
+        }));
+        window._ssPrint = () => repPrintReport('أرصدة الموردين', document.getElementById('ss-table-card').outerHTML);
+        renderKpis();
         renderRows();
     }
 
