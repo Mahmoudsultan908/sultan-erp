@@ -119,6 +119,7 @@ window.custShowStatement = async function(customerId) {
                 </div>
                 <div style="display:flex;align-items:center;gap:10px">
                     <button class="cc-edit" style="background:${custThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold)" onclick="custGoEditProfile('${cust.id}')">✏️ تعديل بيانات العميل</button>
+                    <button class="cc-edit" onclick="custPortalPin('${cust.id}')">🔑 رقم سري لسلطانو</button>
                     <button class="cc-edit" onclick="custRedeemLoyalty('${cust.id}', ${Number(cust.loyalty_points_balance) || 0})">🎁 نقاط: ${Number(cust.loyalty_points_balance) || 0}</button>
                     <button class="mod-modal-close" onclick="custCloseModal('custStmtModal')">&times;</button>
                 </div></div>
@@ -869,3 +870,33 @@ function custSourceBadge(source) {
     if (source === 'rep_app') return '<span style="font-size:9.5px;background:var(--inv-green-light);color:var(--inv-green);padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap">🚗 مندوب</span>';
     return '';
 }
+
+
+// ═══ رقم سري لدخول العميل على تطبيق سلطانو ═══
+// بيولّد الرقم في Postgres (fn_portal_generate_pin — للأدمن/الموظف/المحاسب بس)، والقاعدة بتخزّن
+// نسخة مشفّرة بس؛ فالرقم بيظهر هنا مرة واحدة ومش بيتقرأ تاني. تنفيذ جديد = رقم جديد والقديم بيبطل.
+window.custPortalPin = async function (customerId) {
+    const { data: cRow } = await sb.from('customers').select('name, phone').eq('id', customerId).maybeSingle();
+    const custName = cRow?.name || 'العميل', phone = cRow?.phone || '';
+    if (!confirm('توليد رقم سري جديد لـ ' + custName + ' لدخول تطبيق سلطانو؟\nلو له رقم قديم هيبطل.')) return;
+    try {
+        const { data, error } = await sb.rpc('fn_portal_generate_pin', { p_customer_id: customerId });
+        if (error) throw error;
+        const wa = custDetWaLink(phone);
+        const msg = 'السلام عليكم ' + custName + '\nالرقم السري لدخول تطبيق سلطانو: ' + data + '\nرقم التليفون هو اسم المستخدم. — جملة سلطان';
+        const bg = document.createElement('div');
+        bg.className = 'mod-modal-bg active';
+        bg.style.zIndex = '10060';
+        bg.innerHTML = `<div class="mod-modal" style="max-width:380px;text-align:center">
+            <div class="mod-modal-header"><h3>🔑 الرقم السري</h3><button class="mod-modal-close" onclick="this.closest('.mod-modal-bg').remove()">&times;</button></div>
+            <div class="mod-modal-body">
+                <div style="font-size:12.5px;color:var(--inv-muted)">${custDetEsc(custName)}</div>
+                <div style="font-size:38px;font-weight:900;letter-spacing:8px;direction:ltr;margin:14px 0;color:var(--inv-navy)">${custDetEsc(String(data))}</div>
+                <div style="font-size:12px;color:var(--inv-red);margin-bottom:12px">اكتبه أو ابعته للعميل دلوقتي — مش هيظهر تاني.</div>
+                ${wa ? `<a class="cc-edit" style="text-decoration:none;padding:8px 12px;font-size:12px" href="${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">💬 إرسال واتساب</a>` : ''}
+            </div></div>`;
+        document.body.appendChild(bg);
+    } catch (err) {
+        alert('تعذّر توليد الرقم السري: ' + err.message);
+    }
+};
