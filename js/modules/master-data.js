@@ -148,6 +148,11 @@ function custRenderPage(c) {
                 <option value="none">بدون مندوب</option>
                 ${_mgCustReps.map(r=>`<option value="${r.id}">🚗 ${r.name}</option>`).join('')}
             </select>
+            <select id="custMgCls" class="mod-form-input" style="margin:0;min-width:150px" onchange="custRenderRows()">
+                <option value="all">كل التصنيفات</option>
+                <option value="none">بدون تصنيف</option>
+                ${_mgCustClassifications.map(cl=>`<option value="${cl.id}">${cl.name}</option>`).join('')}
+            </select>
             <select id="custMgPay" class="mod-form-input" style="margin:0;min-width:130px" onchange="custRenderRows()">
                 <option value="all">كل طرق الدفع المفضلة</option>
                 <option value="credit">آجل</option>
@@ -199,12 +204,14 @@ function custRenderRows() {
     let rows = flexSearch(_mgCustList, _mgCustSearch, ['name','phone']);
     const regionFilter = document.getElementById('custMgRegion')?.value || 'all';
     const repFilter = document.getElementById('custMgRep')?.value || 'all';
+    const clsFilter = document.getElementById('custMgCls')?.value || 'all';
     const payFilter = document.getElementById('custMgPay')?.value || 'all';
     const dueFilter = document.getElementById('custMgDue')?.value || 'all';
     const groupBy = document.getElementById('custMgGroupBy')?.value || 'none';
     rows = rows.filter(x => {
         if (regionFilter !== 'all' && (x.region_id || '') !== regionFilter) return false;
         if (repFilter !== 'all' && (repFilter === 'none' ? x.default_rep_id : x.default_rep_id !== repFilter)) return false;
+        if (clsFilter !== 'all' && (clsFilter === 'none' ? x.classification_id : x.classification_id !== clsFilter)) return false;
         if (payFilter !== 'all' && (payFilter === 'none' ? x.preferred_payment_method : x.preferred_payment_method !== payFilter)) return false;
         if (dueFilter !== 'all') {
             const dueBucket = mdCustDueBucket(x);
@@ -291,12 +298,12 @@ function custRenderRows() {
 window.custMgSearch = function(v) { _mgCustSearch = v; custRenderRows(); };
 window.custResetFilters = function() {
     _mgCustSearch = '';
-    const defaults = { custMgSearch: '', custMgRegion: 'all', custMgRep: 'all', custMgPay: 'all', custMgDue: 'all', custMgGroupBy: 'none', custMgBalOp: '', custMgBalVal: '' };
+    const defaults = { custMgSearch: '', custMgRegion: 'all', custMgRep: 'all', custMgCls: 'all', custMgPay: 'all', custMgDue: 'all', custMgGroupBy: 'none', custMgBalOp: '', custMgBalVal: '' };
     Object.entries(defaults).forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
     custRenderRows();
 };
 window.custQuickFilter = function(kind) {
-    const defaults = { custMgSearch: '', custMgRegion: 'all', custMgRep: 'all', custMgPay: 'all', custMgDue: 'all', custMgGroupBy: 'none', custMgBalOp: '', custMgBalVal: '' };
+    const defaults = { custMgSearch: '', custMgRegion: 'all', custMgRep: 'all', custMgCls: 'all', custMgPay: 'all', custMgDue: 'all', custMgGroupBy: 'none', custMgBalOp: '', custMgBalVal: '' };
     _mgCustSearch = '';
     Object.entries(defaults).forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
     if (kind === 'debt' || kind === 'credit') {
