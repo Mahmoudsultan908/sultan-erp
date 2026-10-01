@@ -59,6 +59,7 @@ const SHELL_URLS = [
     './js/modules/sales-reps.js',
     './js/modules/sales.js',
     './js/modules/settings.js',
+    './js/modules/backup.js',
     './js/modules/stock-transfer.js',
     './js/modules/suppliers.js',
     './js/modules/treasury.js',
