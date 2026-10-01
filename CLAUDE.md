@@ -14,7 +14,7 @@ There is no build tooling, no `package.json`, no bundler, no test suite, and no 
 
 - To run it, serve the directory root with any static file server and open `index.html` (or just open `index.html` directly in a browser). Login requires a valid Supabase user (auth is `sb.auth.signInWithPassword`).
 - There is no automated way to verify changes — check correctness by opening the relevant module in a browser and exercising it manually.
-- `sw.js` is a service worker registered by `js/app.js` purely so the app is installable as a PWA. It intentionally does **not** cache anything (fetches always hit network) because the app is 100% live Supabase data.
+- `sw.js` is a service worker registered by `js/app.js`. It caches the app **shell** (the app's own static files, cache-first) so the PWA installs and opens fast, and it always sends Supabase requests to the network (the data is 100% live). Because of the shell cache, after editing any file you must bump its `?v=` in `index.html` **and** `SHELL_CACHE` in `sw.js`; otherwise installed devices keep running the old code.
 
 ## Architecture
 
@@ -61,7 +61,7 @@ Functions called from inline HTML (`onclick`, `oninput`, etc.) are attached with
 
 `js/supabase.js` creates a single global `sb` client (`SUPABASE_URL`/`SUPABASE_KEY` are hardcoded — the key is the public/anon key, protection is via RLS policies, not secrecy). All modules call `sb.from(...)`, `sb.rpc(...)`, `sb.auth...` directly — there is no repository/service abstraction layer.
 
-**Financial correctness lives in Postgres, not in JS.** Stock quantities, customer/supplier balances, and journal entries are updated by database triggers (`SECURITY DEFINER` functions), not by application code — see `returns_migration.sql` for the pattern (`fn_sale_return_item_stock`, `fn_sales_return_balance`, etc.) and the comment header of `js/modules/accounting.js`: the journal/ledger views are **read-only by design**; the app must never write `journal_entries`/`journal_entry_lines` directly. When adding a feature that affects stock, balances, or the ledger, the trigger/RPC lives in Supabase (not checked into this repo except `returns_migration.sql`), and the JS side should only insert the "root" row (e.g. an invoice or a payment) and let triggers cascade the rest. Only `returns_migration.sql` is version-controlled here; treat the live Supabase schema as authoritative and out-of-repo — check with the user before assuming a table/column/trigger exists or is missing.
+**Financial correctness lives in Postgres, not in JS.** Stock quantities, customer/supplier balances, and journal entries are updated by database triggers (`SECURITY DEFINER` functions), not by application code — see `returns_migration.sql` for the pattern (`fn_sale_return_item_stock`, `fn_sales_return_balance`, etc.) and the comment header of `js/modules/accounting.js`: the journal/ledger views are **read-only by design**; the app must never write `journal_entries`/`journal_entry_lines` directly. When adding a feature that affects stock, balances, or the ledger, the trigger/RPC lives in Supabase (not checked into this repo except `returns_migration.sql`), and the JS side should only insert the "root" row (e.g. an invoice or a payment) and let triggers cascade the rest. Only part of the schema history is version-controlled here (`returns_migration.sql` and `archive/sql-migrations-applied/`); many changes were applied directly in Supabase. Treat the live Supabase schema as authoritative and out-of-repo — check with the user before assuming a table/column/trigger exists or is missing. Always read `PROJECT_MEMORY.md` first: it has the current state of the whole system (four repos, one shared database) and the owner's decisions.
 
 ### Styling
 
@@ -72,6 +72,12 @@ RTL Arabic UI (`dir="rtl" lang="ar"`, Cairo font). Two style sources:
 Most per-row/per-value styling is done with inline `style="..."` on generated elements rather than new CSS classes — this is the established convention, not an oversight. Reuse existing `.mod-*`/`.dash-*`/`.inv-*` classes before adding new global CSS.
 
 A `:root` token block already exists in `index.html` (`--inv-navy`, `--inv-navy-deep`, `--inv-gold`, `--inv-gold-light`, `--inv-gold-soft`, `--inv-green`, `--inv-red`, `--inv-bg`, `--inv-card`, `--inv-border`, `--inv-text`, `--inv-muted`, `--inv-text-soft`, `--inv-divider`, etc.) — but only a handful of modules (`sales.js`, `purchases.js`, `returns.js`, `stock-transfer.js`, `van-stock-*.js`) actually reference it via `var(--inv-x)`; the other ~48 modules hardcode raw hex values in their inline styles instead (audited 2026-07-27: 300+ raw occurrences of just the 5 most common token colors). This is real drift, not a deliberate second system — when writing **new** inline styles, prefer `var(--inv-navy)`/`var(--inv-gold)`/etc. over a fresh hex literal whenever the color matches an existing token, and extend the `:root` block with a new token (not a one-off hex) if you need a genuinely new semantic color used more than once. Retrofitting the existing 48 files is out of scope for any single change — don't do a drive-by mass find-and-replace across unrelated modules.
+
+### Working rules (the owner is not a programmer and speaks Egyptian Arabic — explain simply, step by step)
+
+- **Deploy:** the site is served from `main` on GitHub Pages, so merging to `main` publishes immediately. Work on a branch per change, test it, and merge only after the owner explicitly approves.
+- **Database changes:** explain first and get approval. Try every change inside a transaction that rolls back (a `DO` block that raises an exception at the end), then apply it, verify with read-only queries, and record how to undo it. Large wipe/load operations are run by the owner in the Supabase SQL editor.
+- **Public repo:** never put secrets, security findings or financial figures in this repository. Private files live outside GitHub on the owner's machine.
 
 ### Number/date formatting
 
