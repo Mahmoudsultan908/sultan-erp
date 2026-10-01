@@ -22,7 +22,8 @@
 let _wrProducts = [];
 let _wrWarehouses = [];
 let _wrStock = [];
-let _wrTab = 'valuation'; // 'valuation' | 'movement'
+let _wrTab = 'valuation'; // 'valuation' | 'movement' | 'expiry'
+let _wrExpiryOn = false;  // ميزة الصلاحية والدفعات (app_settings.feature_expiry)
 
 function wrFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -43,6 +44,11 @@ async function renderWarehouseReports(c) {
         _wrProducts = products || [];
         _wrStock = bf ? (stock || []).filter(s => bf.wh.includes(s.warehouse_id)) : (stock || []);
         _wrTab = 'valuation';
+        _wrExpiryOn = false;
+        try {
+            const { data: fx } = await sb.from('app_settings').select('value').eq('key', 'feature_expiry').maybeSingle();
+            _wrExpiryOn = ['on', 'true', '1'].includes(String(fx?.value ?? '').replace(/["\s]/g, '').toLowerCase());
+        } catch { /* الميزة مقفولة */ }
         wrRenderPage(c);
     } catch (err) {
         c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
@@ -63,11 +69,59 @@ function wrRenderPage(c) {
     <div class="exp-tabs">
         <button class="exp-tab ${_wrTab === 'valuation' ? 'active' : ''}" onclick="wrSwitchTab('valuation')">💰 تقييم المخزون</button>
         <button class="exp-tab ${_wrTab === 'movement' ? 'active' : ''}" onclick="wrSwitchTab('movement')">🔄 حركة صنف</button>
+        ${_wrExpiryOn ? `<button class="exp-tab ${_wrTab === 'expiry' ? 'active' : ''}" onclick="wrSwitchTab('expiry')">⏳ الصلاحية</button>` : ''}
     </div>
     <div id="wr-body"></div>
     `;
     if (_wrTab === 'valuation') wrRenderValuation();
+    else if (_wrTab === 'expiry') wrRenderExpiry();
     else wrRenderMovementForm();
+}
+
+// ════════════════════════════════════════════════════════════
+// ⏳ الصلاحية: الدفعات المنتهية والقريبة من الانتهاء (fn_expiry_report)
+// ════════════════════════════════════════════════════════════
+let _wrExpDays = 60;
+async function wrRenderExpiry() {
+    const body = document.getElementById('wr-body');
+    if (!body) return;
+    body.innerHTML = '<div class="empty-state"><span>⏳</span>جاري التحميل...</div>';
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    try {
+        const sel = typeof brSelectedId === 'function' ? brSelectedId() : null;
+        const { data, error } = await sb.rpc('fn_expiry_report', { p_days: _wrExpDays, p_branch: sel || null });
+        if (error) throw error;
+        const rows = data || [];
+        const expired = rows.filter(r => r.days_left < 0);
+        const totalVal = rows.reduce((s, r) => s + Number(r.value_at_cost || 0), 0);
+        const expVal = expired.reduce((s, r) => s + Number(r.value_at_cost || 0), 0);
+        body.innerHTML = `
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+            <label style="font-size:13px">اعرض اللي هتنتهي خلال</label>
+            <input type="number" id="wrExpDays" class="ob-input" style="margin:0;width:90px" min="0" value="${_wrExpDays}">
+            <span style="font-size:13px">يوم</span>
+            <button class="mod-btn mod-btn-primary" onclick="_wrExpDays=Math.max(0,parseInt(document.getElementById('wrExpDays').value)||0);wrRenderExpiry()">تحديث</button>
+        </div>
+        <div class="mod-grid" style="margin-bottom:16px">
+            <div class="mod-card"><div class="mod-card-val">${rows.length}</div><div class="mod-card-lbl">دفعات قريبة/منتهية</div></div>
+            <div class="mod-card"><div class="mod-card-val" style="color:var(--inv-red)">${expired.length}</div><div class="mod-card-lbl">منتهية فعلاً (قيمتها ${wrFmt(expVal)})</div></div>
+            <div class="mod-card"><div class="mod-card-val">${wrFmt(totalVal)}</div><div class="mod-card-lbl">إجمالي القيمة المعرّضة (تكلفة)</div></div>
+        </div>
+        <div class="mod-table-wrap"><table class="mod-table"><thead><tr>
+            <th>الصنف</th><th>المخزن</th><th>الدفعة</th><th style="text-align:center">الصلاحية</th><th style="text-align:center">باقي (يوم)</th><th style="text-align:center">الكمية</th><th style="text-align:left">القيمة</th>
+        </tr></thead><tbody>
+        ${rows.length ? rows.map(r => `<tr style="${r.days_left < 0 ? 'background:#FEF2F2' : r.days_left <= 30 ? 'background:#FFFBEB' : ''}">
+            <td><strong>${esc(r.product_name)}</strong> <span style="font-size:11.5px;color:var(--inv-muted-light)">${esc(r.product_code || '')}</span></td>
+            <td>${esc(r.warehouse_name)}</td><td dir="ltr" style="text-align:right">${esc(r.batch_no || '—')}</td>
+            <td style="text-align:center">${esc(r.expiry_date)}</td>
+            <td style="text-align:center;font-weight:700;color:${r.days_left < 0 ? 'var(--inv-red)' : 'inherit'}">${r.days_left < 0 ? 'منتهي من ' + (-r.days_left) : r.days_left}</td>
+            <td style="text-align:center">${wrFmt(r.qty_remaining)}</td><td style="text-align:left">${wrFmt(r.value_at_cost)}</td></tr>`).join('')
+            : `<tr><td colspan="7" class="empty-state"><span>✅</span>مفيش دفعات منتهية أو قريبة من الانتهاء</td></tr>`}
+        </tbody></table></div>
+        <p style="font-size:12px;color:var(--inv-muted-light);margin-top:10px;line-height:1.7">الدفعات بتتخصم من الأقدم صلاحية الأول عند البيع. الكمية بالوحدة الصغرى. أي كمية في المخزون من غير تاريخ صلاحية مش بتظهر هنا.</p>`;
+    } catch (err) {
+        body.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${esc(err.message)}</div>`;
+    }
 }
 
 // ════════════════════════════════════════════════════════════
