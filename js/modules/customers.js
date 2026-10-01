@@ -150,7 +150,7 @@ window.custShowStatement = async function(customerId) {
             interactionsResult,
             groupRes, clsRes, regRes, repRes, agingRes,
         ] = await Promise.all([
-            sb.from('sales').select('id, invoice_no, total, payment_type, status, created_at')
+            sb.from('sales').select('id, invoice_no, total, payment_type, status, created_at, notes')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }),
             sb.from('customer_payments').select('id, ref, amount, discount, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }).limit(100),
@@ -204,10 +204,10 @@ window.custShowStatement = async function(customerId) {
         (sales||[]).forEach(s => {
             if (s.status !== 'confirmed') return;
             if (s.payment_type === 'credit') {
-                moves.push({ date: s.created_at, desc: `فاتورة بيع ${s.invoice_no}`, debit: Number(s.total)||0, credit: 0, type: 'sale-credit', nav: { kind: 'sale', no: s.invoice_no } });
+                moves.push({ date: s.created_at, desc: `فاتورة بيع ${s.invoice_no}${s.notes ? " — " + custDetEsc(s.notes) : ""}`, debit: Number(s.total)||0, credit: 0, type: 'sale-credit', nav: { kind: 'sale', no: s.invoice_no } });
             } else {
                 // نقدي: بيتقيّد للمراجعة بس مالوش أثر على الرصيد (اتقبض وقتها)
-                moves.push({ date: s.created_at, desc: `فاتورة بيع نقدي ${s.invoice_no}`, debit: 0, credit: 0, type: 'sale-cash', nav: { kind: 'sale', no: s.invoice_no } });
+                moves.push({ date: s.created_at, desc: `فاتورة بيع نقدي ${s.invoice_no}${s.notes ? " — " + custDetEsc(s.notes) : ""}`, debit: 0, credit: 0, type: 'sale-cash', nav: { kind: 'sale', no: s.invoice_no } });
             }
         });
         (returns||[]).forEach(r => {
