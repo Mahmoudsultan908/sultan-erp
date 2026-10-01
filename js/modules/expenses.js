@@ -168,6 +168,7 @@ function _expMonthExpTableHTML(expenses) {
                     <button class="cc-edit" onclick="expPrintVoucher('${e.id}')">🖨️</button>
                     <button class="cc-edit" style="${e.excluded_from_investor_split ? 'background:var(--inv-gold-bg);color:var(--inv-gold)' : ''}" title="استبعاد المعاملة دي بس من حساب أرباح المستثمر" onclick="expToggleLineInvestorExclude('${e.id}', ${!!e.excluded_from_investor_split})">💼</button>
                     ${e.status === 'confirmed' ? `<button class="cc-edit" title="نقل المصروف لبند تاني" onclick="expOpenChangeCat('${e.id}')">✏️ البند</button>` : ''}
+                    ${e.status === 'confirmed' ? `<button class="cc-edit" title="تصحيح مبلغ المصروف" onclick="expOpenChangeAmt('${e.id}')">✏️ المبلغ</button>` : ''}
                     ${e.status === 'confirmed' ? `<button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="expCancelExpense('${e.id}')">❌ إلغاء</button>` : ''}
                 `}</td>
             </tr>`).join('')}
@@ -982,6 +983,66 @@ window.expSaveChangeCat = async function (expId) {
         return alert('❌ تعذّر نقل المصروف: ' + (error.message || error));
     }
     expCloseModal('expChgCatModal');
+    renderExpenses(document.getElementById('app-content'));
+};
+
+// تصحيح مبلغ مصروف مسجّل (fn_change_expense_amount)
+// السيرفر بيغيّر المبلغ ويسجّل قيد فرق على الخزنة وحساب المصروف (مش بيمسح القيد الأصلي).
+window.expOpenChangeAmt = function (expId) {
+    const e = (_expList || []).find(x => x.id === expId);
+    if (!e) return;
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'expChgAmtModal';
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:460px">
+            <div class="mod-modal-header"><h3>✏️ تصحيح مبلغ المصروف</h3>
+                <button class="mod-modal-close" onclick="expCloseModal('expChgAmtModal')">&times;</button></div>
+            <div class="mod-modal-body">
+                <div style="font-size:13px;margin-bottom:12px;line-height:1.8">
+                    ${_expEsc(e.description || '—')}<br>
+                    المبلغ الحالي: <b>${_expFmt(e.amount)}</b> ج.م
+                </div>
+                <div class="mod-form-group"><label>المبلغ الصحيح</label>
+                    <input type="number" id="expChgAmt" class="mod-form-input" min="0.01" step="0.01" value="${Number(e.amount) || ''}" oninput="expChgAmtHint('${e.id}')"></div>
+                <div id="expChgAmtHint" style="font-size:12px;color:var(--inv-muted);line-height:1.7"></div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="expCloseModal('expChgAmtModal')">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" id="expChgAmtBtn" onclick="expSaveChangeAmt('${e.id}')">💾 حفظ</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    expChgAmtHint(expId);
+    setTimeout(() => document.getElementById('expChgAmt')?.select(), 50);
+};
+
+window.expChgAmtHint = function (expId) {
+    const e = (_expList || []).find(x => x.id === expId);
+    const inp = document.getElementById('expChgAmt'), hint = document.getElementById('expChgAmtHint');
+    if (!e || !inp || !hint) return;
+    const nw = parseFloat(inp.value), diff = nw - (Number(e.amount) || 0);
+    if (!(nw > 0)) { hint.textContent = 'اكتب مبلغ أكبر من صفر.'; return; }
+    if (Math.abs(diff) < 0.005) { hint.textContent = 'نفس المبلغ الحالي — مفيش تغيير.'; return; }
+    hint.textContent = diff > 0
+        ? `هيتسجّل صرف إضافي ${_expFmt(diff)} ج.م من نفس الخزنة، وقيد فرق على حساب المصروف.`
+        : `هيرجع للخزنة ${_expFmt(-diff)} ج.م، وقيد فرق عكسي على حساب المصروف.`;
+};
+
+window.expSaveChangeAmt = async function (expId) {
+    const e = (_expList || []).find(x => x.id === expId);
+    const inp = document.getElementById('expChgAmt');
+    const nw = parseFloat(inp?.value);
+    if (!e || !(nw > 0)) return alert('اكتب مبلغ صحيح أكبر من صفر');
+    if (Math.abs(nw - (Number(e.amount) || 0)) < 0.005) return alert('نفس المبلغ الحالي');
+    const btn = document.getElementById('expChgAmtBtn');
+    btn.disabled = true; btn.innerText = '⏳ جاري الحفظ...';
+    const { error } = await sb.rpc('fn_change_expense_amount', { p_expense_id: expId, p_new_amount: Math.round(nw * 100) / 100 });
+    if (error) {
+        btn.disabled = false; btn.innerText = '💾 حفظ';
+        return alert('❌ تعذّر تعديل المبلغ: ' + (error.message || error));
+    }
+    expCloseModal('expChgAmtModal');
     renderExpenses(document.getElementById('app-content'));
 };
 
