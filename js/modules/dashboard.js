@@ -52,7 +52,9 @@ async function renderDashboard(container) {
         // ★ مؤشرات المتابعة الجديدة (مقارنة بالشهر السابق، أعمار الديون، هامش الأصناف/العملاء/المناديب،
         //   تنبيهات) — دالة واحدة fn_dashboard_insights في القاعدة، بتتجاب بالتوازي مع باقي الاستعلامات.
         //   لو فشلت (مثلاً صلاحية الدور) القسم بيختفي بس واللوحة الأساسية تكمل عادي.
-        const dashInsightsPromise = sb.rpc('fn_dashboard_insights').then(r => (r.error ? null : r.data), () => null);
+        // فلتر الفرع: بيظهر بس لما يبقى فيه أكتر من فرع نشط (branches.js)؛ الاختيار بيتحفظ على الجهاز ده وبيتأكد إنه لسه فرع موجود
+        const dashBr = await dashBranchState();
+        const dashInsightsPromise = dashFetchInsights(dashBr.selected);
 
         const [
             { data: cashData },
@@ -299,7 +301,7 @@ async function renderDashboard(container) {
                 </div>
             </div>
 
-            ${dashInsightsHTML(dashIns, monthName)}
+            ${dashInsightsHTML(dashIns, monthName, dashBr)}
 
             <!-- اتجاه المبيعات + هدف المبيعات الشهري: جنب بعض فى بداية الصفحة -->
             <div class="dash-row">
@@ -500,9 +502,52 @@ function dashInsDelta(cur, prev) {
     return `<span style="color:${good ? 'var(--inv-green)' : 'var(--inv-red)'};font-weight:700">${good ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}%</span>`;
 }
 
-function dashInsightsHTML(ins, monthName) {
-    if (!ins) return '';
+// ── فلتر الفرع (مؤشرات المتابعة بس) ──
+// ui = { multi, list, selected }؛ الاختيار بيتحفظ في localStorage (قيمة راحة للمستخدم، مش بيانات)
+let dashBranchSel = null;
+function dashStoredBranch() { try { return localStorage.getItem('dash_branch') || null; } catch { return null; } }
+function dashStoreBranch(id) { try { if (id) localStorage.setItem('dash_branch', id); else localStorage.removeItem('dash_branch'); } catch { /* مش مهم */ } }
+async function dashBranchState() {
+    let multi = false, list = [];
+    try {
+        if (typeof brLoad === 'function') {
+            const c = await brLoad();
+            list = c.ok ? c.list.filter(b => b.is_active) : [];
+            multi = list.length > 1;
+        }
+    } catch { /* الفروع مش متاحة → لوحة عادية */ }
+    let selected = multi ? (dashBranchSel || dashStoredBranch()) : null;
+    if (selected && !list.some(b => b.id === selected)) selected = null;     // فرع اتحذف/اتعطّل → كل الفروع
+    dashBranchSel = selected;
+    return { multi, list, selected };
+}
+function dashFetchInsights(branchId) {
+    return sb.rpc('fn_dashboard_insights', branchId ? { p_branch_id: branchId } : {}).then(r => (r.error ? null : r.data), () => null);
+}
+// تغيير الفرع: بنعيد جلب وعرض قسم مؤشرات المتابعة بس (باقي اللوحة زي ما هي)
+async function dashSetBranch(id) {
+    dashBranchSel = id || null; dashStoreBranch(dashBranchSel);
+    const wrap = document.getElementById('dashInsightsWrap');
+    if (wrap) wrap.style.opacity = '0.5';
+    const [ins, br] = await Promise.all([dashFetchInsights(dashBranchSel), dashBranchState()]);
+    const holder = document.getElementById('dashInsightsWrap');
+    if (holder) {
+        const monthName = new Date().toLocaleDateString('ar-EG', { month: 'long' });
+        holder.outerHTML = dashInsightsHTML(ins, monthName, br) || '<div id="dashInsightsWrap"></div>';
+    }
+}
+window.dashSetBranch = dashSetBranch;
+
+function dashInsightsHTML(ins, monthName, ui) {
+    if (!ins) return '<div id="dashInsightsWrap"></div>';
     const f = dashInsFmt, e = dashInsEsc;
+    ui = ui || { multi: false, list: [], selected: null };
+    const branchName = ins.branch && ins.branch.name ? ins.branch.name : null;
+    const branchSelHtml = ui.multi ? `
+        <select class="ob-input" style="margin:0;width:auto;min-width:140px;font-size:12.5px" onchange="dashSetBranch(this.value)" title="فلتر الفرع (لمؤشرات المتابعة)">
+            <option value="">🏬 كل الفروع</option>
+            ${ui.list.map(b => `<option value="${e(b.id)}" ${b.id === ui.selected ? 'selected' : ''}>${e(b.name)}</option>`).join('')}
+        </select>` : '';
     const cur = ins.current || {}, prev = ins.previous || null;
     const hist = Number(ins.history_days) || 0;
 
@@ -565,8 +610,9 @@ function dashInsightsHTML(ins, monthName) {
         : ['var(--inv-muted)', `🐢 الأصناف الراكدة: تظهر بعد ${slowDays} يوم من التشغيل (متبقي ${Math.max(0, slowDays - hist)} يوم)`]);
 
     return `
+    <div id="dashInsightsWrap">
     <div class="dash-card" style="margin-bottom:18px">
-        <div class="dash-card-header"><span>🔎 مؤشرات المتابعة — ${monthName} حتى اليوم</span></div>
+        <div class="dash-card-header"><span>🔎 مؤشرات المتابعة — ${monthName} حتى اليوم${branchName ? ` — <span style="color:var(--inv-gold)">${e(branchName)}</span>` : ''}</span>${branchSelHtml}</div>
         <div style="display:flex;gap:16px;flex-wrap:wrap">
             ${cmp('صافي المبيعات', 'net_sales', f)}
             ${cmp('الربح', 'profit', f)}
@@ -579,11 +625,13 @@ function dashInsightsHTML(ins, monthName) {
         </div>
     </div>
     <div class="dash-row">
-        <div class="dash-card"><div class="dash-card-header"><span>⏳ أعمار الديون</span></div>${agingHTML}</div>
+        <div class="dash-card"><div class="dash-card-header"><span>⏳ أعمار الديون${branchName ? ' <span style="font-size:11px;font-weight:400;color:var(--inv-muted)">(كل الفروع — أرصدة العملاء مش مقسومة على فروع)</span>' : ''}</span></div>${agingHTML}</div>
         <div class="dash-card"><div class="dash-card-header"><span>📦 أعلى الأصناف ربحاً</span></div>${list(top, 'لا مبيعات هذا الشهر بعد')}
             ${bottom.length ? `<div style="font-size:12px;font-weight:800;color:var(--inv-navy);margin:12px 0 4px">الأقل ربحاً / الخاسرة</div>${list(bottom, '')}` : ''}</div>
         <div class="dash-card"><div class="dash-card-header"><span>👥 أعلى العملاء ربحاً</span></div>${list(ins.top_customers, 'لا مبيعات هذا الشهر بعد')}</div>
         <div class="dash-card"><div class="dash-card-header"><span>🚗 الربح حسب المندوب</span></div>${list(ins.by_rep, 'لا مبيعات هذا الشهر بعد')}</div>
+    </div>
+    ${branchName ? '<div style="font-size:11.5px;color:var(--inv-muted);margin:-6px 4px 14px">ملحوظة: فلتر الفرع بيطبّق على قسم "مؤشرات المتابعة" بس — باقي اللوحة (الكروت الرئيسية والاتجاه والمركز المالي) لسه لكل الفروع.</div>' : ''}
     </div>`;
 }
 
