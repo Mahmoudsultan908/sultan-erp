@@ -1356,6 +1356,10 @@ async function invSave(andNew) {
     // فحص الحد الائتماني للعميل الآجل — قرار عمل واضح (27 يوليو 2026): غير
     // الأدمن ممنوع تمامًا من تجاوز الحد، الأدمن بس يقدر يتجاوز بسبب مكتوب
     // إجباري بيتسجّل في activity_logs (مش زرار OK عادي بيعدّي بصمت).
+    // ★ التسجيل والإشعار بقوا من جوه قاعدة البيانات (fn_create_sale) — الواجهة بتبعتلها السبب بس
+    //   (p_credit_override_reason). الكود القديم هنا كان بيكتب activity_logs/notifications من الواجهة
+    //   وقيود CHECK كانت بترفضها بصمت (try/catch فاضي)، فالتجاوزات ما كانتش بتتسجّل أصلاً.
+    let creditOverrideReason = null;
     if (invPayType === 'credit' && invCustId) {
         const c = INV_DB.customers.find(x=>x.id===invCustId);
         const limit = Number(c?.credit_limit) || 0;
@@ -1379,26 +1383,7 @@ async function invSave(andNew) {
             }
             const reason = prompt(`⚠️ تجاوز الحد الائتماني!\n\nالعميل: ${c.name}\nالحد: ${invFmt(limit)} ج.م\nالرصيد الحالي: ${invFmt(c.balance)} ج.م\nالفاتورة: ${invFmt(net)} ج.م\nالتجاوز: ${over} ج.م\n\nاكتب سبب الموافقة على التجاوز (إجباري):`);
             if (!reason || !reason.trim()) { alert('لازم تكتب سبب عشان تكمل.'); return { ok: false }; }
-            try {
-                await sb.from('activity_logs').insert({
-                    user_id: currentUser?.id || null, action: 'credit_limit_override',
-                    entity_type: 'customer', entity_id: invCustId,
-                    metadata: { customer_name: c.name, credit_limit: limit, balance_before: Number(c.balance) || 0, invoice_net: net, over_by: Number(over), reason: reason.trim() },
-                });
-            } catch {}
-            // إشعار لكل الأدمنز — activity_logs مش شاشة حد بيفتحها يوميًا،
-            // لازم تنبيه ظاهر في جرس الإشعارات عشان محدش يفوّته
-            try {
-                const { data: admins } = await sb.from('profiles').select('id').eq('role', 'admin');
-                if (admins?.length) {
-                    await sb.from('notifications').insert(admins.map(a => ({
-                        user_id: a.id, type: 'credit_limit_override',
-                        title: `⚠️ تجاوز حد ائتماني — ${c.name}`,
-                        body: `الحد: ${invFmt(limit)} ج.م — الفاتورة: ${invFmt(net)} ج.م — التجاوز: ${over} ج.م\nالسبب: ${reason.trim()}`,
-                        related_id: invCustId,
-                    })));
-                }
-            } catch {}
+            creditOverrideReason = reason.trim();
         }
     }
 
@@ -1450,6 +1435,7 @@ async function invSave(andNew) {
                     rep_id: invNormalizeRepId(invRepId),
                     treasury_id: invPayType === 'cash' ? (document.getElementById('invTreasuryId')?.value || invTreasuryId || null) : null,
                     source_app: invEffectiveSourceApp(invNormalizeRepId(invRepId)), created_by: currentUser?.id || null,
+                    credit_override_reason: creditOverrideReason,   // بيتبعت للقاعدة وقت المزامنة (أونلاين/أوفلاين نفس الشيء)
                 },
                 items: filled.map(it => {
                     const prod = INV_DB.products.find(p=>p.id===it.pid);
@@ -1565,6 +1551,8 @@ async function invSave(andNew) {
             p_source_app: invEffectiveSourceApp(repIdToSend),
             p_created_by: currentUser?.id || null,
             p_items: itemsPayload,
+            // سبب تجاوز الحد الائتماني (الأدمن فقط) — بنبعته بس لما يكون فيه تجاوز فعلاً
+            ...(creditOverrideReason ? { p_credit_override_reason: creditOverrideReason } : {}),
         });
         if (rpcErr) throw rpcErr;
         if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
@@ -1984,6 +1972,7 @@ if (typeof registerSyncHandler === 'function') {
                 p_source_app: saleRow.source_app,
                 p_created_by: saleRow.created_by,
                 p_items: items,
+                ...(saleRow.credit_override_reason ? { p_credit_override_reason: saleRow.credit_override_reason } : {}),
             });
             if (rpcErr) return { ok: false, error: rpcErr.message, summary: `فاتورة ${tempInvoiceNo}` };
             const invoiceNo = rpcRows[0].invoice_no;
