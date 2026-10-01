@@ -167,6 +167,7 @@ function _expMonthExpTableHTML(expenses) {
                 <td style="white-space:nowrap">${e._queue ? '' : `
                     <button class="cc-edit" onclick="expPrintVoucher('${e.id}')">🖨️</button>
                     <button class="cc-edit" style="${e.excluded_from_investor_split ? 'background:var(--inv-gold-bg);color:var(--inv-gold)' : ''}" title="استبعاد المعاملة دي بس من حساب أرباح المستثمر" onclick="expToggleLineInvestorExclude('${e.id}', ${!!e.excluded_from_investor_split})">💼</button>
+                    ${e.status === 'confirmed' ? `<button class="cc-edit" title="نقل المصروف لبند تاني" onclick="expOpenChangeCat('${e.id}')">✏️ البند</button>` : ''}
                     ${e.status === 'confirmed' ? `<button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="expCancelExpense('${e.id}')">❌ إلغاء</button>` : ''}
                 `}</td>
             </tr>`).join('')}
@@ -236,6 +237,7 @@ function _expCatsPanelHTML(categories, catUsage) {
                             <div class="used">${_expFmt(used)}</div>
                             <div class="lim">/ ${lim > 0 ? _expFmt(lim) : '∞'}</div>
                         </div>
+                        <button class="cc-edit" onclick="expOpenEditCat('${c.id}')">✏️ تعديل البند</button>
                         <button class="cc-edit" onclick="expOpenLimit('${c.id}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})">✏️ الحد</button>
                         <button class="cc-edit" style="${isActive ? 'background:var(--inv-red-bg);color:var(--inv-red)' : 'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="expToggleCategoryActive('${c.id}', ${isActive})">${isActive ? '⛔ تعطيل' : '✅ تفعيل'}</button>
                         <button class="cc-edit" style="${c.excluded_from_investor_split ? 'background:var(--inv-gold-bg);color:var(--inv-gold)' : ''}" title="مصروفات شخصية ماتدخلش في حساب أرباح المستثمر" onclick="expToggleInvestorExclude('${c.id}', ${!!c.excluded_from_investor_split})">${c.excluded_from_investor_split ? '💼 مستبعد من المستثمر' : '💼 استبعاد من المستثمر'}</button>
@@ -852,6 +854,137 @@ window.expToggleLineInvestorExclude = async function(expId, currentlyExcluded) {
 // ════════════════════════════════════════════════════════════
 // 8) أدوات مساعدة (تواريخ الشهر)
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// تعديل بند المصروفات (الاسم / الحساب المحاسبي / النوع)
+// الحد الشهري ليه زرار لوحده (expOpenLimit). تغيير الحساب المحاسبي ممنوع لو على البند
+// مصروفات مؤكدة (عشان قيودها القديمة تفضل على الحساب اللي اتسجّلت عليه) — الحل: انقل
+// المصروفات لبند تاني الأول بزرار "✏️ البند" في جدول المصروفات، وبعدين غيّر الحساب.
+// ════════════════════════════════════════════════════════════
+function _expEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+
+window.expOpenEditCat = async function (catId) {
+    const c = (_expCatsCategories || []).find(x => x.id === catId);
+    if (!c) return;
+    let accounts = [];
+    try {
+        const { data } = await sb.from('accounts').select('code,name').like('code', '5%').order('code');
+        accounts = (data || []).filter(a => !['5015', '5016', '5020'].includes(a.code));   // تكلفة بضاعة/خصومات/عجز مخزون: حسابات نظام
+    } catch { /* نكمّل بالحساب الحالي بس */ }
+    if (c.account_code && !accounts.find(a => a.code === c.account_code)) accounts.unshift({ code: c.account_code, name: '' });
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'expEditCatModal';
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:460px">
+            <div class="mod-modal-header"><h3>✏️ تعديل بند: ${_expEsc(c.name)}</h3>
+                <button class="mod-modal-close" onclick="expCloseModal('expEditCatModal')">&times;</button></div>
+            <div class="mod-modal-body">
+                <div class="mod-form-group"><label>اسم البند *</label>
+                    <input type="text" id="expEcName" class="mod-form-input" value="${_expEsc(c.name)}"></div>
+                <div class="mod-form-group"><label>الحساب المحاسبي</label>
+                    <select id="expEcAcc" class="mod-form-input">
+                        ${accounts.map(a => `<option value="${_expEsc(a.code)}" ${a.code === c.account_code ? 'selected' : ''}>${_expEsc(a.code)}${a.name ? ' — ' + _expEsc(a.name) : ''}</option>`).join('')}
+                    </select>
+                    <div style="font-size:11px;color:var(--inv-muted-light);margin-top:3px">لو على البند مصروفات مؤكدة مش هيتغيّر الحساب (راجع التنبيه بعد الحفظ).</div></div>
+                <div class="mod-form-group"><label>النوع</label>
+                    <select id="expEcSub" class="mod-form-input">
+                        <option value="operating" ${c.subtype !== 'admin' ? 'selected' : ''}>تشغيلي (operating)</option>
+                        <option value="admin" ${c.subtype === 'admin' ? 'selected' : ''}>إداري (admin)</option>
+                    </select></div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="expCloseModal('expEditCatModal')">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" onclick="expSaveEditCat('${c.id}')">💾 حفظ</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+};
+
+window.expSaveEditCat = async function (catId) {
+    const c = (_expCatsCategories || []).find(x => x.id === catId);
+    if (!c) return;
+    const name = document.getElementById('expEcName').value.trim();
+    if (!name) return alert('اسم البند مطلوب');
+    if ((_expCatsCategories || []).some(x => x.id !== catId && (x.name || '').trim() === name) && !confirm('فيه بند تاني بنفس الاسم. تكمّل؟')) return;
+    const payload = { name, subtype: document.getElementById('expEcSub').value };
+    const newAcc = document.getElementById('expEcAcc').value;
+    let note = '';
+    if (newAcc && newAcc !== (c.account_code || '')) {
+        const { count, error: ce } = await sb.from('expenses').select('id', { count: 'exact', head: true }).eq('category_id', catId).eq('status', 'confirmed');
+        if (ce) return alert('❌ تعذّر التحقق من المصروفات المسجلة على البند: ' + ce.message);
+        if (count > 0) note = `\n\n⚠️ الحساب المحاسبي ما اتغيّرش لأن على البند ${count} مصروف مؤكد. انقل المصروفات لبند تاني الأول (زرار "✏️ البند" في جدول المصروفات) وبعدين غيّر الحساب.`;
+        else payload.account_code = newAcc;
+    }
+    const { error } = await sb.from('expense_categories').update(payload).eq('id', catId);
+    if (error) return alert('❌ خطأ في الحفظ: ' + error.message);
+    expCloseModal('expEditCatModal');
+    if (note) alert('✅ اتحفظ الاسم والنوع.' + note);
+    renderExpenses(document.getElementById('app-content'));
+};
+
+// ════════════════════════════════════════════════════════════
+// نقل مصروف مسجّل لبند تاني (fn_change_expense_category)
+// لو الحساب المحاسبي للبند الجديد مختلف، السيرفر بيسجّل قيد نقل تلقائي؛ لو نفس الحساب مفيش قيد.
+// ════════════════════════════════════════════════════════════
+window.expOpenChangeCat = function (expId) {
+    const e = (_expList || []).find(x => x.id === expId);
+    if (!e) return;
+    const cats = (_expCatsCategories || []).filter(c => c.is_active !== false);
+    const cur = (_expCatsCategories || []).find(c => c.id === e.category_id);
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active';
+    modal.id = 'expChgCatModal';
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:460px">
+            <div class="mod-modal-header"><h3>✏️ تغيير بند المصروف</h3>
+                <button class="mod-modal-close" onclick="expCloseModal('expChgCatModal')">&times;</button></div>
+            <div class="mod-modal-body">
+                <div style="font-size:13px;margin-bottom:12px;line-height:1.8">
+                    ${_expEsc(e.description || '—')} — <b>${_expFmt(e.amount)}</b> ج.م<br>
+                    البند الحالي: <b>${_expEsc(cur?.name || '—')}</b> (حساب ${_expEsc(cur?.account_code || '—')})
+                </div>
+                <div class="mod-form-group"><label>البند الجديد</label>
+                    <select id="expChgCat" class="mod-form-input" onchange="expChgCatHint('${e.id}')">
+                        ${cats.map(c => `<option value="${c.id}" ${c.id === e.category_id ? 'selected' : ''}>${_expEsc(c.name)} (حساب ${_expEsc(c.account_code || '—')})</option>`).join('')}
+                    </select></div>
+                <div id="expChgCatHint" style="font-size:12px;color:var(--inv-muted);line-height:1.7"></div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="expCloseModal('expChgCatModal')">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" id="expChgCatBtn" onclick="expSaveChangeCat('${e.id}')">💾 نقل</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    expChgCatHint(expId);
+};
+
+window.expChgCatHint = function (expId) {
+    const e = (_expList || []).find(x => x.id === expId);
+    const sel = document.getElementById('expChgCat'), hint = document.getElementById('expChgCatHint');
+    if (!e || !sel || !hint) return;
+    const cur = (_expCatsCategories || []).find(c => c.id === e.category_id);
+    const nw = (_expCatsCategories || []).find(c => c.id === sel.value);
+    if (!nw || nw.id === e.category_id) { hint.textContent = 'اختار بند مختلف.'; return; }
+    hint.textContent = (cur?.account_code || '') !== (nw.account_code || '')
+        ? `الحساب المحاسبي هيتغيّر من ${cur?.account_code || '—'} إلى ${nw.account_code || '—'}، وهيتسجّل قيد نقل تلقائي. الخزنة والمبلغ ما بيتغيّروش.`
+        : 'نفس الحساب المحاسبي — بيتغيّر اسم البند بس، من غير أي قيد.';
+};
+
+window.expSaveChangeCat = async function (expId) {
+    const e = (_expList || []).find(x => x.id === expId);
+    const sel = document.getElementById('expChgCat');
+    if (!e || !sel || sel.value === e.category_id) return alert('اختار بند مختلف');
+    const btn = document.getElementById('expChgCatBtn');
+    btn.disabled = true; btn.innerText = '⏳ جاري النقل...';
+    const { error } = await sb.rpc('fn_change_expense_category', { p_expense_id: expId, p_new_category_id: sel.value });
+    if (error) {
+        btn.disabled = false; btn.innerText = '💾 نقل';
+        return alert('❌ تعذّر نقل المصروف: ' + (error.message || error));
+    }
+    expCloseModal('expChgCatModal');
+    renderExpenses(document.getElementById('app-content'));
+};
+
 function _expFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function _expToday() { return new Date().toISOString().split('T')[0]; }
 function _expMonthStart() {
