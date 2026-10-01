@@ -10,7 +10,23 @@
 const FT_LIST = [
     { key: 'feature_expiry', icon: '⏳', title: 'الصلاحية والدفعات',
       desc: 'في فاتورة الشراء بتظهر خانتين: رقم الدفعة وتاريخ الصلاحية. عند البيع بتتخصم الدفعات من الأقدم صلاحية الأول، وفي تقارير المخازن تبويب "الصلاحية" بيعرض المنتهي والقريب من الانتهاء.' },
+    { key: 'feature_cheques', icon: '🧾', title: 'الشيكات والبنوك',
+      desc: 'شاشة "الشيكات" في القائمة المالية: شيكات واردة من العملاء وصادرة للموردين بتاريخ استحقاق. الشيك مالوش أثر على الحسابات وهو تحت التحصيل، ولما تضغط "تحصيل" بيتسجل كتحصيل/دفعة عادية في الخزنة أو البنك اللي تختاره. وفي إضافة خزنة بتقدر تحدد إنها حساب بنكي.' },
 ];
+
+// هل الميزة مفعّلة؟ (كاش 30 ثانية عشان الشاشات ما تسألش القاعدة كل مرة)
+const _ftCache = {};
+async function ftOn(key) {
+    const c = _ftCache[key];
+    if (c && Date.now() - c.t < 30000) return c.v;
+    let v = false;
+    try {
+        const { data } = await sb.from('app_settings').select('value').eq('key', key).maybeSingle();
+        v = ftIsOn(data?.value);
+    } catch { v = false; }
+    _ftCache[key] = { t: Date.now(), v };
+    return v;
+}
 
 function ftEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function ftIsOn(v) { return ['on', 'true', '1'].includes(String(v ?? '').replace(/["\s]/g, '').toLowerCase()); }
@@ -43,6 +59,7 @@ window.ftToggle = async function (key, box) {
     try {
         const { error } = await sb.from('app_settings').upsert({ key, value: on ? 'on' : 'off', updated_at: new Date().toISOString() }, { onConflict: 'key' });
         if (error) throw error;
+        delete _ftCache[key];
     } catch (err) {
         box.checked = !on;
         alert('❌ تعذّر الحفظ: ' + err.message);
@@ -50,4 +67,4 @@ window.ftToggle = async function (key, box) {
     box.disabled = false;
 };
 
-Object.assign(window, { ftRenderCard });
+Object.assign(window, { ftRenderCard, ftOn });

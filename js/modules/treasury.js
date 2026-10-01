@@ -105,6 +105,13 @@ window.tsyOpenAddModal = async function() {
     // اختيار الفرع بيظهر بس لما يبقى فيه أكتر من فرع نشط (branches.js)؛ لو فرع واحد القاعدة بتحط الرئيسي تلقائياً
     let brHtml = '';
     try { brHtml = typeof brSelectHtml === 'function' ? await brSelectHtml('tsyNewBranch', null) : ''; } catch { brHtml = ''; }
+    // نوع الخزنة (نقدية / حساب بنكي) بيظهر بس لو ميزة الشيكات والبنوك مفعّلة
+    let kindHtml = '';
+    try {
+        if (typeof ftOn === 'function' && await ftOn('feature_cheques')) kindHtml = `
+            <div class="mod-form-group"><label>النوع</label><select id="tsyNewKind" class="mod-form-input"><option value="cash">💵 خزنة نقدية</option><option value="bank">🏦 حساب بنكي</option></select></div>
+            <div class="mod-form-group"><label>اسم البنك (للحساب البنكي)</label><input type="text" id="tsyNewBank" class="mod-form-input"></div>`;
+    } catch { kindHtml = ''; }
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'tsyAddModal';
@@ -116,6 +123,7 @@ window.tsyOpenAddModal = async function() {
                 <div class="mod-form-group"><label>اسم الخزنة *</label>
                     <input type="text" id="tsyNewName" class="mod-form-input" placeholder="مثال: خزنة الفرع الثاني">
                 </div>
+                ${kindHtml}
                 ${brHtml}
             </div>
             <div class="mod-modal-footer">
@@ -136,7 +144,10 @@ window.tsySaveNew = async function() {
     btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
     try {
         const brSel = document.getElementById('tsyNewBranch');          // موجود بس لما فيه أكتر من فرع
-        const { error } = await sb.from('treasuries').insert({ name, is_active: true, is_default: false, ...(brSel && brSel.value ? { branch_id: brSel.value } : {}) });
+        const kindSel = document.getElementById('tsyNewKind');          // موجود بس لما ميزة البنوك مفعّلة
+        const bankKind = kindSel && kindSel.value === 'bank';
+        const { error } = await sb.from('treasuries').insert({ name, is_active: true, is_default: false, ...(brSel && brSel.value ? { branch_id: brSel.value } : {}),
+            ...(bankKind ? { kind: 'bank', bank_name: document.getElementById('tsyNewBank')?.value.trim() || null } : {}) });
         if (error) throw error;
         tsyCloseModal();
         renderTreasury(document.getElementById('app-content'));

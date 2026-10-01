@@ -29,6 +29,7 @@ const SHELL_URLS = [
     './js/modules/audit-log.js',
     './js/modules/branches.js',
     './js/modules/features.js',
+    './js/modules/cheques.js',
     './js/modules/cash-movement.js',
     './js/modules/collections.js',
     './js/modules/coming-soon.js',
