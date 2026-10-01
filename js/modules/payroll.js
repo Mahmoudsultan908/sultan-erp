@@ -25,7 +25,9 @@
    عشان يبقى مصدر واحد للحقيقة في أي مكان تفتحها منه.
    ════════════════════════════════════════════════════════════ */
 
-let _prlList = []; // employees ∪ sales_reps، كل عنصر معلّم بـ kind
+let _prlList = []; // employees ∪ sales_reps، كل عنصر معلّم بـ kind (النشطين بس)
+let _prlInactiveList = []; // غير النشطين — بيتعرضوا لما _prlShowInactive يتفعّل
+let _prlShowInactive = false;
 let _prlEditingKey = null; // {kind,id} أو null لإضافة موظف جديد
 let _prlTableMissing = false;
 let _prlLastEvalMap = {}; // employee_id -> { date, avg } — موظفين عاديين بس (تقييم الأداء برّه نطاق المناديب)
@@ -68,21 +70,31 @@ async function renderPayroll(c) {
         // الموظف والمندوب قد يكونان نفس الشخص في جدولين مختلفين.
         // نعرضهما كسطر واحد عند تطابق الاسم، مع الاحتفاظ بسجلّي البيانات
         // منفصلين حتى لا تنقطع المرتبات عن الفواتير القديمة.
-        const people = new Map();
-        (employees || []).filter(e => e.is_active !== false).forEach(e => {
-            people.set(prlPersonNameKey(e.name), { ...e, kind: 'employee' });
-        });
-        (reps || []).filter(r => r.is_active !== false).forEach(r => {
-            const key = prlPersonNameKey(r.name);
-            const existing = people.get(key);
-            if (existing) {
-                existing.repId = r.id;
-                existing.repData = r;
-            } else {
-                people.set(key, { ...r, kind: 'rep' });
-            }
-        });
-        _prlList = [...people.values()].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+        const buildPeople = (emps, repsIn, skipKeys) => {
+            const people = new Map();
+            emps.forEach(e => {
+                const key = prlPersonNameKey(e.name);
+                if (!skipKeys || !skipKeys.has(key)) people.set(key, { ...e, kind: 'employee' });
+            });
+            repsIn.forEach(r => {
+                const key = prlPersonNameKey(r.name);
+                if (skipKeys && skipKeys.has(key)) return;
+                const existing = people.get(key);
+                if (existing) {
+                    existing.repId = r.id;
+                    existing.repData = r;
+                } else {
+                    people.set(key, { ...r, kind: 'rep' });
+                }
+            });
+            return people;
+        };
+        const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ar');
+        const activePeople = buildPeople((employees || []).filter(e => e.is_active !== false), (reps || []).filter(r => r.is_active !== false));
+        // غير النشطين: بنعرضهم بس لو الزرار مفعّل، ومن غير ما ندخّلهم في عدّاد النشطين
+        const inactivePeople = buildPeople((employees || []).filter(e => e.is_active === false), (reps || []).filter(r => r.is_active === false), new Set(activePeople.keys()));
+        _prlList = [...activePeople.values()].sort(byName);
+        _prlInactiveList = [...inactivePeople.values()].sort(byName);
 
         // آخر تقييم لكل موظف عادي — اختياري، لو جدول employee_evaluations لسه ما اتعملش نتجاهل الخطأ بهدوء
         const evalResult = await sb.from('employee_evaluations')
@@ -113,6 +125,7 @@ function prlRenderPage(c) {
     const active = _prlList.filter(p => p.is_active !== false);
     const totalBase = active.reduce((s, p) => s + (Number(p.base_salary) || 0), 0);
     const repCount = active.filter(p => p.kind === 'rep').length;
+    const shownList = _prlShowInactive ? _prlList.concat(_prlInactiveList) : _prlList;
 
     c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
@@ -131,21 +144,28 @@ function prlRenderPage(c) {
             <div class="mod-card"><div class="mod-card-icon" style="background:var(--inv-gold-bg);color:var(--inv-gold)">💰</div><div class="mod-card-val">${prlFmt(totalBase)}</div><div class="mod-card-lbl">إجمالي الرواتب الأساسية</div></div>
         </div>
 
+        <div style="margin-bottom:10px">
+            <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--inv-muted)">
+                <input type="checkbox" ${_prlShowInactive ? 'checked' : ''} onchange="prlToggleInactive(this.checked)">
+                🚫 إظهار غير النشطين (${_prlInactiveList.length})
+            </label>
+        </div>
+
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
                 <th>الاسم</th><th>النوع</th><th>الهاتف</th><th>تفاصيل</th><th>آخر تقييم</th>
                 <th style="text-align:left">الراتب الأساسي</th><th style="text-align:center">الحالة</th><th style="text-align:center">إجراءات</th>
             </tr></thead>
             <tbody>
-                ${_prlList.length === 0 ? `<tr><td colspan="8" class="empty-state"><span>👥</span>لا يوجد موظفون أو مناديب بعد.</td></tr>` :
-                _prlList.map(p => {
+                ${shownList.length === 0 ? `<tr><td colspan="8" class="empty-state"><span>👥</span>لا يوجد موظفون أو مناديب بعد.</td></tr>` :
+                shownList.map(p => {
                     const key = prlKey(p.kind, p.id);
                     const lastEval = p.kind === 'employee' ? _prlLastEvalMap[p.id] : null;
                     const rep = p.repData || (p.kind === 'rep' ? p : null);
                     const details = p.kind === 'rep'
                         ? `عمولة ${Number(p.commission_pct) || 0}% • هدف ${prlFmt(p.daily_sales_target)}/يوم`
                         : `${p.job_title || '—'}${rep ? ` • عمولة ${Number(rep.commission_pct) || 0}% • هدف ${prlFmt(rep.daily_sales_target)}/يوم` : ''}`;
-                    return `<tr>
+                    return `<tr style="${p.is_active === false ? 'opacity:.6;background:#F8FAFC' : ''}">
                     <td style="font-weight:600">${p.name}</td>
                     <td>${p.kind === 'rep' ? '<span style="color:#4338CA;font-weight:700">🚗 مندوب</span>' : '<span style="color:var(--inv-muted)">👔 موظف</span>'}</td>
                     <td dir="ltr" style="color:var(--inv-muted)">${p.phone || '—'}</td>
@@ -154,6 +174,7 @@ function prlRenderPage(c) {
                     <td style="text-align:left;font-weight:700">${prlFmt(p.base_salary)}</td>
                     <td style="text-align:center">${p.is_active !== false ? '<span style="color:var(--inv-green);font-weight:600">✅ نشط</span>' : '<span style="color:var(--inv-muted-light);font-weight:600">🚫 غير نشط</span>'}</td>
                     <td style="text-align:center;white-space:nowrap">
+                        ${p.is_active === false && p.kind === 'employee' ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="prlReactivate('${p.id}')">♻️ تفعيل</button>` : ''}
                         <button class="cc-edit" onclick="prlOpenEdit('${p.kind}','${p.id}')">✏️</button>
                         <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold)" onclick="prlShowStatement('${p.kind}','${p.id}')">📄 كشف حساب</button>
                         ${p.kind === 'employee' && typeof eevOpenAdd === 'function' ? `<button class="cc-edit" style="background:#FEF9C3;color:#B45309" onclick="eevOpenAdd('${p.id}')" title="تقييم سريع">⭐</button>` : ''}
@@ -163,6 +184,19 @@ function prlRenderPage(c) {
             </tbody></table>
         </div>`;
 }
+
+window.prlToggleInactive = function (on) {
+    _prlShowInactive = !!on;
+    prlRenderPage(document.getElementById('app-content'));
+};
+
+window.prlReactivate = async function (id) {
+    const p = _prlInactiveList.find(x => x.kind === 'employee' && x.id === id);
+    if (!p || !confirm(`تفعيل الموظف "${p.name}" من جديد؟`)) return;
+    const { error } = await sb.from('employees').update({ is_active: true }).eq('id', id);
+    if (error) return alert('❌ خطأ: ' + error.message);
+    renderPayroll(document.getElementById('app-content'));
+};
 
 window.prlGoAddRep = function () {
     alert('إضافة مندوب مبيعات محتاجة حساب دخول فعلي (إيميل/باسورد) — هيتوجّه لك الآن لشاشة "⚙️ الإعدادات"، دوس على تبويب "👥 المستخدمون" وأضف مستخدم بصلاحية "مندوب".');
@@ -175,7 +209,7 @@ window.prlGoAddRep = function () {
 // ════════════════════════════════════════════════════════════
 window.prlOpenAdd = function () { _prlEditingKey = null; prlOpenEmployeeModal(null); };
 window.prlOpenEdit = function (kind, id) {
-    const p = _prlList.find(x => x.kind === kind && x.id === id);
+    const p = _prlList.concat(_prlInactiveList).find(x => x.kind === kind && x.id === id);
     if (!p) return;
     _prlEditingKey = { kind, id };
     if (kind === 'rep') prlOpenRepModal(p); else prlOpenEmployeeModal(p);
@@ -199,8 +233,8 @@ function prlOpenEmployeeModal(x) {
                         <input type="text" id="prlPhone" class="mod-form-input" value="${x?.phone || ''}" dir="ltr"></div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                    <div class="mod-form-group"><label>الراتب الأساسي (ج.م) *</label>
-                        <input type="number" id="prlBaseSalary" class="mod-form-input" value="${x?.base_salary || 0}" min="0" step="0.01"></div>
+                    <div class="mod-form-group"><label>الراتب الأساسي (ج.م) — ممكن 0</label>
+                        <input type="number" id="prlBaseSalary" class="mod-form-input" value="${x?.base_salary ?? 0}" min="0" step="0.01"></div>
                     <div class="mod-form-group"><label>تاريخ التعيين</label>
                         <input type="date" id="prlHireDate" class="mod-form-input" value="${x?.hire_date || ''}"></div>
                 </div>
@@ -233,7 +267,7 @@ window.prlSave = async function () {
     const name = document.getElementById('prlName').value.trim();
     const base_salary = parseFloat(document.getElementById('prlBaseSalary').value) || 0;
     if (!name) return alert('اسم الموظف مطلوب');
-    if (base_salary <= 0) return alert('الراتب الأساسي يجب أن يكون أكبر من صفر');
+    if (base_salary < 0) return alert('الراتب الأساسي لا يمكن أن يكون سالب');
 
     const payload = {
         name,

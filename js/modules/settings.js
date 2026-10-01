@@ -103,12 +103,19 @@ async function renderSettings(container) {
                 { key: 'sultanoo_loyalty_points_per_egp', value: document.getElementById('set-loyalty-rate').value },
             ];
             try {
-                for (const e of entries) {
-                    await sb.from('app_settings').upsert({ key: e.key, value: JSON.stringify(e.value), updated_at: new Date().toISOString() });
-                }
+                // طلب واحد لكل الإعدادات (بدل 12 طلب ورا بعض): أسرع، وإما يتحفظوا كلهم أو ولا واحد
+                const stamp = new Date().toISOString();
+                const { error } = await sb.from('app_settings').upsert(
+                    entries.map(e => ({ key: e.key, value: JSON.stringify(e.value), updated_at: stamp })));
+                if (error) throw error;
+                // الصفحة ممكن تكون اتبدّلت أثناء الحفظ — ما نكسرش الحفظ بسبب رسالة التأكيد
                 const msg = document.getElementById('sett-save-msg');
-                msg.style.display = 'inline';
-                setTimeout(()=> msg.style.display='none', 3000);
+                if (msg) {
+                    msg.style.display = 'inline';
+                    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+                } else {
+                    alert('✅ تم حفظ الإعدادات');
+                }
             } catch(err) {
                 alert('❌ خطأ في الحفظ: ' + err.message);
             }
