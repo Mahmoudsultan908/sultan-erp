@@ -101,7 +101,10 @@ async function renderTreasury(c) {
     }
 }
 
-window.tsyOpenAddModal = function() {
+window.tsyOpenAddModal = async function() {
+    // اختيار الفرع بيظهر بس لما يبقى فيه أكتر من فرع نشط (branches.js)؛ لو فرع واحد القاعدة بتحط الرئيسي تلقائياً
+    let brHtml = '';
+    try { brHtml = typeof brSelectHtml === 'function' ? await brSelectHtml('tsyNewBranch', null) : ''; } catch { brHtml = ''; }
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'tsyAddModal';
@@ -113,6 +116,7 @@ window.tsyOpenAddModal = function() {
                 <div class="mod-form-group"><label>اسم الخزنة *</label>
                     <input type="text" id="tsyNewName" class="mod-form-input" placeholder="مثال: خزنة الفرع الثاني">
                 </div>
+                ${brHtml}
             </div>
             <div class="mod-modal-footer">
                 <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="tsyCloseModal()">إلغاء</button>
@@ -131,7 +135,8 @@ window.tsySaveNew = async function() {
     const btn = document.querySelector('#tsyAddModal .mod-btn-primary');
     btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
     try {
-        const { error } = await sb.from('treasuries').insert({ name, is_active: true, is_default: false });
+        const brSel = document.getElementById('tsyNewBranch');          // موجود بس لما فيه أكتر من فرع
+        const { error } = await sb.from('treasuries').insert({ name, is_active: true, is_default: false, ...(brSel && brSel.value ? { branch_id: brSel.value } : {}) });
         if (error) throw error;
         tsyCloseModal();
         renderTreasury(document.getElementById('app-content'));
@@ -139,7 +144,15 @@ window.tsySaveNew = async function() {
     finally { btn.innerText = '💾 حفظ'; btn.disabled = false; }
 };
 
-window.tsyOpenEditModal = function(treasuryId, currentName) {
+window.tsyOpenEditModal = async function(treasuryId, currentName) {
+    // الفرع الحالي للخزنة بنجيبه بس لو فيه أكتر من فرع (غير كده مفيش اختيار فرع أصلاً)
+    let brHtml = '';
+    try {
+        if (typeof brIsMulti === 'function' && await brIsMulti()) {
+            const { data: cur } = await sb.from('treasuries').select('branch_id').eq('id', treasuryId).maybeSingle();
+            brHtml = await brSelectHtml('tsyEditBranch', cur?.branch_id || null);
+        }
+    } catch { brHtml = ''; }
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'tsyEditModal';
@@ -151,6 +164,7 @@ window.tsyOpenEditModal = function(treasuryId, currentName) {
                 <div class="mod-form-group"><label>اسم الخزنة *</label>
                     <input type="text" id="tsyEditName" class="mod-form-input" value="${currentName}">
                 </div>
+                ${brHtml}
             </div>
             <div class="mod-modal-footer">
                 <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="tsyCloseEditModal()">إلغاء</button>
@@ -169,7 +183,8 @@ window.tsySaveEdit = async function(treasuryId) {
     const btn = document.querySelector('#tsyEditModal .mod-btn-primary');
     btn.innerText = 'جاري الحفظ...'; btn.disabled = true;
     try {
-        const { error } = await sb.from('treasuries').update({ name }).eq('id', treasuryId);
+        const brSel = document.getElementById('tsyEditBranch');         // موجود بس لما فيه أكتر من فرع
+        const { error } = await sb.from('treasuries').update({ name, ...(brSel && brSel.value ? { branch_id: brSel.value } : {}) }).eq('id', treasuryId);
         if (error) throw error;
         tsyCloseEditModal();
         renderTreasury(document.getElementById('app-content'));

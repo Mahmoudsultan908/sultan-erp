@@ -81,6 +81,8 @@ async function renderSettings(container) {
                 <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">بتحدد شرائح كارت "أعمار الديون" في اللوحة (الافتراضي 30 / 60 / 90). لازم الأرقام تتزايد (الأول أصغر من التاني وهكذا). الشرائح دي بتتطبق كمان على كشف حساب العميل وتقرير "أرصدة العملاء" (لو الحساب الدقيق تعذّر تحميله، الحساب التقريبي البديل بيستخدم 30/60/90).</p>
             </div>
 
+            <div id="set-branches-card"></div>
+
             <div class="dash-card" style="padding:24px;margin-top:16px">
                 <h3 style="margin:0 0 16px;font-size:15px">🛒 إعدادات سلطانو</h3>
                 <label class="ob-label">الحد الأدنى العام للطلب (ج.م)</label>
@@ -110,6 +112,9 @@ async function renderSettings(container) {
             <button class="ob-save-btn" style="margin-top:20px;padding:14px 32px;font-size:14px" onclick="settSaveAll()">💾 حفظ كل الإعدادات</button>
             <span id="sett-save-msg" style="margin-right:12px;font-size:13px;color:var(--inv-green);display:none">✅ تم الحفظ بنجاح</span>
         </div>`;
+
+        // كارت الفروع (branches.js) — بيختفي لوحده لو جدول الفروع مش موجود
+        if (typeof brRenderCard === 'function') brRenderCard(document.getElementById('set-branches-card'));
 
         window.settSaveAll = async () => {
             // مؤشرات اللوحة: نتأكد من المدى قبل الحفظ (القاعدة كمان بترجع للافتراضي لو القيمة برا المدى)
