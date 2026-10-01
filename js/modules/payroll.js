@@ -348,7 +348,7 @@ function prlOpenRepModal(x) {
                         <input type="number" id="prlRepVisitsTarget" class="mod-form-input" value="${x.daily_visits_target || 0}" min="0" step="1"></div>
                 </div>
                 <div class="mod-form-group"><label>🔒 PIN تحميل العربية <small style="color:var(--inv-muted-light);font-weight:400">(اختياري)</small></label>
-                    <input type="text" id="prlRepVanLoadPin" class="mod-form-input" value="${x.van_load_pin || ''}" dir="ltr" maxlength="8"></div>
+                    <input type="text" id="prlRepVanLoadPin" class="mod-form-input" value="" placeholder="جاري التحميل..." dir="ltr" maxlength="8"></div>
                 <div class="mod-form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                     <input type="checkbox" id="prlRepIsActive" ${x.is_active !== false ? 'checked' : ''}> نشط
                 </label></div>
@@ -361,6 +361,7 @@ function prlOpenRepModal(x) {
             </div>
         </div>`;
     document.body.appendChild(modal);
+    if (typeof repPinLoad === 'function') repPinLoad(x.id, 'prlRepVanLoadPin');
 }
 
 window.prlSaveRep = async function () {
@@ -375,7 +376,6 @@ window.prlSaveRep = async function () {
         grace_minutes: document.getElementById('prlRepGraceMinutes').value !== '' ? parseInt(document.getElementById('prlRepGraceMinutes').value, 10) : null,
         daily_sales_target: parseFloat(document.getElementById('prlRepDailyTarget').value) || 0,
         daily_visits_target: parseInt(document.getElementById('prlRepVisitsTarget').value) || 0,
-        van_load_pin: document.getElementById('prlRepVanLoadPin').value.trim() || null,
         is_active: document.getElementById('prlRepIsActive').checked,
         notes: document.getElementById('prlRepNotes').value.trim() || null,
     };
@@ -384,6 +384,7 @@ window.prlSaveRep = async function () {
     try {
         const { error } = await sb.from('sales_reps').update(payload).eq('id', _prlEditingKey.id);
         if (error) throw error;
+        if (typeof repPinSave === 'function') await repPinSave(_prlEditingKey.id, 'prlRepVanLoadPin');
         document.getElementById('prlModal').remove();
         renderPayroll(document.getElementById('app-content'));
     } catch (err) {

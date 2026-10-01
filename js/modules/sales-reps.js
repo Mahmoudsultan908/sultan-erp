@@ -182,6 +182,33 @@ window.repOnSearch = function (v) { _repSearch = v; repRenderRows(); };
 // ════════════════════════════════════════════════════════════
 // 2) إضافة / تعديل مندوب
 // ════════════════════════════════════════════════════════════
+// PIN تحميل العربية بيتخزن في جدول منفصل (rep_van_pins) للأدمن/المحاسب بس، مش في sales_reps.
+// الدالتين دول مشتركين مع شاشة المرتبات (payroll.js).
+window.repPinLoad = async function (repId, inputId) {
+    const inp = document.getElementById(inputId);
+    if (!inp) return;
+    if (!repId) { inp.placeholder = 'مثال: 1234'; return; }
+    try {
+        const { data, error } = await sb.from('rep_van_pins').select('pin').eq('rep_id', repId).maybeSingle();
+        if (error) throw error;
+        inp.value = data?.pin || '';
+        inp.placeholder = 'مثال: 1234';
+    } catch (err) {
+        inp.placeholder = 'تعذّر تحميل الـPIN';
+        inp.disabled = true;
+    }
+};
+window.repPinSave = async function (repId, inputId) {
+    const inp = document.getElementById(inputId);
+    if (!inp || !repId || inp.disabled) return;
+    const pin = inp.value.trim();
+    if (pin && !/^[0-9]{1,8}$/.test(pin)) throw new Error('PIN التحميل لازم يكون أرقام فقط (لحد 8)');
+    const { error } = pin
+        ? await sb.from('rep_van_pins').upsert({ rep_id: repId, pin, updated_at: new Date().toISOString() })
+        : await sb.from('rep_van_pins').delete().eq('rep_id', repId);
+    if (error) throw error;
+};
+
 window.repOpenAdd = function () { _repEditingId = null; repOpenModal(null); };
 window.repOpenEdit = function (id) { const r = _repList.find(x => x.id === id); if (r) { _repEditingId = id; repOpenModal(r); } };
 
@@ -216,7 +243,7 @@ function repOpenModal(x) {
                         <input type="number" id="repVisitsTarget" class="mod-form-input" value="${x?.daily_visits_target || 0}" min="0" step="1"></div>
                 </div>
                 <div class="mod-form-group"><label>🔒 PIN تحميل العربية <small style="color:var(--inv-muted-light);font-weight:400">(تأكيد إضافي قبل ما المندوب يحمّل عربيته بنفسه من تطبيقه — سيبه فاضي لو مش عايزه يقدر يحمّل نفسه)</small></label>
-                    <input type="text" id="repVanLoadPin" class="mod-form-input" value="${x?.van_load_pin || ''}" placeholder="مثال: 1234" dir="ltr" maxlength="8"></div>
+                    <input type="text" id="repVanLoadPin" class="mod-form-input" value="" placeholder="جاري التحميل..." dir="ltr" maxlength="8"></div>
                 <div class="mod-form-group"><label>ملاحظات</label>
                     <input type="text" id="repNotes" class="mod-form-input" value="${x?.notes || ''}" placeholder="اختياري"></div>
             </div>
@@ -226,6 +253,7 @@ function repOpenModal(x) {
             </div>
         </div>`;
     document.body.appendChild(modal);
+    repPinLoad(x?.id, 'repVanLoadPin');
     setTimeout(() => document.getElementById('repName')?.focus(), 50);
 }
 
@@ -240,7 +268,6 @@ window.repSave = async function () {
         price_level_id: document.getElementById('repPriceLevel').value || null,
         daily_sales_target: parseFloat(document.getElementById('repDailyTarget').value) || 0,
         daily_visits_target: parseInt(document.getElementById('repVisitsTarget').value) || 0,
-        van_load_pin: document.getElementById('repVanLoadPin').value.trim() || null,
         notes: document.getElementById('repNotes').value.trim() || null,
     };
 
@@ -256,6 +283,7 @@ window.repSave = async function () {
             if (error) throw error;
             repId = data.id;
         }
+        await repPinSave(repId, 'repVanLoadPin');
         // كل مندوب لازم يكون له خزنة خاصة بيه — بتتعمل مرة واحدة بس لو مش موجودة
         if (repId && typeof usrEnsureRepTreasury === 'function') {
             await usrEnsureRepTreasury(repId, name);
