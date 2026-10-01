@@ -5,6 +5,7 @@
    ════════════════════════════════════════════════════════════ */
 
 let _whList = [];
+let _whBr = { show: false, list: [] };   // اسم فرع كل مخزن بيظهر بس لما يبقى فيه أكتر من فرع نشط (branches.js)
 
 function whFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -16,6 +17,8 @@ async function renderWarehouses(c) {
             sb.from('inventory_stock').select('warehouse_id, qty, products(purchase_price)'),
         ]);
         _whList = warehouses || [];
+        try { _whBr = (typeof brIsMulti === 'function' && await brIsMulti()) ? { show: true, list: (await brLoad()).list } : { show: false, list: [] }; }
+        catch { _whBr = { show: false, list: [] }; }
 
         const stockByWh = {};
         (stock||[]).forEach(s => {
@@ -51,6 +54,7 @@ function whRenderPage(c, stockByWh) {
                         <div>
                             <div style="font-weight:800;font-size:15px">${w.name}</div>
                             ${w.is_main ? '<span class="dash-badge dash-badge-green" style="margin-top:4px;display:inline-block">⭐ المخزن الرئيسي</span>' : ''}
+                            ${_whBr.show && w.branch_id ? `<div style="font-size:12px;color:var(--inv-muted);margin-top:4px">🏬 ${String(brName(_whBr.list, w.branch_id)).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}</div>` : ''}
                         </div>
                         <div style="display:flex;gap:4px">
                             <button class="cc-edit" onclick="whOpenEdit('${w.id}')">✏️</button>
@@ -69,7 +73,10 @@ function whRenderPage(c, stockByWh) {
 window.whOpenAdd = function() { whOpenModal(null); };
 window.whOpenEdit = function(id) { const w = _whList.find(x=>x.id===id); if (w) whOpenModal(w); };
 
-function whOpenModal(w) {
+async function whOpenModal(w) {
+    // اختيار الفرع بيظهر بس لما يبقى فيه أكتر من فرع نشط (branches.js)؛ لو فرع واحد القاعدة بتحط الرئيسي تلقائياً
+    let brHtml = '';
+    try { brHtml = typeof brSelectHtml === 'function' ? await brSelectHtml('whBranch', w?.branch_id) : ''; } catch { brHtml = ''; }
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
     modal.id = 'whModal';
@@ -80,6 +87,7 @@ function whOpenModal(w) {
             <div class="mod-modal-body">
                 <div class="mod-form-group"><label>اسم المخزن *</label>
                     <input type="text" id="whName" class="mod-form-input" value="${w?.name||''}" placeholder="مثال: المخزن الرئيسي، فرع المهندسين"></div>
+                ${brHtml}
                 ${!w ? `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--inv-text-soft);margin-top:8px">
                     <input type="checkbox" id="whIsMain" style="width:auto"> تعيينه كمخزن رئيسي
                 </label>` : ''}
@@ -100,14 +108,16 @@ window.whSave = async function(editId) {
     const btn = document.querySelector('#whModal .mod-btn-primary');
     btn.innerText = '⏳ جاري الحفظ...'; btn.disabled = true;
     try {
+        const brSel = document.getElementById('whBranch');            // موجود بس لما فيه أكتر من فرع
+        const brExtra = brSel && brSel.value ? { branch_id: brSel.value } : {};
         if (editId) {
-            const { error } = await sb.from('warehouses').update({ name }).eq('id', editId);
+            const { error } = await sb.from('warehouses').update({ name, ...brExtra }).eq('id', editId);
             if (error) throw error;
         } else {
             const isMain = document.getElementById('whIsMain')?.checked || false;
             // لو هيتحدد كرئيسي، نشيل الصفة من المخزن الرئيسي القديم الأول
             if (isMain) await sb.from('warehouses').update({ is_main: false }).eq('is_main', true);
-            const { error } = await sb.from('warehouses').insert({ name, is_main: isMain });
+            const { error } = await sb.from('warehouses').insert({ name, is_main: isMain, ...brExtra });
             if (error) throw error;
         }
         document.getElementById('whModal').remove();
