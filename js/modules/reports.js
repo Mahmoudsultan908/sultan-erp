@@ -58,6 +58,7 @@ function balRvDueStatus(balance, dueStr, today) {
 // بيتوزّع على أحدث فواتير الآجل، وأي جزء مالوش فاتورة (رصيد افتتاحي/تحويل)
 // بيتحسب في خانة «+90 / افتتاحي».
 function balRvAging(balance, invoices, nowMs) {
+    // الحساب المحلي البديل (لو الدالة الدقيقة فشلت) دايماً 30/60/90؛ حدود الشرائح المضبوطة من الإعدادات بتيجي من fn_customer_aging_cfg
     const out = { b30: 0, b60: 0, b90: 0, b90p: 0 };
     let remaining = Number(balance) || 0;
     if (remaining <= 0.005) return out;
@@ -311,10 +312,13 @@ async function renderReports(container) {
         const repMap = nameMap(repRes), grpMap = nameMap(grpRes), clsMap = nameMap(clsRes), regMap = nameMap(regRes);
         const customers = custRes.data || [];
         // أعمار المديونية الدقيقة (FIFO) من قاعدة البيانات — لو الدالة مش متاحة نرجع للحساب المحلي التقريبي
-        const agRes = await sb.rpc('fn_customer_aging').then(r => r, () => ({ data: null, error: true }));
+        // fn_customer_aging_cfg: نفس الحساب بشرائح من الإعدادات العامة (مؤشرات لوحة التحكم → شرائح أعمار الديون)، وبترجّع الحدود المستخدمة في b1/b2/b3
+        const agRes = await sb.rpc('fn_customer_aging_cfg').then(r => r, () => ({ data: null, error: true }));
         const agMap = {};
         if (!agRes.error && Array.isArray(agRes.data)) agRes.data.forEach(a => { agMap[a.customer_id] = a; });
         const agExact = !agRes.error && Array.isArray(agRes.data);
+        const agFirst = agExact ? agRes.data[0] : null;
+        const agBd = agFirst ? [Number(agFirst.b1) || 30, Number(agFirst.b2) || 60, Number(agFirst.b3) || 90] : [30, 60, 90];
         const debtorIds = customers.filter(x => Number(x.balance) > 0.005).map(x => x.id);
         const salesBy = {}, payBy = {};
         if (debtorIds.length) {
@@ -340,7 +344,7 @@ async function renderReports(container) {
                 cls: clsMap[cu.classification_id] || '', region: regMap[cu.region_id] || '',
                 bal, limit: Number(cu.credit_limit) || 0, due, dueDate: balRvDateStr(cu.payment_due_date), lim,
                 ag: agMap[cu.id]
-                    ? { b30: Number(agMap[cu.id].b0_30) || 0, b60: Number(agMap[cu.id].b31_60) || 0, b90: Number(agMap[cu.id].b61_90) || 0, b90p: Number(agMap[cu.id].b90p) || 0, open: Number(agMap[cu.id].opening_undated) || 0 }
+                    ? { b30: Number(agMap[cu.id].bucket1) || 0, b60: Number(agMap[cu.id].bucket2) || 0, b90: Number(agMap[cu.id].bucket3) || 0, b90p: Number(agMap[cu.id].bucket4) || 0, open: Number(agMap[cu.id].opening_undated) || 0 }
                     : Object.assign(balRvAging(bal, inv, nowMs), { open: 0 }),
                 locked: !!cu.debt_locked,
                 lastInv: inv[0] || null, lastPay: pays[0] || null,
@@ -395,7 +399,7 @@ async function renderReports(container) {
             const countEl = document.getElementById('cs-count'); if (countEl) countEl.textContent = list.length + ' عميل';
             body.innerHTML = !list.length ? `<tr><td colspan="11" class="empty-state"><span>👥</span>لا يوجد عملاء مطابقين</td></tr>` :
                 list.map(r => {
-                    const ag = r.bal > 0.005 ? [['0-30', r.ag.b30], ['31-60', r.ag.b60], ['61-90', r.ag.b90], ['+90', r.ag.b90p], ['افتتاحي', r.ag.open || 0]].filter(x => x[1] > 0.005).map(x => `<div>${x[0]}: <b>${fmt(x[1])}</b></div>`).join('') : '';
+                    const ag = r.bal > 0.005 ? [[`0-${agBd[0]}`, r.ag.b30], [`${agBd[0] + 1}-${agBd[1]}`, r.ag.b60], [`${agBd[1] + 1}-${agBd[2]}`, r.ag.b90], [`+${agBd[2]}`, r.ag.b90p], ['افتتاحي', r.ag.open || 0]].filter(x => x[1] > 0.005).map(x => `<div>${x[0]}: <b>${fmt(x[1])}</b></div>`).join('') : '';
                     const lastPay = r.lastPay ? `${balRvDateStr(r.lastPay.created_at)}<div><b>${fmt(r.lastPay.amount)}</b> · ${balRvAgo(Math.max(0, Math.floor((nowMs - new Date(r.lastPay.created_at).getTime()) / 86400000)))}</div>` : (r.bal > 0.005 ? '<span style="color:var(--inv-red)">لم يسدد</span>' : '');
                     const wa = balRvWaLink(r.phone);
                     const phone = r.phone ? `<a href="tel:${balRvEsc(r.phone)}" style="color:inherit;text-decoration:none;direction:ltr;unicode-bidi:embed">${balRvEsc(r.phone)}</a>${wa ? ` <a href="${wa}" target="_blank" rel="noopener" title="واتساب" style="text-decoration:none">💬</a>` : ''}` : '<span style="color:var(--inv-muted)">—</span>';
@@ -423,11 +427,11 @@ async function renderReports(container) {
                 <button class="cc-edit" onclick="window._csPrint()">🖨️ طباعة</button>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${selHtml('المجموعة', 'group')}${selHtml('التصنيف', 'cls')}${selHtml('المندوب', 'rep')}${selHtml('المنطقة', 'region')}<button class="cc-edit" onclick="window._csResetFilters()">↺ مسح الفلاتر</button></div>
-            <div style="font-size:12px;color:var(--inv-muted);margin-top:8px">الأعمار (FIFO): كل سداد (تحصيل + خصم + مرتجع آجل + تحويل صادر) بيغطي الأقدم أول، والدين الافتتاحي اللي مالوش فاتورة هو الأقدم وبيظهر لوحده في خانة «افتتاحي» بدل ما يتخلط مع +90. الدفعة المستهدفة: يومي = المحصّل النهارده، أسبوعي = آخر ٧ أيام، شهري = من أول الشهر. الأولوية: 1 عاجل = متأخر أو فوق الحد أو موقوف، 2 مهم = بدون ميعاد/حد ورصيد ≥ ١٬٠٠٠.</div>
+            <div style="font-size:12px;color:var(--inv-muted);margin-top:8px">الأعمار (FIFO): كل سداد (تحصيل + خصم + مرتجع آجل + تحويل صادر) بيغطي الأقدم أول، والدين الافتتاحي اللي مالوش فاتورة هو الأقدم وبيظهر لوحده في خانة «افتتاحي» بدل ما يتخلط مع +${agBd[2]}. الدفعة المستهدفة: يومي = المحصّل النهارده، أسبوعي = آخر ٧ أيام، شهري = من أول الشهر. الأولوية: 1 عاجل = متأخر أو فوق الحد أو موقوف، 2 مهم = بدون ميعاد/حد ورصيد ≥ ١٬٠٠٠.</div>
         </div>
         <div id="cs-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px"></div>
         <div class="dash-card" style="padding:10px 14px;margin-bottom:12px;font-size:13px">
-            أعمار المديونية: 0-30 يوم <b>${fmt(ageTot.b30)}</b> · 31-60 <b>${fmt(ageTot.b60)}</b> · 61-90 <b>${fmt(ageTot.b90)}</b> · +90 <b>${fmt(ageTot.b90p)}</b> · افتتاحي غير مؤرَّخ <b>${fmt(ageTot.open)}</b> · الأقدم من 30 يوم: <b style="color:${olderPct > 20 ? 'var(--inv-red)' : 'var(--inv-green)'}">${olderPct.toFixed(1)}%</b>
+            أعمار المديونية: 0-${agBd[0]} يوم <b>${fmt(ageTot.b30)}</b> · ${agBd[0] + 1}-${agBd[1]} <b>${fmt(ageTot.b60)}</b> · ${agBd[1] + 1}-${agBd[2]} <b>${fmt(ageTot.b90)}</b> · +${agBd[2]} <b>${fmt(ageTot.b90p)}</b> · افتتاحي غير مؤرَّخ <b>${fmt(ageTot.open)}</b> · الأقدم من ${agBd[0]} يوم: <b style="color:${olderPct > 20 ? 'var(--inv-red)' : 'var(--inv-green)'}">${olderPct.toFixed(1)}%</b>
             ${agExact ? '' : '<div style="font-size:11.5px;color:var(--inv-muted);margin-top:4px">⚠️ تقدير محلي تقريبي (تعذّر تحميل الحساب الدقيق من قاعدة البيانات).</div>'}
         </div>
         <div style="font-size:12px;color:var(--inv-muted);margin:0 4px 6px" id="cs-count"></div>
@@ -448,7 +452,7 @@ async function renderReports(container) {
             'العميل': r.name, 'التليفون': r.phone, 'المجموعة': r.group, 'التصنيف': r.cls, 'المنطقة': r.region, 'المندوب': r.rep,
             'الرصيد': r.bal, 'الحد الائتماني': r.limit, 'تجاوز الحد': r.lim.over,
             'ميعاد الاستحقاق': r.dueDate, 'حالة الاستحقاق': r.due.label, 'موقوف': r.locked ? 'نعم' : 'لا',
-            '0-30': r.ag.b30, '31-60': r.ag.b60, '61-90': r.ag.b90, '+90': r.ag.b90p, 'افتتاحي غير مؤرَّخ': r.ag.open || 0,
+            [`0-${agBd[0]}`]: r.ag.b30, [`${agBd[0] + 1}-${agBd[1]}`]: r.ag.b60, [`${agBd[1] + 1}-${agBd[2]}`]: r.ag.b90, [`+${agBd[2]}`]: r.ag.b90p, 'افتتاحي غير مؤرَّخ': r.ag.open || 0,
             'الدفعة المستهدفة': r.target || '', 'دورية الهدف': r.target ? balRvSchedLabel(r.sched) : '', 'المحصّل في فترة الهدف': r.target ? r.collected : '',
             'آخر فاتورة آجل': r.lastInv ? balRvDateStr(r.lastInv.created_at) : '', 'آخر تحصيل': r.lastPay ? balRvDateStr(r.lastPay.created_at) : '',
             'قيمة آخر تحصيل': r.lastPay ? Number(r.lastPay.amount) : '', 'الأولوية': balRvPriorityLabel(r.pr)

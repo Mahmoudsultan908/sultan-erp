@@ -49,6 +49,11 @@ async function renderDashboard(container) {
         // البيع الفعلية (مش رقم مُدخَل يدويًا)، يُستخدم فى معادلة هدف المبيعات تحت
         const marginWindowStart = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
 
+        // ★ مؤشرات المتابعة الجديدة (مقارنة بالشهر السابق، أعمار الديون، هامش الأصناف/العملاء/المناديب،
+        //   تنبيهات) — دالة واحدة fn_dashboard_insights في القاعدة، بتتجاب بالتوازي مع باقي الاستعلامات.
+        //   لو فشلت (مثلاً صلاحية الدور) القسم بيختفي بس واللوحة الأساسية تكمل عادي.
+        const dashInsightsPromise = sb.rpc('fn_dashboard_insights').then(r => (r.error ? null : r.data), () => null);
+
         const [
             { data: cashData },
             { data: salesToday },
@@ -141,6 +146,8 @@ async function renderDashboard(container) {
                 q.in('account_code', ['1001','1002','1003','1004','1005','2001','2002'])
                     .lte('journal_entries.entry_date', today)),
         ]);
+
+        const dashIns = await dashInsightsPromise;
 
         // ── تجميع مبيعات آخر 30 يوم يوميًا (تعبئة الأيام الفاضية بصفر) ──
         const dayBuckets = {};
@@ -291,6 +298,8 @@ async function renderDashboard(container) {
                     </div>
                 </div>
             </div>
+
+            ${dashInsightsHTML(dashIns, monthName)}
 
             <!-- اتجاه المبيعات + هدف المبيعات الشهري: جنب بعض فى بداية الصفحة -->
             <div class="dash-row">
@@ -473,6 +482,109 @@ async function renderDashboard(container) {
             <button class="dash-refresh" onclick="renderDashboard(document.getElementById('app-content'))" style="margin-top:12px">إعادة المحاولة</button>
         </div>`;
     }
+}
+
+// ════════════════════════════════════════════════════════════
+// مؤشرات المتابعة — بتعرض نتيجة fn_dashboard_insights (قاعدة البيانات)
+// نفس تعريفات اللوحة: الربح = صافي المبيعات − تكلفة البضاعة − المصروفات − خصومات التحصيل.
+// مقارنة الفترة السابقة وراكد العملاء/الأصناف بيظهروا تلقائياً لما يتجمع تاريخ كفاية.
+// ════════════════════════════════════════════════════════════
+function dashInsFmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function dashInsEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function dashInsDelta(cur, prev) {
+    cur = Number(cur) || 0; prev = Number(prev) || 0;
+    if (!prev) return '<span style="color:var(--inv-muted)">—</span>';
+    const pct = (cur - prev) / Math.abs(prev) * 100;
+    const good = pct >= 0;
+    return `<span style="color:${good ? 'var(--inv-green)' : 'var(--inv-red)'};font-weight:700">${good ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}%</span>`;
+}
+
+function dashInsightsHTML(ins, monthName) {
+    if (!ins) return '';
+    const f = dashInsFmt, e = dashInsEsc;
+    const cur = ins.current || {}, prev = ins.previous || null;
+    const hist = Number(ins.history_days) || 0;
+
+    // ── مقارنة الشهر الحالي بنفس الفترة من الشهر السابق ──
+    const cmp = (label, key, fmtFn) => `
+        <div style="flex:1;min-width:140px">
+            <div style="font-size:12px;color:var(--inv-muted)">${label}</div>
+            <div style="font-size:19px;font-weight:800;color:var(--inv-navy)">${fmtFn(cur[key])}</div>
+            <div style="font-size:12px">${prev ? dashInsDelta(cur[key], prev[key]) + ` <span style="color:var(--inv-muted)">(قبل: ${fmtFn(prev[key])})</span>` : '<span style="color:var(--inv-muted)">—</span>'}</div>
+        </div>`;
+    const cmpNote = prev
+        ? `مقارنة ${e(cur.from)} → ${e(cur.to)} بنفس الفترة ${e(prev.from)} → ${e(prev.to)}`
+        : 'المقارنة بالشهر السابق هتظهر أول ما يتجمع بيانات شهر سابق في النظام';
+
+    // ── أعمار الديون ──
+    const a = ins.aging || {};
+    // حدود الشرائح جاية من الإعدادات (الإعدادات العامة → مؤشرات لوحة التحكم)؛ الافتراضي 30/60/90
+    const bd = (Array.isArray(a.bounds) && a.bounds.length === 3) ? a.bounds.map(Number) : [30, 60, 90];
+    const bk = Array.isArray(a.buckets) ? a.buckets : [0, 0, 0, 0];
+    const buckets = [
+        [`0 – ${bd[0]} يوم`, bk[0], 'var(--inv-green)'],
+        [`${bd[0] + 1} – ${bd[1]} يوم`, bk[1], 'var(--inv-gold)'],
+        [`${bd[1] + 1} – ${bd[2]} يوم`, bk[2], '#EA580C'],
+        [`أكثر من ${bd[2]} يوم`, bk[3], 'var(--inv-red)'],
+        ['رصيد افتتاحي غير مؤرخ', a.opening_undated, 'var(--inv-muted)'],
+    ];
+    const maxB = Math.max(1, ...buckets.map(b => Number(b[1]) || 0));
+    const agingHTML = (Number(a.open_total) || 0) > 0 ? buckets.map(([lbl, v, col]) => `
+        <div style="margin:7px 0">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px"><span>${lbl}</span><b>${f(v)}</b></div>
+            <div style="height:7px;border-radius:4px;background:var(--inv-bg);margin-top:3px"><div style="height:7px;border-radius:4px;width:${Math.round((Number(v) || 0) / maxB * 100)}%;background:${col}"></div></div>
+        </div>`).join('') + `<div style="font-size:12px;color:var(--inv-muted);margin-top:8px">إجمالي الديون المفتوحة ${f(a.open_total)} — ${a.customers_with_debt || 0} عميل</div>`
+        : '<p class="dash-empty">لا توجد ديون مفتوحة ✅</p>';
+
+    // ── قوائم الهامش ──
+    const list = (rows, empty) => (rows && rows.length) ? rows.map(r => `
+        <div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:12.5px;border-bottom:1px solid var(--inv-bg)">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e(r.name)}</span>
+            <span style="white-space:nowrap;color:${Number(r.profit) < 0 ? 'var(--inv-red)' : 'var(--inv-text)'}"><b>${f(r.profit)}</b>${r.margin_pct != null ? ` <span style="color:var(--inv-muted)">(${r.margin_pct}%)</span>` : ''}</span>
+        </div>`).join('') : `<p class="dash-empty">${empty}</p>`;
+    const top = ins.top_products || [];
+    const bottom = (ins.bottom_products || []).filter(p => !top.some(t => t.name === p.name));
+
+    // ── تنبيهات ──
+    const b = ins.below_cost || {};
+    const alerts = [];
+    if ((b.lines || 0) > 0) alerts.push(['var(--inv-red)', `🚨 ${b.lines} سطر بيع <b>تحت التكلفة</b> هذا الشهر — خسارة ${f(b.loss)}`]);
+    const rt = ins.returns || {};
+    // الأرقام (أيام الركود / حد تحذير المرتجعات) جاية من الإعدادات → الإعدادات العامة → "مؤشرات اللوحة"
+    const st = ins.settings || {};
+    const dormantDays = Number(st.dormant_days) || 30;
+    const slowDays = Number(st.slow_stock_days) || 60;
+    const retWarn = st.returns_warn_pct != null ? Number(st.returns_warn_pct) : 5;
+    if (rt.pct != null) alerts.push([rt.pct > retWarn ? 'var(--inv-gold)' : 'var(--inv-muted)', `↩️ المرتجعات ${rt.pct}% من المبيعات (${f(rt.returns)})`]);
+    alerts.push(ins.dormant
+        ? ['var(--inv-gold)', `😴 ${ins.dormant.count} عميل لم يشتروا منذ ${dormantDays} يوم — أرصدتهم ${f(ins.dormant.balance)}`]
+        : ['var(--inv-muted)', `😴 العملاء الراكدون: يظهر بعد ${dormantDays} يوم من التشغيل (متبقي ${Math.max(0, dormantDays - hist)} يوم)`]);
+    alerts.push(ins.slow_stock
+        ? ['var(--inv-gold)', `🐢 ${ins.slow_stock.count} صنف راكد (لا مبيعات ${slowDays} يوم) بقيمة ${f(ins.slow_stock.value)}`]
+        : ['var(--inv-muted)', `🐢 الأصناف الراكدة: تظهر بعد ${slowDays} يوم من التشغيل (متبقي ${Math.max(0, slowDays - hist)} يوم)`]);
+
+    return `
+    <div class="dash-card" style="margin-bottom:18px">
+        <div class="dash-card-header"><span>🔎 مؤشرات المتابعة — ${monthName} حتى اليوم</span></div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+            ${cmp('صافي المبيعات', 'net_sales', f)}
+            ${cmp('الربح', 'profit', f)}
+            ${cmp('عدد الفواتير', 'invoices', v => String(Number(v) || 0))}
+            ${cmp('متوسط الفاتورة', 'avg_invoice', f)}
+        </div>
+        <div style="font-size:11.5px;color:var(--inv-muted);margin-top:10px">${cmpNote}</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:5px">
+            ${alerts.map(([col, html]) => `<div style="font-size:12.5px;color:${col}">${html}</div>`).join('')}
+        </div>
+    </div>
+    <div class="dash-row">
+        <div class="dash-card"><div class="dash-card-header"><span>⏳ أعمار الديون</span></div>${agingHTML}</div>
+        <div class="dash-card"><div class="dash-card-header"><span>📦 أعلى الأصناف ربحاً</span></div>${list(top, 'لا مبيعات هذا الشهر بعد')}
+            ${bottom.length ? `<div style="font-size:12px;font-weight:800;color:var(--inv-navy);margin:12px 0 4px">الأقل ربحاً / الخاسرة</div>${list(bottom, '')}` : ''}</div>
+        <div class="dash-card"><div class="dash-card-header"><span>👥 أعلى العملاء ربحاً</span></div>${list(ins.top_customers, 'لا مبيعات هذا الشهر بعد')}</div>
+        <div class="dash-card"><div class="dash-card-header"><span>🚗 الربح حسب المندوب</span></div>${list(ins.by_rep, 'لا مبيعات هذا الشهر بعد')}</div>
+    </div>`;
 }
 
 function dashFmtTrend(n) {

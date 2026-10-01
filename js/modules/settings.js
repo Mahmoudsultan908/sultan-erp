@@ -58,6 +58,30 @@ async function renderSettings(container) {
             </div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
+                <h3 style="margin:0 0 16px;font-size:15px">📊 مؤشرات لوحة التحكم</h3>
+                <label class="ob-label">العميل الراكد: عدد الأيام بدون شراء</label>
+                <input type="number" id="set-dash-dormant-days" class="ob-input" style="max-width:250px" value="${get('dash_dormant_customer_days','30')}" min="1" max="365" step="1">
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">العميل اللي اشترى قبل كده ومشترّاش خلال العدد ده من الأيام بيتحسب "راكد" في اللوحة (من 1 إلى 365، الافتراضي 30). بيظهر بعد ما يعدّي نفس العدد من الأيام على تشغيل النظام.</p>
+                <label class="ob-label" style="margin-top:14px">الصنف الراكد: عدد الأيام بدون بيع</label>
+                <input type="number" id="set-dash-slow-days" class="ob-input" style="max-width:250px" value="${get('dash_slow_stock_days','60')}" min="1" max="730" step="1">
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">الصنف اللي له مخزون ومتباعش خلال العدد ده من الأيام بيتحسب "راكد" (من 1 إلى 730، الافتراضي 60).</p>
+                <label class="ob-label" style="margin-top:14px">تحذير المرتجعات: النسبة من المبيعات (%)</label>
+                <input type="number" id="set-dash-returns-warn" class="ob-input" style="max-width:250px" value="${get('dash_returns_warn_pct','5')}" min="0" max="100" step="0.5">
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">لو المرتجعات عدّت النسبة دي من مبيعات الشهر، سطرها في اللوحة بيتلوّن بالأصفر (الافتراضي 5%).</p>
+                <label class="ob-label" style="margin-top:14px">شرائح أعمار الديون (بالأيام)</label>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                    <span style="font-size:13px">حتى</span>
+                    <input type="number" id="set-dash-aging-1" class="ob-input" style="width:90px" value="${get('dash_aging_days_1','30')}" min="1" max="3650" step="1">
+                    <span style="font-size:13px">ثم حتى</span>
+                    <input type="number" id="set-dash-aging-2" class="ob-input" style="width:90px" value="${get('dash_aging_days_2','60')}" min="1" max="3650" step="1">
+                    <span style="font-size:13px">ثم حتى</span>
+                    <input type="number" id="set-dash-aging-3" class="ob-input" style="width:90px" value="${get('dash_aging_days_3','90')}" min="1" max="3650" step="1">
+                    <span style="font-size:13px">وبعدها "أكثر من"</span>
+                </div>
+                <p style="font-size:12px;color:var(--inv-muted-light);margin-top:6px">بتحدد شرائح كارت "أعمار الديون" في اللوحة (الافتراضي 30 / 60 / 90). لازم الأرقام تتزايد (الأول أصغر من التاني وهكذا). الشرائح دي بتتطبق كمان على كشف حساب العميل وتقرير "أرصدة العملاء" (لو الحساب الدقيق تعذّر تحميله، الحساب التقريبي البديل بيستخدم 30/60/90).</p>
+            </div>
+
+            <div class="dash-card" style="padding:24px;margin-top:16px">
                 <h3 style="margin:0 0 16px;font-size:15px">🛒 إعدادات سلطانو</h3>
                 <label class="ob-label">الحد الأدنى العام للطلب (ج.م)</label>
                 <input type="number" id="set-sultano-min-order" class="ob-input" style="max-width:250px" value="${get('sultanoo_min_order_amount','0')}" min="0" step="10">
@@ -88,6 +112,24 @@ async function renderSettings(container) {
         </div>`;
 
         window.settSaveAll = async () => {
+            // مؤشرات اللوحة: نتأكد من المدى قبل الحفظ (القاعدة كمان بترجع للافتراضي لو القيمة برا المدى)
+            const dashRange = (id, label, min, max) => {
+                const v = parseFloat(document.getElementById(id).value);
+                if (!(v >= min && v <= max)) { alert(`❌ ${label}: لازم رقم بين ${min} و ${max}`); return null; }
+                return v;
+            };
+            const dashDormant = dashRange('set-dash-dormant-days', 'أيام العميل الراكد', 1, 365);
+            const dashSlow = dashRange('set-dash-slow-days', 'أيام الصنف الراكد', 1, 730);
+            const dashRetWarn = dashRange('set-dash-returns-warn', 'نسبة تحذير المرتجعات', 0, 100);
+            const dashAg1 = dashRange('set-dash-aging-1', 'الشريحة الأولى (أيام)', 1, 3650);
+            const dashAg2 = dashRange('set-dash-aging-2', 'الشريحة الثانية (أيام)', 1, 3650);
+            const dashAg3 = dashRange('set-dash-aging-3', 'الشريحة الثالثة (أيام)', 1, 3650);
+            if (dashDormant === null || dashSlow === null || dashRetWarn === null
+                || dashAg1 === null || dashAg2 === null || dashAg3 === null) return;
+            if (!(dashAg1 < dashAg2 && dashAg2 < dashAg3)) {
+                alert('❌ شرائح أعمار الديون: لازم تتزايد (الأولى أصغر من الثانية والثانية أصغر من الثالثة)');
+                return;
+            }
             const entries = [
                 { key: 'company_name', value: document.getElementById('set-company-name').value },
                 { key: 'company_phone', value: document.getElementById('set-company-phone').value },
@@ -98,6 +140,12 @@ async function renderSettings(container) {
                 { key: 'system_start_date', value: document.getElementById('set-system-start').value },
                 { key: 'daily_sales_target', value: document.getElementById('set-daily-sales-target').value },
                 { key: 'monthly_target_profit_margin', value: document.getElementById('set-monthly-target-margin').value },
+                { key: 'dash_dormant_customer_days', value: String(dashDormant) },
+                { key: 'dash_slow_stock_days', value: String(dashSlow) },
+                { key: 'dash_returns_warn_pct', value: String(dashRetWarn) },
+                { key: 'dash_aging_days_1', value: String(dashAg1) },
+                { key: 'dash_aging_days_2', value: String(dashAg2) },
+                { key: 'dash_aging_days_3', value: String(dashAg3) },
                 { key: 'sultanoo_min_order_amount', value: document.getElementById('set-sultano-min-order').value },
                 { key: 'sultanoo_loyalty_enabled', value: document.getElementById('set-loyalty-enabled').checked },
                 { key: 'sultanoo_loyalty_points_per_egp', value: document.getElementById('set-loyalty-rate').value },
