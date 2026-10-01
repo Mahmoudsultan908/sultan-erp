@@ -33,7 +33,8 @@ function custDetLimitState(balance, limit) {
 // أعمار المديونية بافتراض إن السداد بيغطي الأقدم أول (FIFO) — نفس منطق
 // شاشة "أرصدة العملاء"، وأي جزء بدون فاتورة يتحسب في "+90/افتتاحي".
 function custDetAging(balance, sales, nowMs) {
-    const out = { b30: 0, b60: 0, b90: 0, b90p: 0, opening: 0, source: 'js' };
+    // bounds: حدود الشرائح (الحساب المحلي البديل دايماً 30/60/90؛ الحساب الدقيق من القاعدة بيرجّع الحدود المضبوطة من الإعدادات)
+    const out = { b30: 0, b60: 0, b90: 0, b90p: 0, opening: 0, source: 'js', bounds: [30, 60, 90] };
     let remaining = Number(balance) || 0;
     if (remaining <= 0.005) return out;
     const inv = (sales || []).filter(s => s.status === 'confirmed' && s.payment_type === 'credit').slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -48,11 +49,13 @@ function custDetAging(balance, sales, nowMs) {
     if (remaining > 0.005) out.b90p += remaining;
     return out;
 }
-// صف fn_customer_aging → نفس شكل custDetAging (+ opening = دين افتتاحي غير مؤرَّخ، وsource='db')
+// صف fn_customer_aging_cfg → نفس شكل custDetAging (+ opening = دين افتتاحي غير مؤرَّخ، وsource='db').
+// أسماء الحقول (b30/b60/b90/b90p) هي الشرائح 1..4 بالترتيب، وحدودها الفعلية (من الإعدادات) في bounds.
 function custDetAgingFromRpc(row) {
     if (!row) return null;
-    return { b30: Number(row.b0_30) || 0, b60: Number(row.b31_60) || 0, b90: Number(row.b61_90) || 0, b90p: Number(row.b90p) || 0,
-             opening: Number(row.opening_undated) || 0, source: 'db' };
+    return { b30: Number(row.bucket1) || 0, b60: Number(row.bucket2) || 0, b90: Number(row.bucket3) || 0, b90p: Number(row.bucket4) || 0,
+             opening: Number(row.opening_undated) || 0, source: 'db',
+             bounds: [Number(row.b1) || 30, Number(row.b2) || 60, Number(row.b3) || 90] };
 }
 function custDetPeriodStart(sched, nowMs) {
     const d = new Date(nowMs);
@@ -176,8 +179,8 @@ window.custShowStatement = async function(customerId) {
             cust.classification_id ? sb.from('customer_classifications').select('name').eq('id', cust.classification_id).single().then(r => r, () => ({ data: null })) : Promise.resolve({ data: null }),
             cust.region_id ? sb.from('customer_regions').select('name').eq('id', cust.region_id).single().then(r => r, () => ({ data: null })) : Promise.resolve({ data: null }),
             (cust.default_rep_id || cust.primary_rep_id) ? sb.from('sales_reps').select('name').eq('id', cust.default_rep_id || cust.primary_rep_id).single().then(r => r, () => ({ data: null })) : Promise.resolve({ data: null }),
-            // أعمار المديونية الدقيقة من قاعدة البيانات (fn_customer_aging) — لو فشلت نرجع للحساب المحلي التقريبي
-            sb.rpc('fn_customer_aging', { p_customer_id: customerId }).then(r => r, () => ({ data: null, error: true })),
+            // أعمار المديونية الدقيقة من قاعدة البيانات (fn_customer_aging_cfg — شرائحها من الإعدادات العامة) — لو فشلت نرجع للحساب المحلي التقريبي
+            sb.rpc('fn_customer_aging_cfg', { p_customer_id: customerId }).then(r => r, () => ({ data: null, error: true })),
         ]);
         // ── بطاقة تفاصيل العميل: حد ائتماني/استحقاق/أعمار/دفعة مستهدفة (بند 2026-09-21) ──
         const custDetNow = Date.now(), custDetTodayD = custDetToday();
@@ -540,8 +543,9 @@ function custStmtAgingBarHtml() {
     if (tot <= 0.005) return '';
     const seg = (v, col) => v > 0.005 ? `<div title="${custFmt(v)}" style="width:${v/tot*100}%;background:${col}"></div>` : '';
     const exact = ag.source === 'db';
+    const bd = (Array.isArray(ag.bounds) && ag.bounds.length === 3) ? ag.bounds : [30, 60, 90];
     return `<div class="dash-card" style="padding:10px 14px;margin-bottom:14px;font-size:12.5px">
-        أعمار المديونية (FIFO — السداد بيغطي الأقدم أولاً): 0-30 يوم <b>${custFmt(ag.b30)}</b> · 31-60 <b>${custFmt(ag.b60)}</b> · 61-90 <b>${custFmt(ag.b90)}</b> · ${exact ? '+90' : '+90/افتتاحي'} <b>${custFmt(ag.b90p)}</b>${exact ? ` · افتتاحي غير مؤرَّخ <b>${custFmt(opening)}</b>` : ''}
+        أعمار المديونية (FIFO — السداد بيغطي الأقدم أولاً): 0-${bd[0]} يوم <b>${custFmt(ag.b30)}</b> · ${bd[0] + 1}-${bd[1]} <b>${custFmt(ag.b60)}</b> · ${bd[1] + 1}-${bd[2]} <b>${custFmt(ag.b90)}</b> · ${exact ? '+' + bd[2] : '+' + bd[2] + '/افتتاحي'} <b>${custFmt(ag.b90p)}</b>${exact ? ` · افتتاحي غير مؤرَّخ <b>${custFmt(opening)}</b>` : ''}
         <div style="display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--inv-border);margin-top:6px">${seg(opening,'#64748B')}${seg(ag.b90p,'#DC2626')}${seg(ag.b90,'#EA580C')}${seg(ag.b60,'#D97706')}${seg(ag.b30,'#059669')}</div>
         ${exact ? '' : '<div style="font-size:11px;color:var(--inv-muted);margin-top:4px">تقدير محلي تقريبي (تعذّر تحميل الحساب الدقيق).</div>'}
     </div>`;
