@@ -38,7 +38,7 @@
 - **المخزون:** `warehouses` (المخزن الرئيسي + "المكنة"), `inventory_stock`, `van_stock` (مخزون عربية كل مندوب — منفصل), `van_stock_loads/returns/counts*`, `stock_transfers*`, `inventory_transfers*` (الأخير غير مستخدم), `stock_counts*`.
 - **المالية:** `accounts` (شجرة حسابات), `journal_entries/lines`, `cash_transactions`, `treasuries` (8 خزن، منها خزنة لكل مندوب), `treasury_transfers`, `balance_transfers`, `customer_payments` (سندات القبض الفعلية), `customer_collections` (**جدول قديم فارغ**), `supplier_payments`, `expenses`, `expense_categories`, `opening_balances`, `accrued_liabilities_manual`, `financial_events` (سجل تدقيق مالي).
 - **المستثمرون:** `capital_partners`, `capital_partner_transactions`, `investor_profit_snapshots_v2` + `_lines` (النسخة v1 `investor_profit_snapshots` قديمة/فارغة).
-- **المندوبون:** `rep_routes`, `rep_route_customers`, `rep_visits`, `rep_day_closings` (unique rep_id+close_date), `rep_invoice_offers`.
+- **المندوبون:** `rep_routes`, `rep_route_customers`, `rep_visits`, `rep_standard_loads` (الحمولة القياسية لكل مندوب، قراءة فقط والكتابة بـ`fn_save_standard_load`), `rep_day_closings` (unique rep_id+close_date), `rep_invoice_offers`.
 - **سلطانو:** `customer_orders/_items`, `customer_carts`, `banners`, `push_subscriptions`, `loyalty_points_ledger`.
 - **أخرى:** `app_settings` (jsonb، ~27 مفتاح)، `system_settings`, `attendance_records`, `employee_evaluations`, `employee_incentives`, `archive_documents`, `private_chat_*`, `tasks/messages/conversations/notifications` (بقايا مشروع "workflow-hub" الأصلي), `activity_logs`.
 
@@ -54,6 +54,7 @@
 - **سلطانو (`fn_sultano_*`):** get_priced_products / categories / subcategories / areas / banners / settings / customer_by_phone / customer_account / orders / order_status / loyalty… (البحث بالتليفون لوحده اتقفل), `submit_order` (السعر يُحسب على السيرفر، فيه idempotency بـ `client_order_id`), `register_customer`, `request_customer_update`, `save/remove_push_subscription`, `sync_cart`, `clear_cart`, `check_cart_fulfilled`. `fn_loyalty_redeem_points` للأدمن.
 - **Triggers أساسية:** `trg_sale_status` / `trg_purchase_status` / `trg_*_return_status` / `trg_customer_payment_status` / `trg_payment_status` / `trg_expense_status` (تنشئ الخزنة والقيد والرصيد عند التأكيد/الإلغاء)، `trg_sale_item_insert` (المخزون + COGS)، `trg_sale_item_van_stock`, `trg_van_stock_load/return_item_apply`, `trg_treasury_transfer`, `trg_balance_transfer`, `trg_capital_partner_tx_apply`, `trg_block_edit_*` (منع تعديل المبالغ بعد التأكيد), `trg_customer_orders_award_loyalty_points`.
 - **تواريخ الاستحقاق (سبتمبر 2026):** `trg_sync_customer_due_date` على `sales` (الدالة `fn_sync_customer_due_date`) بتحدّث `customers.payment_due_date` تلقائياً من آخر فاتورة بيع آجلة مؤكدة: تاريخ الفاتورة نفسه، أو 7 أيام من يوم الفاتورة لو من غير تاريخ (فواتير المندوب). النقدي لا يغيّره، وعند إلغاء آخر فاتورة يرجع لتاريخ اللي قبلها.
+- **الحمولة القياسية للمندوب (أكتوبر 2026):** `fn_save_standard_load(p_items jsonb)` (SECURITY DEFINER، للمندوب النشط فقط، بتستبدل حمولته كلها ذرّياً) والجدول `rep_standard_loads` (RLS قراءة لصاحبها وللأدمن والمحاسب فقط، بدون كتابة مباشرة).
 - **Edge Function `telegram-notify`** (verify_jwt=true): تطبيق المناديب بيبعت رسائل/ملفات تيليجرام عن طريقها؛ التوكن ورقم الشات أسرار (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) على Supabase، ومفيش توكن في كود التطبيق.
 - **Edge Function:** `send-push-notification` (Web Push لعملاء سلطانو، VAPID، verify_jwt=true) — الكود في `supabase/functions/`.
 
@@ -112,7 +113,8 @@
 - **Idempotency:** `isDuplicateRefError` (23505 على ref) = نجاح سابق. البيع يمنع الأصناف غير الحقيقية (غير UUID). خزنة المندوب تُقرأ **حيّة وقت المزامنة**.
 - **سحب من ERP:** عملاء المندوب (primary/default rep) + أرصدتهم وحدود ائتمانهم و`debt_locked`، مخزون العربية (`van_stock`), خطوط السير، مستوى السعر/الأهداف/الخزنة. عميل جديد أو تعديل من المندوب يمر على `customer_change_requests` للمراجعة.
 - إشعارات **تيليجرام** (بوت) لكل عملية + طباعة/واتساب للفاتورة. تحميل العربية بنفسه (`van_stock_loads` بـ PIN).
-- SW `mandob-sultan-v18` cache-first لنفس الأصل فقط.
+- SW `mandob-sultan-v21` cache-first لنفس الأصل فقط (ارفع الرقم مع كل نشر).
+- **تبويب "🚛 حمّل" (أكتوبر 2026، مكان صفحة الطلبات القديمة اللي اتشالت):** المندوب بيحمّل عربيته بنفسه. نفس شكل صفحة الطلبات: شريط علوي بالعدد، بحث، فلاتر (الكل / على عربيتي / الناقص عن حمولتي)، عدّاد − و+ مع كتابة الكمية مباشرة وزرار "الكل"، والصف بيتحدّث مكانه من غير إعادة بناء القايمة. مراجعة الأصناف ثم **PIN التحميل** (`sales_reps.van_load_pin`)، وبيتحقق من الرصيد لحظياً قبل التنفيذ. أونلاين بس. التنفيذ بنفس منطق الـERP (`van_stock_loads` + `van_stock_load_items` والمخزون بيتحرك بالـtrigger). **"⭐ كمّل حمولتي"** بيملا السلة بـ(الحمولة القياسية − اللي على العربية) في حدود المتاح، و**"📌 اعتمدها حمولتي"** بيحفظ اللي هتبقى عليه العربية بعد التحميل كحمولة قياسية (بيستبدل القديمة ويحذّر لو الكميات هتقل) عن طريق `fn_save_standard_load`. لو جدول الحمولة القياسية مش موجود الصفحة بتشتغل وتحمّل، وزرارين الحمولة بس بيقولوا "مش مفعّلة".
 
 ## 5) تطبيق العملاء (`sultanoo`)
 
@@ -187,7 +189,7 @@
 - **خصوصية المستودعات** (Public حالياً).
 - **مفتاح Google القديم** يتمسح من Google Cloud (المالك).
 - **دمج أداة النسخة الاحتياطية في الـERP** بدل `settBackupNow` (أدمن فقط، تسحب صفحة صفحة وتقارن العدد) + زرار "تصدير بيانات الجهاز" في تطبيق المندوب (طابور المزامنة والمخزون المحلي).
-- **تسهيل تحميل المندوب لنفسه** في تطبيق المندوب (حالياً صنف صنف): نقاش مع المالك (استيراد Excel، تحميل آخر مرة، بالفئة/الشركة، باركود).
+- **متابعة تبويب "حمّل":** ننتظر ملاحظات المناديب بعد أول استخدام. أفكار محتملة: حمولة قياسية يحدّدها الأدمن من الـERP، باركود، إعادة آخر تحميلة، استيراد Excel داخل التطبيق.
 - **حفظ ملاحظات فاتورة البيع** في قاعدة البيانات (عمود + `fn_create_sale`).
 - توزيع الأرقام السرية لسلطانو على العملاء النشطين اللي ملهمش رقم.
 - تعيين مورد افتراضي للأصناف اللي موردها اتحذف في الإقفال.
