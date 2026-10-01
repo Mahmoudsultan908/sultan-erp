@@ -29,6 +29,7 @@ let invEditingOldCustId = null;
 let invEditingOldInvoiceNo = null;
 let invEditingOldSourceApp = null; // source_app الأصلي للفاتورة قبل التعديل — عشان نحافظ عليه (راجع التعليق فوق fn_create_sale)
 let invEditingOldDueDate = null;
+let invEditingOldNotes = null;
 let invEditingOldDiscount = 0;
 
 // المهلة الافتراضية لتاريخ استحقاق الفاتورة الآجلة (يوم) — قابلة للتعديل يدوي وقت البيع دايماً
@@ -313,7 +314,7 @@ async function renderSales(c) {
     invTreasuryId = INV_DB.treasuries?.find(t => t.is_default)?.id || null;
     invPriceLevelCode = 'RETAIL';
     invRepId = null;
-    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null; invEditingOldDueDate = null; invEditingOldDiscount = 0;
+    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null; invEditingOldNotes = null; invEditingOldDueDate = null; invEditingOldDiscount = 0;
     invPendingQuoteId = null;
     invPendingOrderId = null;
     invPendingOrderNo = null;
@@ -337,6 +338,7 @@ async function renderSales(c) {
                 invEditingOldInvoiceNo = oldSale.invoice_no;
                 invEditingOldSourceApp = oldSale.source_app;
                 invEditingOldDueDate = oldSale.due_date || null;
+                invEditingOldNotes = oldSale.notes || null;
                 invEditingOldDiscount = Number(oldSale.discount) || 0;
 
                 invItems = (oldSale.sale_items || []).map(it => ({
@@ -623,7 +625,7 @@ function invNotesCardHTML() {
     return `
     <div class="inv-card">
         <div class="inv-card-title">📝 ملاحظات</div>
-        <textarea class="inv-notes" id="invNotes" rows="2" placeholder="ملاحظات الفاتورة..."></textarea>
+        <textarea class="inv-notes" id="invNotes" rows="2" placeholder="ملاحظات الفاتورة...">${String(invEditingOldNotes || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</textarea>
     </div>`;
 }
 
@@ -1442,6 +1444,7 @@ async function invSave(andNew) {
                     customer_id: invCustId || null,
                     payment_type: invPayType,
                     due_date: invPayType === 'credit' ? (document.getElementById('invDueDate')?.value || null) : null,
+                    notes: (document.getElementById('invNotes')?.value || '').trim() || null,
                     subtotal, vat_amount: 0, total: net, discount: extra,
                     status: 'confirmed', warehouse_id: invWarehouseId,
                     rep_id: invNormalizeRepId(invRepId),
@@ -1570,10 +1573,15 @@ async function invSave(andNew) {
         //   في Supabase مش في الريبو، وتعديلها أخطر من تحديث بسيط بعد الإدراج) —
         //   بنحدّثه بـ UPDATE منفصل خفيف على نفس الصف بعد النجاح، مش جزء من
         //   الترانزاكشن المالية لأنه حقل معلوماتي بحت مالوش أثر على القيد/الرصيد.
-        if (invPayType === 'credit' && rpcRows?.[0]?.id) {
-            const dueDateVal = document.getElementById('invDueDate')?.value || null;
-            if (dueDateVal) {
-                try { await sb.from('sales').update({ due_date: dueDateVal }).eq('id', rpcRows[0].id); } catch {}
+        //   وملاحظات الفاتورة (sales.notes) بنفس الطريقة: UPDATE خفيف بعد نجاح الحفظ.
+        if (rpcRows?.[0]?.id) {
+            const saleExtra = {};
+            const dueDateVal = invPayType === 'credit' ? (document.getElementById('invDueDate')?.value || null) : null;
+            if (dueDateVal) saleExtra.due_date = dueDateVal;
+            const notesVal = (document.getElementById('invNotes')?.value || '').trim();
+            if (notesVal) saleExtra.notes = notesVal;
+            if (Object.keys(saleExtra).length) {
+                try { await sb.from('sales').update(saleExtra).eq('id', rpcRows[0].id); } catch {}
             }
         }
 
@@ -1980,8 +1988,13 @@ if (typeof registerSyncHandler === 'function') {
             if (rpcErr) return { ok: false, error: rpcErr.message, summary: `فاتورة ${tempInvoiceNo}` };
             const invoiceNo = rpcRows[0].invoice_no;
 
-            if (saleRow.payment_type === 'credit' && saleRow.due_date && rpcRows[0].id) {
-                try { await sb.from('sales').update({ due_date: saleRow.due_date }).eq('id', rpcRows[0].id); } catch {}
+            if (rpcRows[0].id) {
+                const extraUpd = {};
+                if (saleRow.payment_type === 'credit' && saleRow.due_date) extraUpd.due_date = saleRow.due_date;
+                if (saleRow.notes) extraUpd.notes = saleRow.notes;
+                if (Object.keys(extraUpd).length) {
+                    try { await sb.from('sales').update(extraUpd).eq('id', rpcRows[0].id); } catch {}
+                }
             }
 
             // لو الفاتورة دي جاية أصلاً من تحويل عرض سعر، اتعلّم "تم التحويل"

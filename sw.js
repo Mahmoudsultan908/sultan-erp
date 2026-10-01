@@ -8,7 +8,7 @@
 //     supabase-js/xlsx, الأيقونات) → cache-first مع تحديث في الخلفية،
 //     عشان التطبيق نفسه (مش بياناته) يفتح حتى بدون إنترنت.
 
-const SHELL_CACHE = 'sultan-erp-shell-v15';
+const SHELL_CACHE = 'sultan-erp-shell-v16';
 const SUPABASE_HOST = 'fanaozxqlodzfdgstwaz.supabase.co';
 
 const SHELL_URLS = [
@@ -59,6 +59,7 @@ const SHELL_URLS = [
     './js/modules/sales-reps.js',
     './js/modules/sales.js',
     './js/modules/settings.js',
+    './js/modules/backup.js',
     './js/modules/stock-transfer.js',
     './js/modules/suppliers.js',
     './js/modules/treasury.js',
