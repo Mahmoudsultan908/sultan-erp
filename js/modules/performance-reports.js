@@ -16,6 +16,10 @@ let _perfTab = 'product'; // 'product' | 'customer' | 'rep' | 'compare' | 'payme
 let _perfPaymentsRows = []; // آخر نتيجة تحميل تبويب المدفوعات — عشان خانة البحث تفلتر منها من غير استعلام جديد
 let _perfReturnsRows = []; // نفس الفكرة لتبويب المرتجعات
 
+// فلتر الفرع (branches.js): الفرع المختار من أعلى صفحة التقارير — فاضي = كل الفروع. لو الدوال مش محمّلة بنتجاهله.
+async function prfBf() { try { return typeof brReportFilter === 'function' ? await brReportFilter() : null; } catch { return null; } }
+function prfBr(q, f, kind, foreign) { return (f && typeof brApply === 'function') ? brApply(q, f, kind, foreign) : q; }
+
 // ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
 //   يضيّق النتيجة — sale_items بقى أكتر من كده بعد نقل البيانات التاريخية،
 //   فتقرير "حسب الصنف" و"مقارنة فترات" كانا بيحسبوا إيراد/تكلفة ناقصين
@@ -150,10 +154,11 @@ window.prfLoadByProduct = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
+        const bf = await prfBf();
         const { data: items, error } = await prfFetchAllRows(
             'sale_items',
             'product_id, qty, free_qty, line_total, cost_price_snapshot, sales!inner(created_at, status)',
-            (q) => q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59')
+            (q) => prfBr(q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59'), bf, 'doc', 'sales')
         );
         if (error) throw error;
 
@@ -245,10 +250,11 @@ window.prfLoadByCustomer = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
-        const { data: sales, error } = await sb.from('sales')
+        const bf = await prfBf();
+        const { data: sales, error } = await prfBr(sb.from('sales')
             .select('customer_id, total, created_at')
             .eq('status', 'confirmed')
-            .gte('created_at', from).lte('created_at', to + 'T23:59:59');
+            .gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc');
         if (error) throw error;
 
         const byCust = {};
@@ -315,10 +321,11 @@ window.prfLoadByRep = async function () {
         //   sales_returns.rep_id عمود جديد (راجع sales_returns_rep_id_migration.sql) —
         //   لو لسه ما اتضافش/الجدول لسه مش موجود، e3 بيرجع خطأ ونتجاهله بهدوء
         //   ونحسب من غير خصم مرتجعات (نفس فلسفة sales_reps الاختيارية فوق).
+        const bf = await prfBf();
         const [{ data: allSales, error: e1 }, { data: repSales, error: e2 }, { data: repReturns, error: e3 }] = await Promise.all([
-            sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
-            sb.from('sales').select('rep_id, total').eq('status', 'confirmed').not('rep_id', 'is', null).gte('created_at', from).lte('created_at', to + 'T23:59:59'),
-            sb.from('sales_returns').select('rep_id, total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            prfBr(sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
+            prfBr(sb.from('sales').select('rep_id, total').eq('status', 'confirmed').not('rep_id', 'is', null).gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
+            prfBr(sb.from('sales_returns').select('rep_id, total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;
@@ -418,10 +425,11 @@ function prfRenderCompareForm() {
 }
 
 async function prfLoadPeriodTotals(from, to) {
+    const bf = await prfBf();
     const [{ data: items, error: e1 }, { data: sales, error: e2 }] = await Promise.all([
         prfFetchAllRows('sale_items', 'product_id, qty, line_total, sales!inner(created_at, status)', (q) =>
-            q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59')),
-        sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            prfBr(q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59'), bf, 'doc', 'sales')),
+        prfBr(sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
     ]);
     if (e1) throw e1;
     if (e2) throw e2;
@@ -526,11 +534,12 @@ window.prfLoadPayments = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
+        const bf = await prfBf();
         const [{ data: collections, error: e1 }, { data: payouts, error: e2 }] = await Promise.all([
-            sb.from('customer_payments').select('id, customer_id, amount, treasury_id, ref, created_at')
-                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
-            sb.from('supplier_payments').select('id, supplier_id, amount, treasury_id, ref, created_at')
-                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            prfBr(sb.from('customer_payments').select('id, customer_id, amount, treasury_id, ref, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'tr'),
+            prfBr(sb.from('supplier_payments').select('id, supplier_id, amount, treasury_id, ref, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'tr'),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;
@@ -634,11 +643,12 @@ window.prfLoadReturns = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
+        const bf = await prfBf();
         const [{ data: salesRet, error: e1 }, { data: purRet, error: e2 }] = await Promise.all([
-            sb.from('sales_returns').select('id, customer_id, rep_id, total, return_no, created_at')
-                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
-            sb.from('purchase_returns').select('id, supplier_id, total, return_no, created_at')
-                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            prfBr(sb.from('sales_returns').select('id, customer_id, rep_id, total, return_no, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
+            prfBr(sb.from('purchase_returns').select('id, supplier_id, total, return_no, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;

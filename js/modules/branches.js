@@ -41,6 +41,38 @@ async function brSelectHtml(selectId, selectedId) {
     return `<div class="mod-form-group"><label>الفرع</label><select id="${selectId}" class="mod-form-input">${opts}</select></div>`;
 }
 
+// ── فلتر الفرع للتقارير ──
+// الفرع المختار = نفس اختيار لوحة التحكم (localStorage 'dash_branch') — فاضي = كل الفروع.
+// فرع المستند = فرع مخزنه لو له مخزن، وإلا فرع خزنته، وإلا الفرع الرئيسي (نفس fn_branch_of في القاعدة).
+function brSelectedId() { try { return localStorage.getItem('dash_branch') || null; } catch { return null; } }
+const _brFilterCache = {};
+async function brReportFilter() {
+    const id = brSelectedId(); if (!id) return null;
+    const c = await brLoad(); const b = c.ok ? c.list.find(x => x.id === id && x.is_active) : null;
+    if (!b) return null;                                   // فرع اتحذف/اتعطّل → كل الفروع
+    if (_brFilterCache[id] && Date.now() - _brFilterCache[id].t < 60000) return _brFilterCache[id].f;
+    const [w, t] = await Promise.all([ sb.from('warehouses').select('id').eq('branch_id', id), sb.from('treasuries').select('id').eq('branch_id', id) ]);
+    const wh = (w.data || []).map(x => x.id), tr = (t.data || []).map(x => x.id), none = '00000000-0000-0000-0000-000000000000';
+    const doc = [];
+    if (wh.length) doc.push(`warehouse_id.in.(${wh.join(',')})`);
+    if (tr.length) doc.push(`and(warehouse_id.is.null,treasury_id.in.(${tr.join(',')}))`);
+    if (b.is_main) doc.push('and(warehouse_id.is.null,treasury_id.is.null)');
+    const trOnly = [];
+    if (tr.length) trOnly.push(`treasury_id.in.(${tr.join(',')})`);
+    if (b.is_main) trOnly.push('treasury_id.is.null');
+    const f = { id, name: b.name, wh, tr, isMain: !!b.is_main,
+        docOr: doc.length ? doc.join(',') : `warehouse_id.eq.${none}`,       // مستندات فيها مخزن + خزنة (مبيعات، مرتجعات...)
+        trOr: trOnly.length ? trOnly.join(',') : `treasury_id.eq.${none}` };   // مستندات فيها خزنة بس (تحصيلات، مدفوعات، مصروفات)
+    _brFilterCache[id] = { t: Date.now(), f };
+    return f;
+}
+// بيطبّق الفلتر على استعلام (kind: 'doc' | 'tr'، foreign: اسم الجدول لو الاستعلام على جدول متداخل زي sales!inner)
+function brApply(q, f, kind, foreign) {
+    if (!f) return q;
+    const expr = kind === 'tr' ? f.trOr : f.docOr;
+    return foreign ? q.or(expr, { foreignTable: foreign, referencedTable: foreign }) : q.or(expr);
+}
+
 // ── كارت إدارة الفروع (الإعدادات العامة) ──
 async function brRenderCard(el) {
     if (!el) return;
@@ -123,4 +155,4 @@ window.brDelete = async function (id) {
     }
 };
 
-Object.assign(window, { brLoad, brIsMulti, brSelectHtml, brName, brRenderCard });
+Object.assign(window, { brLoad, brIsMulti, brSelectHtml, brName, brRenderCard, brSelectedId, brReportFilter, brApply });

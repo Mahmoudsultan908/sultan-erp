@@ -37,9 +37,11 @@ async function renderWarehouseReports(c) {
             sb.from('products').select('id,name,code,unit,purchase_price,is_active').order('name'),
             sb.from('inventory_stock').select('warehouse_id,product_id,qty'),
         ]);
-        _wrWarehouses = warehouses || [];
+        // فلتر الفرع (نفس اختيار لوحة التحكم): بنعرض مخازن الفرع المختار ومخزونها بس
+        let bf = null; try { bf = typeof brReportFilter === 'function' ? await brReportFilter() : null; } catch { bf = null; }
+        _wrWarehouses = bf ? (warehouses || []).filter(w => bf.wh.includes(w.id)) : (warehouses || []);
         _wrProducts = products || [];
-        _wrStock = stock || [];
+        _wrStock = bf ? (stock || []).filter(s => bf.wh.includes(s.warehouse_id)) : (stock || []);
         _wrTab = 'valuation';
         wrRenderPage(c);
     } catch (err) {

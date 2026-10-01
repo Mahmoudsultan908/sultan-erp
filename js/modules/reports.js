@@ -144,6 +144,7 @@ async function renderReports(container) {
         <div class="ob-tabs">
             ${reportTabs.map(t => `<button class="ob-tab rep-tab-btn" data-rep="${t.id}" onclick="repSwitch('${t.id}')">${t.label}</button>`).join('')}
         </div>
+        <div id="rep-branch-note" style="display:none;margin-top:12px;font-size:12px;color:var(--inv-muted);background:var(--inv-gold-bg);padding:8px 12px;border-radius:8px">🏬 فلتر الفرع بيطبّق على قائمة الدخل بس هنا. كشوف العملاء والموردين والمؤجلات لكل الفروع (العملاء والموردين مشتركين بين الفروع).</div>
         <div id="rep-content" style="margin-top:16px"></div>
     </div>`;
 
@@ -151,6 +152,8 @@ async function renderReports(container) {
 
     window.repSwitch = (id) => {
         document.querySelectorAll('.rep-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.rep === id));
+        const bn = document.getElementById('rep-branch-note');
+        if (bn) bn.style.display = (typeof brSelectedId === 'function' && brSelectedId() && id !== 'pl') ? 'block' : 'none';
         renderReportContent(id);
     };
 
@@ -169,6 +172,21 @@ async function renderReports(container) {
     // 1) قائمة الدخل P&L
     // ─────────────────────────────────────────
     async function plComputeTotals(from, to) {
+        // ★ الحساب من القاعدة (fn_report_totals): نفس المعادلات وحدود التواريخ القديمة بالظبط (اتأكدنا بالمقارنة على البيانات
+        //   الحقيقية)، وبيدعم فلتر الفرع. لو الدالة مش متاحة (صلاحية الدور مثلاً) بنكمّل بالاستعلامات القديمة تحت زي ما كانت.
+        try {
+            const bf = typeof brReportFilter === 'function' ? await brReportFilter() : null;
+            const { data: t, error: tErr } = await sb.rpc('fn_report_totals', { p_from: from, p_to: to, ...(bf ? { p_branch: bf.id } : {}) });
+            if (!tErr && t) {
+                const totalSales = Number(t.sales) || 0, totalReturns = Number(t.returns) || 0;
+                const cogsSales = Number(t.cogs_sales) || 0, cogsReturns = Number(t.cogs_returns) || 0;
+                const totalExpenses = Number(t.expenses) || 0, totalCollectionDiscounts = Number(t.discounts) || 0;
+                const netSales = totalSales - totalReturns, totalCOGS = cogsSales - cogsReturns;
+                const netProfit = netSales - totalCOGS - totalExpenses - totalCollectionDiscounts;
+                const margin = netSales > 0 ? (netProfit / netSales * 100) : 0;
+                return { totalSales, totalReturns, netSales, cogsSales, cogsReturns, totalCOGS, totalExpenses, totalCollectionDiscounts, netProfit, margin, branchName: bf ? bf.name : null };
+            }
+        } catch { /* نكمّل بالطريقة القديمة */ }
         const [{ data: sales }, { data: expenses }, { data: salesReturns }, { data: saleItemsCost }, { data: returnItemsCost }, { data: collectionDiscounts }] = await Promise.all([
             sb.from('sales').select('total,subtotal').eq('status','confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
             sb.from('expenses').select('amount').eq('status','confirmed').gte('expense_date', from).lte('expense_date', to),
@@ -233,7 +251,7 @@ async function renderReports(container) {
         const toDefault = today.toISOString().slice(0,10);
 
         const load = async (from, to) => {
-            const { totalSales, totalReturns, netSales, cogsSales, cogsReturns, totalCOGS, totalExpenses, totalCollectionDiscounts, netProfit, margin } = await plComputeTotals(from, to);
+            const { totalSales, totalReturns, netSales, cogsSales, cogsReturns, totalCOGS, totalExpenses, totalCollectionDiscounts, netProfit, margin, branchName } = await plComputeTotals(from, to);
 
             c.innerHTML = `
             <div class="dash-card" style="padding:20px;margin-bottom:16px">
@@ -253,7 +271,7 @@ async function renderReports(container) {
                 ⚠️ الفترة دي بتشمل بيانات منقولة من ديكسف (قبل ${SULTAN_LIVE_CUTOVER}) فيها تسويات ترحيل لمرة واحدة (رأس مال، تصحيحات أرصدة) مش جزء من الأداء التشغيلي العادي — عشان كده الرقم هنا مش متوقع يطابق "صافي المركز المالي" في الداشبورد. للأداء الفعلي المستمر استخدم فترة تبدأ من ${SULTAN_LIVE_CUTOVER}.
             </div>` : ''}
             <div class="dash-card" style="padding:24px;max-width:550px" id="pl-card">
-                <h3 style="margin:0 0 16px;font-size:15px">قائمة الدخل (${from} إلى ${to})</h3>
+                <h3 style="margin:0 0 16px;font-size:15px">قائمة الدخل (${from} إلى ${to})${branchName ? ` — <span style="color:var(--inv-gold)">${String(branchName).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}</span>` : ''}</h3>
                 <div class="dash-summary-row"><span>صافي المبيعات</span><span class="dash-s-green">${fmt(netSales)}</span></div>
                 <div class="dash-summary-row" style="font-size:11px;color:var(--inv-muted-light)"><span>(إجمالي ${fmt(totalSales)} - مرتجعات ${fmt(totalReturns)})</span><span></span></div>
                 <div class="dash-summary-row"><span>(-) تكلفة البضاعة المباعة</span><span class="dash-s-red">${fmt(totalCOGS)}</span></div>
