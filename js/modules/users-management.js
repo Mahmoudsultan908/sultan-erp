@@ -10,6 +10,10 @@
    ════════════════════════════════════════════════════════════ */
 
 let _usrList = [];
+// نطاق الفروع لكل مستخدم (branches.js + جدول user_branches): بيظهر بس لما يبقى فيه أكتر من فرع نشط
+let _usrBr = { multi: false, list: [], map: {} };
+const USR_SCOPABLE_ROLES = ['employee', 'cashier', 'rep'];   // الأدمن والمحاسب مش بيتقيّدوا (قيد في القاعدة)
+function usrEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 const USR_ROLE_LABELS = {
     admin: 'مدير النظام', accountant: 'محاسب', cashier: 'كاشير',
@@ -51,6 +55,21 @@ async function renderUsersManagement(c) {
         const { data: profiles, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         _usrList = profiles || [];
+        // نطاق الفروع (لو الفروع متاحة وفيه أكتر من فرع نشط) — أي فشل هنا مايأثرش على باقي الشاشة
+        _usrBr = { multi: false, list: [], map: {} };
+        try {
+            if (typeof brLoad === 'function') {
+                const b = await brLoad(true);
+                if (b.ok) {
+                    _usrBr.list = b.list;
+                    _usrBr.multi = b.list.filter(x => x.is_active).length > 1;
+                    if (_usrBr.multi) {
+                        const { data: ub } = await sb.from('user_branches').select('user_id, branch_id');
+                        (ub || []).forEach(r => { (_usrBr.map[r.user_id] = _usrBr.map[r.user_id] || []).push(r.branch_id); });
+                    }
+                }
+            }
+        } catch { /* مفيش نطاق فروع */ }
         usrRenderPage(c);
     } catch (err) {
         c.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:20px;border-radius:12px">خطأ: ${err.message}</div>`;
@@ -85,7 +104,7 @@ function usrRenderPage(c) {
 
         <div class="mod-table-wrap">
             <table class="mod-table"><thead><tr>
-                <th>المستخدم</th><th>الصلاحية</th><th>الحالة</th><th>آخر ظهور</th><th></th>
+                <th>المستخدم</th><th>الصلاحية</th>${_usrBr.multi ? '<th>الفروع</th>' : ''}<th>الحالة</th><th>آخر ظهور</th><th></th>
             </tr></thead><tbody id="usrTbody"></tbody></table>
         </div>`;
     usrRenderRows();
@@ -111,6 +130,7 @@ function usrRenderRows() {
                     ${Object.entries(USR_ROLE_LABELS).map(([v,l])=>`<option value="${v}" ${u.role===v?'selected':''}>${l}</option>`).join('')}
                 </select>
             </td>
+            ${_usrBr.multi ? `<td style="font-size:12.5px">${usrBranchCellHtml(u)}</td>` : ''}
             <td><span class="dash-badge ${active?'dash-badge-green':'dash-badge-blue'}" style="${!active?'background:var(--inv-red-bg);color:var(--inv-red)':''}">${active?'✅ نشط':'🚫 معطّل'}</span></td>
             <td class="dash-muted" style="font-size:12.5px">${usrFmtLastSeen(u.last_seen)}</td>
             <td><button class="cc-edit" style="${active?'background:var(--inv-red-bg);color:var(--inv-red)':'background:var(--inv-green-light);color:var(--inv-green)'}" onclick="usrToggleActive('${u.id}', ${!active})">${active?'🚫 تعطيل':'✅ تفعيل'}</button></td>
@@ -228,6 +248,91 @@ async function usrEnsureRepTreasury(repId, repName) {
     }
 }
 
+// ════════════════════════════════════════════════════════════
+// نطاق الفروع للمستخدم (branch_scope + user_branches) — التنفيذ الفعلي في القاعدة (سياسات RLS + Triggers)
+//   all      = بيشوف وينشئ بيانات كل الفروع (الوضع الافتراضي لكل المستخدمين)
+//   assigned = بيشوف وينشئ بيانات الفروع المحددة له بس (للكاشير/الموظف/المندوب فقط)
+// ════════════════════════════════════════════════════════════
+function usrBranchCellHtml(u) {
+    const scoped = u.branch_scope === 'assigned';
+    const names = (_usrBr.map[u.id] || []).map(id => { const b = _usrBr.list.find(x => x.id === id); return b ? usrEsc(b.name) : ''; }).filter(Boolean);
+    const label = scoped
+        ? (names.length ? names.join('، ') : '<span style="color:var(--inv-red)">⚠️ مقيَّد بدون فروع (مابيشوفش حاجة)</span>')
+        : '<span style="color:var(--inv-muted)">كل الفروع</span>';
+    const canScope = USR_SCOPABLE_ROLES.includes(u.role);
+    return `${label} <button class="cc-edit" style="margin-right:6px" onclick="usrOpenBranches('${u.id}')" title="${canScope ? 'تحديد الفروع' : 'الأدمن والمحاسب بيشوفوا كل الفروع'}" ${canScope ? '' : 'disabled'}>🏬</button>`;
+}
+
+window.usrOpenBranches = function(userId) {
+    const u = _usrList.find(x => x.id === userId); if (!u) return;
+    if (!USR_SCOPABLE_ROLES.includes(u.role)) return alert('الأدمن والمحاسب بيشوفوا كل الفروع (عشان تقاريرهم شاملة). التقييد للكاشير والموظف والمندوب بس.');
+    const scoped = u.branch_scope === 'assigned';
+    const mine = _usrBr.map[u.id] || [];
+    const modal = document.createElement('div');
+    modal.className = 'mod-modal-bg active'; modal.id = 'usrBrModal';
+    modal.innerHTML = `
+        <div class="mod-modal" style="max-width:440px">
+            <div class="mod-modal-header"><h3>🏬 فروع ${usrEsc(u.name || u.email)}</h3>
+                <button class="mod-modal-close" onclick="document.getElementById('usrBrModal').remove()">&times;</button></div>
+            <div class="mod-modal-body">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:8px">
+                    <input type="radio" name="usrScope" value="all" ${scoped ? '' : 'checked'} onchange="usrBrScopeChanged()" style="width:auto"> كل الفروع (بدون تقييد)
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:8px">
+                    <input type="radio" name="usrScope" value="assigned" ${scoped ? 'checked' : ''} onchange="usrBrScopeChanged()" style="width:auto"> فروع محددة فقط
+                </label>
+                <div id="usrBrList" style="margin:8px 22px 0;display:${scoped ? 'block' : 'none'}">
+                    ${_usrBr.list.filter(b => b.is_active || mine.includes(b.id)).map(b => `
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0">
+                            <input type="checkbox" class="usrBrChk" value="${usrEsc(b.id)}" ${mine.includes(b.id) ? 'checked' : ''} style="width:auto"> ${usrEsc(b.name)}${b.is_active ? '' : ' (معطّل)'}
+                        </label>`).join('')}
+                </div>
+                <p style="font-size:11.5px;color:var(--inv-muted-light);margin-top:12px;line-height:1.7">
+                    المستخدم المقيَّد بيشوف وينشئ فواتير ومصروفات وتحصيلات ومخزون وخزن فروعه بس، والقاعدة بتمنعه من غير كده حتى لو حاول من برا الشاشة.
+                    تحويلات الخزن والمخازن، وعربيات المناديب، والجرد، ودفتر الأستاذ، وبعض التقارير الشاملة لسه مش مقيّدة بالكامل، فالأنسب تقييد الكاشير والموظف والمندوب بس.</p>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="mod-btn" style="background:#F1F5F9;color:var(--inv-text-soft)" onclick="document.getElementById('usrBrModal').remove()">إلغاء</button>
+                <button class="mod-btn mod-btn-primary" onclick="usrSaveBranches('${u.id}')">💾 حفظ</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+};
+
+window.usrBrScopeChanged = function() {
+    const assigned = document.querySelector('input[name="usrScope"]:checked')?.value === 'assigned';
+    const el = document.getElementById('usrBrList'); if (el) el.style.display = assigned ? 'block' : 'none';
+};
+
+window.usrSaveBranches = async function(userId) {
+    const u = _usrList.find(x => x.id === userId); if (!u) return;
+    const assigned = document.querySelector('input[name="usrScope"]:checked')?.value === 'assigned';
+    const picked = Array.from(document.querySelectorAll('.usrBrChk:checked')).map(x => x.value);
+    if (assigned && !picked.length) return alert('اختار فرع واحد على الأقل، أو اختار "كل الفروع".');
+    if (assigned && !USR_SCOPABLE_ROLES.includes(u.role)) return alert('الأدمن والمحاسب مينفعش يتقيّدوا بفروع.');
+    const btn = document.querySelector('#usrBrModal .mod-btn-primary'); btn.disabled = true; btn.innerText = '⏳ جاري الحفظ...';
+    try {
+        if (assigned) {
+            // الترتيب مهم: الفروع الأول، وبعدين نفعّل التقييد — عشان مفيش لحظة المستخدم يكون فيها مقيَّد بدون فروع
+            const { error: dErr } = await sb.from('user_branches').delete().eq('user_id', userId);
+            if (dErr) throw dErr;
+            const { error: iErr } = await sb.from('user_branches').insert(picked.map(b => ({ user_id: userId, branch_id: b })));
+            if (iErr) throw iErr;
+            const { error: pErr } = await sb.from('profiles').update({ branch_scope: 'assigned' }).eq('id', userId);
+            if (pErr) throw pErr;
+        } else {
+            const { error: pErr } = await sb.from('profiles').update({ branch_scope: 'all' }).eq('id', userId);
+            if (pErr) throw pErr;
+            await sb.from('user_branches').delete().eq('user_id', userId);   // تنظيف؛ فشلها مش مؤثر (التقييد اتشال)
+        }
+        document.getElementById('usrBrModal')?.remove();
+        renderUsersManagement(document.getElementById('app-content'));
+    } catch (err) {
+        alert('❌ تعذّر الحفظ: ' + err.message);
+        btn.disabled = false; btn.innerText = '💾 حفظ';
+    }
+};
+
 window.usrToggleActive = async function(userId, activate) {
     const msg = activate ? 'إعادة تفعيل هذا المستخدم؟' : 'تعطيل هذا المستخدم؟ لن يستطيع الدخول للنظام بعدها.';
     if (!confirm(msg)) return;
@@ -240,8 +345,18 @@ window.usrToggleActive = async function(userId, activate) {
 
 window.usrChangeRole = async function(userId, newRole) {
     try {
-        const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', userId);
+        const cur = _usrList.find(x => x.id === userId);
+        const patch = { role: newRole };
+        // مستخدم مقيَّد بفروع واتحول لدور شامل (أدمن/محاسب): القاعدة بترفض الدور ده مع التقييد، فبنشيل التقييد معاه
+        if (cur && cur.branch_scope === 'assigned' && !USR_SCOPABLE_ROLES.includes(newRole)) {
+            if (!confirm('المستخدم ده مقيَّد بفروع معيّنة. الدور الجديد (' + (USR_ROLE_LABELS[newRole] || newRole) + ') بيشوف كل الفروع، فهيتشال التقييد. تكمل؟')) {
+                renderUsersManagement(document.getElementById('app-content')); return;
+            }
+            patch.branch_scope = 'all';
+        }
+        const { error } = await sb.from('profiles').update(patch).eq('id', userId);
         if (error) throw error;
+        if (patch.branch_scope === 'all') renderUsersManagement(document.getElementById('app-content'));
 
         // لو اتحول لمندوب مبيعات، لازم يبقى له صف sales_reps بنفس الـ id (لو مش موجود أصلاً)
         if (newRole === 'rep') {
