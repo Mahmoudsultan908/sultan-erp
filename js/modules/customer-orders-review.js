@@ -567,17 +567,14 @@ window.corCompleteCart = async function (customerId) {
     if (!cart) return;
     const items = cart.items || [];
     if (!items.length) { alert('⚠️ السلة دي فاضية'); return; }
-    // ★ نمسح السلة من سلطان دلوقتي عشان الشاشة هنا متفضلش وارية "معلّقة" —
-    //   ملحوظة: سلة العميل نفسها على موبايله مش هتتمسح تلقائياً فوراً (البرنامج
-    //   عندنا معندوش وسيلة يبعتله تحديث لحظي)، فلو فتح سلطانو تاني هيلاقيها
-    //   لسه فيها نفس الأصناف — عادي، مش خطر تكرار حقيقي: سجّلنا هنا توقيت
-    //   الإكمال (cart_fulfilled_at)، فلو جهازه حاول يبعت طلب فشل قبل كده
-    //   (يدوي أو أوتوماتيك) هيتأكد الأول إن حد مكملهوش من عندنا، ويلغي
-    //   المحاولة بدل ما يعمل طلب مكرر — راجع fn_sultano_check_cart_fulfilled.
-    try { await sb.rpc('fn_sultano_clear_cart', { p_customer_id: customerId }); } catch {}
-    try { await sb.from('customers').update({ cart_fulfilled_at: new Date().toISOString() }).eq('id', customerId); } catch {}
+    // ★ مسح السلة من سلطان وتسجيل cart_fulfilled_at بيحصلوا من شاشة المبيعات بعد نجاح حفظ الفاتورة فعلاً
+    //   (cartCustomerId تحت) — مش هنا. قبل كده كانوا بيحصلوا قبل الحفظ، فلو الأدمن قفل الشاشة من غير حفظ
+    //   كانت السلة بتضيع ومحاولة العميل التانية بتتمنع برسالة "اتنفّذ بالفعل".
+    //   ملحوظة: سلة العميل على موبايله مش بتتمسح لحظياً، لكن cart_fulfilled_at بيمنع تكرار طلب فشل قبل كده
+    //   (راجع fn_sultano_check_cart_fulfilled).
     window._pendingQuoteConversion = {
         kind: 'cart',
+        cartCustomerId: customerId,
         customerId,
         items: items.map(it => ({
             pid: it.product_id, name: it.name || '', code: '',

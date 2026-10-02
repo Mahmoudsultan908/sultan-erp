@@ -41,6 +41,7 @@ function invDefaultDueDate() {
 }
 let invPendingQuoteId = null; // عرض سعر بيتحوّل حالياً — يتعلّم "تم التحويل" بعد نجاح الحفظ بس (مش قبله)
 let invPendingOrderId = null; // طلب سلطانو بيتحوّل حالياً — نفس المنطق، customer_orders.converted_sale_id بيتحدّث بعد الحفظ بس
+let invPendingCartCustId = null; // تكملة سلة عميل سلطانو: السلة بتتمسح ويتسجّل cart_fulfilled_at بعد نجاح الحفظ بس
 let invPendingOrderNo = null; // رقم/إجمالي الطلب الأصلي — بيتعرض في بانر تأكيد واضح فوق الفاتورة عشان مايتلخبطش مع طلب تاني
 let invPendingOrderTotal = null;
 
@@ -319,6 +320,7 @@ async function renderSales(c) {
     invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null; invEditingOldNotes = null; invEditingOldDueDate = null; invEditingOldDiscount = 0;
     invPendingQuoteId = null;
     invPendingOrderId = null;
+    invPendingCartCustId = null;
     invPendingOrderNo = null;
     invPendingOrderTotal = null;
 
@@ -380,6 +382,7 @@ async function renderSales(c) {
         } else {
             invPendingQuoteId = pending.quoteId || null;
         }
+        invPendingCartCustId = pending.kind === 'cart' ? (pending.cartCustomerId || null) : null;
     }
 
     c.innerHTML = `
@@ -1623,6 +1626,13 @@ async function invSave(andNew) {
             invPendingQuoteId = null;
         }
 
+        // ★ لو الفاتورة دي جاية من "إكمال سلة" عميل سلطانو: دلوقتي بس (بعد نجاح الحفظ) نمسح سلته ونسجّل إنها اتنفّذت
+        if (invPendingCartCustId) {
+            try { await sb.rpc('fn_sultano_clear_cart', { p_customer_id: invPendingCartCustId }); } catch {}
+            try { await sb.from('customers').update({ cart_fulfilled_at: new Date().toISOString() }).eq('id', invPendingCartCustId); } catch {}
+            invPendingCartCustId = null;
+        }
+
         // ★ لو الفاتورة دي جاية من اعتماد طلب سلطانو، اربط الطلب بالفاتورة
         //   الحقيقية دلوقتي بس — بعد نجاح الحفظ فعلاً (نفس منطق عروض الأسعار فوق)
         if (invPendingOrderId) {
@@ -1635,6 +1645,7 @@ async function invSave(andNew) {
                 }).eq('id', invPendingOrderId);
             } catch {}
             invPendingOrderId = null;
+            invPendingCartCustId = null;
             invPendingOrderNo = null;
             invPendingOrderTotal = null;
         }
