@@ -372,6 +372,8 @@ function custOpenModal(x) {
                         <option value="">بدون مندوب افتراضي</option>
                         ${_mgCustReps.map(r=>`<option value="${r.id}" ${x?.default_rep_id===r.id?'selected':''}>🚗 ${r.name}</option>`).join('')}
                     </select></div>` : ''}
+                <div class="mod-form-group"><label>الرقم الضريبي <small style="color:var(--inv-muted-light);font-weight:400">(اختياري — للفاتورة الإلكترونية لاحقاً)</small></label>
+                    <input type="text" id="custTaxId" class="mod-form-input" dir="ltr" value="${(x?.tax_id||'').replace(/"/g,'&quot;')}"></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div class="mod-form-group"><label>الحد الائتماني (ج.م)</label>
                         <input type="number" id="custCreditLimit" class="mod-form-input" value="${x?.credit_limit||0}" min="0" step="0.01"></div>
@@ -430,6 +432,7 @@ window.custSave = async function() {
         group_id: document.getElementById('custGroup').value || null,
         visit_day: document.getElementById('custVisitDay').value || null,
         credit_limit: parseFloat(document.getElementById('custCreditLimit').value) || 0,
+        tax_id: document.getElementById('custTaxId')?.value.trim() || null,
         preferred_payment_method: document.getElementById('custPayMethod').value || null,
         default_rep_id: document.getElementById('custDefaultRep')?.value || null,
         debt_locked: !!document.getElementById('custDebtLocked')?.checked,
