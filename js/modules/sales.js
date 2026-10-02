@@ -41,6 +41,7 @@ function invDefaultDueDate() {
 }
 let invPendingQuoteId = null; // عرض سعر بيتحوّل حالياً — يتعلّم "تم التحويل" بعد نجاح الحفظ بس (مش قبله)
 let invPendingOrderId = null; // طلب سلطانو بيتحوّل حالياً — نفس المنطق، customer_orders.converted_sale_id بيتحدّث بعد الحفظ بس
+let invPayTypeHint = null; // رسالة تنبيه بتتعرض مرة بعد فتح الفاتورة (طريقة الدفع اتحددت من تفضيل العميل)
 let invPendingCartCustId = null; // تكملة سلة عميل سلطانو: السلة بتتمسح ويتسجّل cart_fulfilled_at بعد نجاح الحفظ بس
 let invPendingOrderNo = null; // رقم/إجمالي الطلب الأصلي — بيتعرض في بانر تأكيد واضح فوق الفاتورة عشان مايتلخبطش مع طلب تاني
 let invPendingOrderTotal = null;
@@ -374,6 +375,17 @@ async function renderSales(c) {
             invItems.push({ id: Date.now()+Math.random(), pid: null, name: '', code: '', qty: 1, price: 0, disc: 0, free: 0, unit: '', stock: 0 });
         }
         if (pending.customerId) invCustId = pending.customerId;
+        // طريقة الدفع: من تفضيل العميل (نقدي/آجل) لو متحدد، وإلا الافتراضي (آجل) مع تنبيه يراجعها — قبل كده كانت دايماً آجل من غير ما حد ياخد باله
+        const pendCust = pending.customerId ? INV_DB.customers.find(x => x.id === pending.customerId) : null;
+        if (pendCust) {
+            const pref = pendCust.preferred_payment_method;
+            if (pref === 'cash' || pref === 'credit') {
+                invPayType = pref;
+                invPayTypeHint = `💳 طريقة الدفع: ${pref === 'cash' ? 'نقدي' : 'آجل'} (تفضيل العميل) — راجعها قبل الحفظ`;
+            } else {
+                invPayTypeHint = 'ℹ️ العميل ملوش طريقة دفع مفضلة — الفاتورة آجل افتراضياً، راجعها قبل الحفظ';
+            }
+        }
         // هيتعلّم "تم التحويل" بعد الحفظ الناجح فعلاً — راجع التعليق في quotations.js
         if (pending.kind === 'order') {
             invPendingOrderId = pending.quoteId || null;
@@ -440,6 +452,7 @@ async function renderSales(c) {
     // ربط الأحداث
     invBindEvents();
     invSetPayType(invPayType); // القالب فوق بيثبّت "نقدي" شكلياً — نزامن الشكل مع الحالة الحقيقية
+    if (invPayTypeHint) { const h = invPayTypeHint; invPayTypeHint = null; setTimeout(() => invToast(h, 'info'), 400); }
     document.getElementById('invDiscExtra').value = invEditingOldDiscount || 0;
     invRenderItems();
     invUpdateSummary();
@@ -848,6 +861,12 @@ function invSelectCustomer(id) {
     // تطبيق مستوى السعر الافتراضي لمجموعة العميل تلقائياً (يبقى قابل للتغيير يدوياً بعدها بحرية)
     const defaultLevel = c.group_id ? INV_DB.groupLevelMap?.[c.group_id] : null;
     if (defaultLevel) invSetPriceLevel(defaultLevel, true);
+    // طريقة الدفع المفضلة للعميل (نقدي/آجل) — بتتطبق عند اختياره في فاتورة جديدة بس، ويقدر المستخدم يغيّرها بعدها بحرية
+    const prefPay = c.preferred_payment_method;
+    if (!invEditingId && (prefPay === 'cash' || prefPay === 'credit') && prefPay !== invPayType) {
+        invSetPayType(prefPay);
+        invToast(`💳 طريقة الدفع: ${prefPay === 'cash' ? 'نقدي' : 'آجل'} (تفضيل ${c.name})`, 'info');
+    }
     // نسب المندوب الأساسي بتاع العميل تلقائياً للفاتورة — بس لو مفيش مندوب متختار
     // فعلاً (عشان مانكسرش اختيار يدوي سابق)، يقدر المستخدم يغيّره بحرية بعد كده
     if (c.default_rep_id && !invRepId) {
