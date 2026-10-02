@@ -114,7 +114,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
         <div class="nav-item" data-mod="purchase-orders" onclick="loadMod(this, 'purchase-orders')">📋 أوامر الشراء</div>
         <div class="nav-item" data-mod="purchase-suggestions" onclick="loadMod(this, 'purchase-suggestions')">💡 اقتراح أمر شراء</div>
-        <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 تكامل واتساب <span class="nav-soon-badge">قريباً</span></div>
+        <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 رسائل واتساب</div>
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي <span class="nav-soon-badge">قريباً</span></div>
         </div>
 
