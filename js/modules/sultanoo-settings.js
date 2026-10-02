@@ -38,7 +38,13 @@ async function renderSultanooSettings(c) {
         const { data: settings, error } = await sb
             .from('app_settings')
             .select('key, value')
-            .in('key', ['vacation_mode', 'vacation_message', 'category_display_mode']);
+            .in('key', ['vacation_mode', 'vacation_message', 'category_display_mode', 'sultanoo_default_price_level']);
+        // مستويات الأسعار المتاحة (لاختيار المستوى الافتراضي للعملاء اللي ملهمش مجموعة)
+        let priceLevels = [];
+        try {
+            const { data: pls } = await sb.from('price_levels').select('code, name').order('name');
+            priceLevels = pls || [];
+        } catch { /* لو فشل الاختيار بيتخفى والإعداد القديم يفضل شغال */ }
 
         console.log('Sultanoo settings response:', { settings, error });
 
@@ -55,6 +61,8 @@ async function renderSultanooSettings(c) {
         const vacationMode = settingsObj.vacation_mode === true;
         const vacationMessage = settingsObj.vacation_message || '';
         const categoryMode = settingsObj.category_display_mode || 'main';
+        const defaultLevel = String(settingsObj.sultanoo_default_price_level ?? '').replace(/^"|"$/g, '') || 'SPECIAL';
+        const lvlEsc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
         console.log('Parsed values:', { vacationMode, vacationMessage, categoryMode });
 
@@ -109,6 +117,18 @@ async function renderSultanooSettings(c) {
                 </div>
             </div>
 
+            <!-- مستوى السعر الافتراضي -->
+            ${priceLevels.length ? `
+            <div class="mod-card" style="margin-bottom:20px;padding:20px">
+                <h3 style="margin:0 0 12px;color:var(--inv-text);font-size:16px">💲 مستوى السعر الافتراضي</h3>
+                <p style="color:var(--inv-muted);font-size:13px;margin-bottom:15px;line-height:1.7">
+                    العميل اللي مالوش مجموعة (زي أي عميل جديد سجّل نفسه من التطبيق) بياخد الأسعار حسب المستوى ده — في الكتالوج وفي الطلب. العميل اللي ليه مجموعة بياخد مستوى مجموعته زي ما هو.
+                </p>
+                <select id="sultanooDefaultLevel" class="mod-form-input" style="max-width:300px">
+                    ${priceLevels.map(l => `<option value="${lvlEsc(l.code)}" ${l.code === defaultLevel ? 'selected' : ''}>${lvlEsc(l.name)} (${lvlEsc(l.code)})</option>`).join('')}
+                </select>
+            </div>` : ''}
+
             <!-- أزرار الحفظ -->
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
                 <button class="mod-btn mod-btn-primary" onclick="sultanooSaveSettings()" style="min-width:120px">
@@ -137,6 +157,7 @@ window.sultanooSaveSettings = async function() {
     const vacationMode = document.getElementById('sultanooVacationMode').checked;
     const vacationMessage = document.getElementById('sultanooVacationMessage').value.trim();
     const categoryMode = document.querySelector('input[name="categoryMode"]:checked').value;
+    const defaultLevelVal = document.getElementById('sultanooDefaultLevel')?.value || null;   // لازم نقراه قبل ما الحاوية تتبدّل بشاشة "جارٍ الحفظ"
 
     const container = _sultanooSettingsContainer || document.getElementById('corBody');
     if (!container) { sultanooToast('⚠️ تعذّر تحديد مكان عرض الإعدادات — أعد فتح الصفحة', 'error'); return; }
@@ -149,6 +170,13 @@ window.sultanooSaveSettings = async function() {
             { key: 'vacation_message', value: vacationMessage },
             { key: 'category_display_mode', value: categoryMode }
         ];
+
+        // مستوى السعر الافتراضي: upsert (المفتاح ممكن يكون لسه مش موجود، والـupdate كان هيعدّي بصمت من غير ما يحفظ حاجة)
+        if (defaultLevelVal) {
+            const { error } = await sb.from('app_settings').upsert(
+                { key: 'sultanoo_default_price_level', value: defaultLevelVal, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+            if (error) throw error;
+        }
 
         for (const update of updates) {
             const { error } = await sb
