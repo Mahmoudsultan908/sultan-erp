@@ -34,6 +34,7 @@ const SHELL_URLS = [
     './js/modules/collections.js',
     './js/modules/coming-soon.js',
     './js/modules/whatsapp.js',
+    './js/modules/budgets.js',
     './js/modules/crm.js',
     './js/modules/customer-supplier-import.js',
     './js/modules/customers.js',

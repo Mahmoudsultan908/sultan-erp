@@ -92,6 +92,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="expense-decision" onclick="loadMod(this, 'expense-decision')">🎯 قرار المصروفات</div>
         <div class="nav-item" data-mod="treasury" onclick="loadMod(this, 'treasury')">🏦 الخزن</div>
         <div class="nav-item" data-mod="cheques" onclick="loadMod(this, 'cheques')">🧾 الشيكات</div>
+        <div class="nav-item" data-mod="budgets" onclick="loadMod(this, 'budgets')">🎯 الميزانيات</div>
         <div class="nav-item" data-mod="balance-transfer" onclick="loadMod(this, 'balance-transfer')">🔀 تحويل أرصدة</div>
         <div class="nav-item" data-mod="liquidity-forecast" onclick="loadMod(this, 'liquidity-forecast')">💧 توقع السيولة</div>
         </div>
@@ -449,6 +450,7 @@ const titles = {
         'investors': 'المستثمرين',
         'treasury': 'الخزن',
         'cheques': 'الشيكات',
+        'budgets': 'الميزانيات',
         'balance-transfer': 'تحويل الأرصدة',
         'general-import-export': 'استيراد وتصدير عام',
         'print-center': 'مركز الطباعة',
@@ -496,6 +498,7 @@ async function _dispatchRender(modName, c) {
     if (modName === 'investors' && typeof renderInvestors === 'function') await renderInvestors(c);
     if (modName === 'treasury' && typeof renderTreasury === 'function') await renderTreasury(c);
     if (modName === 'cheques' && typeof renderCheques === 'function') await renderCheques(c);
+    if (modName === 'budgets' && typeof renderBudgets === 'function') await renderBudgets(c);
     if (modName === 'balance-transfer' && typeof renderBalanceTransfer === 'function') await renderBalanceTransfer(c);
     if (modName === 'general-import-export' && typeof renderGeneralImportExport === 'function') await renderGeneralImportExport(c);
     if (modName === 'print-center' && typeof renderPrintCenter === 'function') await renderPrintCenter(c);
