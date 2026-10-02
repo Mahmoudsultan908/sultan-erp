@@ -15,10 +15,6 @@ function csRenderPage(c, icon, title, description) {
 }
 
 // ── موديولات V16 الكبيرة (لم تُبنَ إطلاقاً) ──
-async function renderWhatsAppIntegration(c) {
-    csRenderPage(c, '💬', 'تكامل واتساب',
-        'إرسال الفواتير وإشعارات التحصيل والتذكيرات للعملاء مباشرة عبر واتساب.');
-}
 async function renderAIDashboard(c) {
     csRenderPage(c, '🤖', 'لوحة الذكاء الاصطناعي',
         'تحليلات ذكية وتوصيات تلقائية لتحسين المبيعات وإدارة المخزون بناءً على بيانات النظام.');
@@ -30,6 +26,5 @@ async function renderAIDashboard(c) {
 // (بقت صفحة مراجعة طلبات سلطانو، مش قريباً)
 
 Object.assign(window, {
-    renderWhatsAppIntegration,
     renderAIDashboard,
 });
