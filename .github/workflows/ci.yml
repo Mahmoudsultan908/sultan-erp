@@ -27,6 +27,8 @@ jobs:
           fi
       - name: Run checks
         run: node scripts/ci-check.js
+      - name: Check global name collisions
+        run: node scripts/globals-check.js
 
   tests:
     runs-on: ubuntu-latest
