@@ -69,6 +69,12 @@ async function purLoadData() {
     PUR_DB.warehouses = warehouses || [];
     PUR_DB.treasuries = treasuries || [];
     PUR_DB.companies = companies || [];
+    // ميزة الصلاحية والدفعات (مقفولة افتراضياً — بتتفعّل من الإعدادات): حقلين إضافيين في كل سطر
+    PUR_DB.expiryOn = false;
+    try {
+        const { data: fx } = await sb.from('app_settings').select('value').eq('key', 'feature_expiry').maybeSingle();
+        PUR_DB.expiryOn = ['on', 'true', '1'].includes(String(fx?.value ?? '').replace(/["\s]/g, '').toLowerCase());
+    } catch { /* مش مهم */ }
     PUR_DB.stockMap = {};
     (stockRows || []).forEach(r => { PUR_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0; });
 
@@ -185,6 +191,7 @@ async function renderPurchases(c) {
                             <th style="width:92px">سعر الشراء</th>
                             <th style="width:64px">خصم%</th>
                             <th style="width:90px">المؤجل%</th>
+                            ${PUR_DB.expiryOn ? '<th style="width:96px">رقم الدفعة</th><th style="width:132px">تاريخ الصلاحية</th>' : ''}
                             <th style="width:100px">الإجمالي</th>
                             <th style="width:40px"></th>
                         </tr></thead>
@@ -473,7 +480,7 @@ function purRenderItems() {
     if (!tbody) return;
 
     if (!purItems.length || (purItems.length === 1 && !purItems[0].pid)) {
-        tbody.innerHTML = `<tr class="inv-empty-row"><td colspan="12">
+        tbody.innerHTML = `<tr class="inv-empty-row"><td colspan="${PUR_DB.expiryOn ? 14 : 12}">
             <span class="em-ic">📥</span>
             ابدأ بالبحث في الأعلى أو اضغط <kbd style="background:#F1F5F9;padding:1px 6px;border-radius:4px">F3</kbd> لإضافة أول صنف
         </td></tr>`;
@@ -529,6 +536,11 @@ function purRenderItems() {
                         onclick="purToggleDeferredType(${idx})">${deferredType==='percent'?'٪':'ثابت'}</button>
                 </div>
             </td>
+            ${PUR_DB.expiryOn ? `
+            <td><input class="inv-cell-input" value="${(it.batch||'').replace(/"/g,'&quot;')}" placeholder="اختياري" dir="ltr"
+                oninput="purItems[${idx}].batch=this.value"></td>
+            <td><input type="date" class="inv-cell-input" value="${it.expiry||''}" title="تاريخ الصلاحية — سيبه فاضي لو الصنف ملوش صلاحية"
+                oninput="purItems[${idx}].expiry=this.value"></td>` : ''}
             <td class="inv-cell-total" id="purRowTotal-${idx}">${purFmt(lineTotal)}</td>
             <td class="inv-cell-del">
                 <button class="inv-del-btn" onclick="purRemoveRow(${idx})">✕</button>
@@ -1104,6 +1116,7 @@ async function purSave(andNew) {
                 deferred_type: it.deferredType || 'percent',
                 deferred_due_date: deferredPerUnit > 0 ? (document.getElementById('purDate')?.value || null) : null,
                 units_per_carton_snapshot: prod?.units_per_carton || 1,
+                ...(PUR_DB.expiryOn && it.expiry ? { batch_no: (it.batch || '').trim() || null, expiry_date: it.expiry } : {}),
             };
         });
         const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_purchase', {

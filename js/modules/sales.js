@@ -146,6 +146,8 @@ async function invLoadData() {
     });
 
     // بناء خريطة المخزون: 'warehouseId|productId' => qty
+    // دفع مقدم جزئي على الفاتورة الآجلة (ميزة مفعّلة من الإعدادات — features.js)
+    try { INV_DB.splitPayOn = typeof ftOn === 'function' && await ftOn('feature_split_payment'); } catch { INV_DB.splitPayOn = false; }
     INV_DB.stockMap = {};
     (stockRows || []).forEach(r => {
         INV_DB.stockMap[r.warehouse_id + '|' + r.product_id] = Number(r.qty) || 0;
@@ -589,6 +591,15 @@ function invDueCardHTML() {
     <div class="inv-card inv-due" id="invDueCard">
         <div class="inv-card-title" style="color:var(--inv-red)">📅 تاريخ الاستحقاق</div>
         <input type="date" class="inv-due-input" id="invDueDate" value="${invEditingOldDueDate || invDefaultDueDate()}">
+        ${INV_DB.splitPayOn && !invEditingId ? `
+        <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--inv-divider)">
+            <div style="font-size:12px;font-weight:700;margin-bottom:6px">💵 دفع مقدّم (اختياري)</div>
+            <input type="number" class="inv-cash-field" id="invAdvancePaid" placeholder="المبلغ المدفوع دلوقتي" min="0" step="0.01">
+            <select id="invAdvanceTreasury" class="mod-form-input" style="margin-top:6px">
+                ${(INV_DB.treasuries||[]).map(t => `<option value="${t.id}" ${t.id===invTreasuryId?'selected':''}>${t.name}</option>`).join('')}
+            </select>
+            <div style="font-size:11px;color:var(--inv-muted);margin-top:4px">الباقي بيتسجّل على حساب العميل.</div>
+        </div>` : ''}
     </div>`;
 }
 
@@ -1353,6 +1364,20 @@ async function invSave(andNew) {
         }
     }
 
+    // تحذير البيع بأقل من التكلفة (ميزة مفعّلة من الإعدادات — features.js): بنسأل قبل الحفظ لو أي صنف صافي سعره تحت سعر الشراء
+    try {
+        if (typeof ftOn === 'function' && await ftOn('feature_below_cost_warn')) {
+            const low = [];
+            for (const it of filled) {
+                const prod = INV_DB.products.find(p => p.id === it.pid);
+                const cost = prod ? invGetBuyPrice(prod) : 0;
+                const net1 = (Number(it.price) || 0) * (1 - (Number(it.disc) || 0) / 100);
+                if (cost > 0 && net1 < cost) low.push(`• ${it.name}: بيع ${invFmt(net1)} — تكلفة ${invFmt(cost)} (خسارة ${invFmt(cost - net1)} للوحدة)`);
+            }
+            if (low.length && !confirm('⚠️ أصناف بتتباع بأقل من التكلفة:\n\n' + low.join('\n') + '\n\nهل تريد المتابعة؟')) return { ok: false };
+        }
+    } catch { /* التحذير اختياري — مايوقفش الحفظ */ }
+
     // فحص الحد الائتماني للعميل الآجل — قرار عمل واضح (27 يوليو 2026): غير
     // الأدمن ممنوع تمامًا من تجاوز الحد، الأدمن بس يقدر يتجاوز بسبب مكتوب
     // إجباري بيتسجّل في activity_logs (مش زرار OK عادي بيعدّي بصمت).
@@ -1618,6 +1643,27 @@ async function invSave(andNew) {
         if (invPayType === 'credit' && invCustId) {
             const c = INV_DB.customers.find(x=>x.id===invCustId);
             if (c) c.balance = (Number(c.balance)||0) + net;
+        }
+
+        // دفع مقدّم: بيتسجّل كتحصيل عادي من العميل (نفس المسار المحاسبي: خزنة + رصيد العميل) بعد نجاح الفاتورة.
+        // لو التحصيل فشل لأي سبب الفاتورة تفضل سليمة وبنقول للمستخدم يسجّل التحصيل يدوي من شاشة التحصيلات.
+        if (invPayType === 'credit' && invCustId && INV_DB.splitPayOn && !invEditingId && rpcRows?.[0]?.id) {
+            const adv = Math.min(parseFloat(document.getElementById('invAdvancePaid')?.value) || 0, net);
+            if (adv > 0) {
+                try {
+                    const { error: advErr } = await sb.from('customer_payments').insert({
+                        ref: 'ADV-' + invoiceNo, customer_id: invCustId, amount: adv, status: 'confirmed',
+                        treasury_id: document.getElementById('invAdvanceTreasury')?.value || invTreasuryId || null,
+                        created_by: currentUser?.id || null,
+                    });
+                    if (advErr) throw advErr;
+                    const c = INV_DB.customers.find(x=>x.id===invCustId);
+                    if (c) c.balance = (Number(c.balance)||0) - adv;
+                    invToast(`💵 اتسجّل دفع مقدّم ${invFmt(adv)} ج.م على الفاتورة ${invoiceNo}`, 'success');
+                } catch (e) {
+                    alert(`⚠️ الفاتورة ${invoiceNo} اتحفظت، لكن الدفع المقدّم (${invFmt(adv)} ج.م) ما اتسجّلش: ${e.message}\nسجّله يدوي من شاشة التحصيلات.`);
+                }
+            }
         }
 
         localStorage.removeItem(INV_AUTOSAVE_KEY);

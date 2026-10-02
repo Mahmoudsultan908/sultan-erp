@@ -16,6 +16,10 @@ let _perfTab = 'product'; // 'product' | 'customer' | 'rep' | 'compare' | 'payme
 let _perfPaymentsRows = []; // آخر نتيجة تحميل تبويب المدفوعات — عشان خانة البحث تفلتر منها من غير استعلام جديد
 let _perfReturnsRows = []; // نفس الفكرة لتبويب المرتجعات
 
+// فلتر الفرع (branches.js): الفرع المختار من أعلى صفحة التقارير — فاضي = كل الفروع. لو الدوال مش محمّلة بنتجاهله.
+async function prfBf() { try { return typeof brReportFilter === 'function' ? await brReportFilter() : null; } catch { return null; } }
+function prfBr(q, f, kind, foreign) { return (f && typeof brApply === 'function') ? brApply(q, f, kind, foreign) : q; }
+
 // ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي من غير فلتر
 //   يضيّق النتيجة — sale_items بقى أكتر من كده بعد نقل البيانات التاريخية،
 //   فتقرير "حسب الصنف" و"مقارنة فترات" كانا بيحسبوا إيراد/تكلفة ناقصين
@@ -90,6 +94,7 @@ const PRF_TABS = [
     { id: 'compare', label: '⚖️ مقارنة فترات' },
     { id: 'payments', label: '💰 المدفوعات' },
     { id: 'returns', label: '↩️ المرتجعات' },
+    { id: 'suppliers', label: '🏭 تقييم الموردين' },
 ];
 
 function prfRenderPage(c) {
@@ -108,6 +113,7 @@ function prfRenderPage(c) {
     else if (_perfTab === 'rep') prfRenderByRepForm();
     else if (_perfTab === 'payments') prfRenderPaymentsForm();
     else if (_perfTab === 'returns') prfRenderReturnsForm();
+    else if (_perfTab === 'suppliers') prfRenderSuppliersForm();
     else prfRenderCompareForm();
 }
 
@@ -150,10 +156,11 @@ window.prfLoadByProduct = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
+        const bf = await prfBf();
         const { data: items, error } = await prfFetchAllRows(
             'sale_items',
             'product_id, qty, free_qty, line_total, cost_price_snapshot, sales!inner(created_at, status)',
-            (q) => q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59')
+            (q) => prfBr(q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59'), bf, 'doc', 'sales')
         );
         if (error) throw error;
 
@@ -245,10 +252,11 @@ window.prfLoadByCustomer = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
-        const { data: sales, error } = await sb.from('sales')
+        const bf = await prfBf();
+        const { data: sales, error } = await prfBr(sb.from('sales')
             .select('customer_id, total, created_at')
             .eq('status', 'confirmed')
-            .gte('created_at', from).lte('created_at', to + 'T23:59:59');
+            .gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc');
         if (error) throw error;
 
         const byCust = {};
@@ -315,10 +323,11 @@ window.prfLoadByRep = async function () {
         //   sales_returns.rep_id عمود جديد (راجع sales_returns_rep_id_migration.sql) —
         //   لو لسه ما اتضافش/الجدول لسه مش موجود، e3 بيرجع خطأ ونتجاهله بهدوء
         //   ونحسب من غير خصم مرتجعات (نفس فلسفة sales_reps الاختيارية فوق).
+        const bf = await prfBf();
         const [{ data: allSales, error: e1 }, { data: repSales, error: e2 }, { data: repReturns, error: e3 }] = await Promise.all([
-            sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
-            sb.from('sales').select('rep_id, total').eq('status', 'confirmed').not('rep_id', 'is', null).gte('created_at', from).lte('created_at', to + 'T23:59:59'),
-            sb.from('sales_returns').select('rep_id, total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            prfBr(sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
+            prfBr(sb.from('sales').select('rep_id, total').eq('status', 'confirmed').not('rep_id', 'is', null).gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
+            prfBr(sb.from('sales_returns').select('rep_id, total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;
@@ -418,10 +427,11 @@ function prfRenderCompareForm() {
 }
 
 async function prfLoadPeriodTotals(from, to) {
+    const bf = await prfBf();
     const [{ data: items, error: e1 }, { data: sales, error: e2 }] = await Promise.all([
         prfFetchAllRows('sale_items', 'product_id, qty, line_total, sales!inner(created_at, status)', (q) =>
-            q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59')),
-        sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            prfBr(q.eq('sales.status', 'confirmed').gte('sales.created_at', from).lte('sales.created_at', to + 'T23:59:59'), bf, 'doc', 'sales')),
+        prfBr(sb.from('sales').select('total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
     ]);
     if (e1) throw e1;
     if (e2) throw e2;
@@ -526,11 +536,12 @@ window.prfLoadPayments = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
+        const bf = await prfBf();
         const [{ data: collections, error: e1 }, { data: payouts, error: e2 }] = await Promise.all([
-            sb.from('customer_payments').select('id, customer_id, amount, treasury_id, ref, created_at')
-                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
-            sb.from('supplier_payments').select('id, supplier_id, amount, treasury_id, ref, created_at')
-                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            prfBr(sb.from('customer_payments').select('id, customer_id, amount, treasury_id, ref, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'tr'),
+            prfBr(sb.from('supplier_payments').select('id, supplier_id, amount, treasury_id, ref, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'tr'),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;
@@ -634,11 +645,12 @@ window.prfLoadReturns = async function () {
     resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
 
     try {
+        const bf = await prfBf();
         const [{ data: salesRet, error: e1 }, { data: purRet, error: e2 }] = await Promise.all([
-            sb.from('sales_returns').select('id, customer_id, rep_id, total, return_no, created_at')
-                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
-            sb.from('purchase_returns').select('id, supplier_id, total, return_no, created_at')
-                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'),
+            prfBr(sb.from('sales_returns').select('id, customer_id, rep_id, total, return_no, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
+            prfBr(sb.from('purchase_returns').select('id, supplier_id, total, return_no, created_at')
+                .eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;
@@ -721,8 +733,70 @@ function prfRenderReturnsResult(rows) {
     window._prfExportRows = rows.map(r => ({ النوع: r.kind === 'sale' ? 'مرتجع بيع' : 'مرتجع شراء', 'رقم المرتجع': r.no || '—', الاسم: r.name, المبلغ: r.amount, التاريخ: new Date(r.created_at).toLocaleDateString('ar-EG') }));
 }
 
+// ════════════════════════════════════════════════════════════
+// 8) تقييم الموردين — حجم الشراء + نسبة المرتجعات (حدود التقييم قابلة للتعديل)
+// ════════════════════════════════════════════════════════════
+function prfRenderSuppliersForm() {
+    const body = document.getElementById('prf-body');
+    if (!body) return;
+    body.innerHTML = prfDateRangeBarHTML({ from: 'prfSupFrom', to: 'prfSupTo' }, 'prfLoadSuppliers()') + `
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:13px">
+            <span>التقييم: 🟢 لو المرتجعات أقل من</span>
+            <input type="number" id="prfSupGood" class="ob-input" style="margin:0;width:70px" value="2" min="0" step="0.5"><span>%</span>
+            <span>🔴 لو وصلت</span>
+            <input type="number" id="prfSupBad" class="ob-input" style="margin:0;width:70px" value="5" min="0" step="0.5"><span>% أو أكتر</span>
+            <button class="mod-btn" onclick="prfLoadSuppliers()">تحديث</button>
+        </div>
+        <div id="prf-result"></div>`;
+    prfLoadSuppliers();
+}
+
+window.prfLoadSuppliers = async function () {
+    const from = document.getElementById('prfSupFrom')?.value || perfDefaultFrom();
+    const to = document.getElementById('prfSupTo')?.value || perfToday();
+    const good = parseFloat(document.getElementById('prfSupGood')?.value) || 2;
+    const bad = parseFloat(document.getElementById('prfSupBad')?.value) || 5;
+    const resultEl = document.getElementById('prf-result');
+    resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--inv-muted)">⏳ جاري التجميع...</div>';
+    try {
+        const bf = await prfBf();
+        const [{ data: pur, error: e1 }, { data: ret, error: e2 }] = await Promise.all([
+            prfBr(sb.from('purchases').select('supplier_id, total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
+            prfBr(sb.from('purchase_returns').select('supplier_id, total').eq('status', 'confirmed').gte('created_at', from).lte('created_at', to + 'T23:59:59'), bf, 'doc'),
+        ]);
+        if (e1) throw e1;
+        if (e2) throw e2;
+        const g = {};
+        const slot = id => g[id || '__none__'] || (g[id || '__none__'] = { bought: 0, n: 0, returned: 0 });
+        (pur || []).forEach(r => { const s = slot(r.supplier_id); s.bought += Number(r.total) || 0; s.n++; });
+        (ret || []).forEach(r => { slot(r.supplier_id).returned += Number(r.total) || 0; });
+        const grand = Object.values(g).reduce((s, x) => s + x.bought, 0);
+        const rows = Object.entries(g).map(([id, x]) => {
+            const rate = x.bought > 0 ? (x.returned / x.bought) * 100 : (x.returned > 0 ? 100 : 0);
+            return { name: id === '__none__' ? 'بدون مورد' : (_perfSuppliers.find(s => s.id === id)?.name || 'مورد محذوف'),
+                bought: x.bought, n: x.n, returned: x.returned, rate, share: grand > 0 ? (x.bought / grand) * 100 : 0,
+                grade: rate >= bad ? '🔴' : rate < good ? '🟢' : '🟡' };
+        }).sort((a, b) => b.bought - a.bought);
+        resultEl.innerHTML = `
+        <div class="mod-table-wrap"><table class="mod-table"><thead><tr>
+            <th>المورد</th><th style="text-align:center">عدد الفواتير</th><th style="text-align:left">المشتريات</th><th style="text-align:center">نسبة من الإجمالي</th>
+            <th style="text-align:left">المرتجعات</th><th style="text-align:center">نسبة المرتجع</th><th style="text-align:center">التقييم</th>
+        </tr></thead><tbody>
+        ${rows.length ? rows.map(r => `<tr><td><strong>${r.name}</strong></td><td style="text-align:center">${r.n}</td>
+            <td style="text-align:left;font-weight:700">${perfFmt(r.bought)}</td><td style="text-align:center">${r.share.toFixed(1)}%</td>
+            <td style="text-align:left">${perfFmt(r.returned)}</td><td style="text-align:center">${r.rate.toFixed(1)}%</td><td style="text-align:center;font-size:18px">${r.grade}</td></tr>`).join('')
+            : '<tr><td colspan="7" class="empty-state"><span>📭</span>لا توجد مشتريات في الفترة</td></tr>'}
+        </tbody></table></div>${PRF_ACTIONS_HTML}`;
+        window._prfExportName = 'تقييم الموردين';
+        window._prfPrintTitle = 'تقرير تقييم الموردين';
+        window._prfExportRows = rows.map(r => ({ المورد: r.name, 'عدد الفواتير': r.n, المشتريات: r.bought, المرتجعات: r.returned, 'نسبة المرتجع %': r.rate.toFixed(1) }));
+    } catch (err) {
+        resultEl.innerHTML = `<div style="background:var(--inv-red-bg);color:var(--inv-red);padding:16px;border-radius:10px">خطأ: ${err.message}</div>`;
+    }
+};
+
 Object.assign(window, {
-    renderPerformanceReports, prfSwitchTab,
+    renderPerformanceReports, prfSwitchTab, prfLoadSuppliers,
     prfLoadByProduct, prfLoadByCustomer, prfLoadByRep, prfLoadCompare,
     prfLoadPayments, prfFilterPayments, prfLoadReturns, prfFilterReturns,
 });

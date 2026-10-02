@@ -310,7 +310,7 @@ async function posSave() {
     });
 
     try {
-        const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_sale', {
+        const salePayload = {
             p_customer_id: posPayType === 'credit' ? posCustId : null,
             p_payment_type: posPayType,
             p_subtotal: subtotal,
@@ -323,7 +323,16 @@ async function posSave() {
             p_source_app: 'erp',
             p_created_by: currentUser?.id || null,
             p_items: itemsPayload,
-        });
+        };
+        let { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_sale', salePayload);
+        // الحد الائتماني (بوضع enforce): القاعدة بترفض الأدمن لو من غير سبب مكتوب، وبترفض غير الأدمن تماماً.
+        // للأدمن بس بنسأل عن السبب ونعيد المحاولة مرة واحدة؛ لو ألغى أو سابه فاضي بنعرض نفس رسالة الرفض.
+        if (rpcErr && /لازم سبب مكتوب لتجاوز الحد/.test(rpcErr.message || '')) {
+            const reason = prompt(`⚠️ ${rpcErr.message}\n\nاكتب سبب الموافقة على التجاوز (إجباري):`);
+            if (reason && reason.trim()) {
+                ({ data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_sale', { ...salePayload, p_credit_override_reason: reason.trim() }));
+            }
+        }
         if (rpcErr) throw rpcErr;
 
         const saleId = rpcRows?.[0]?.id;
