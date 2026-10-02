@@ -1,0 +1,29 @@
+name: CI
+
+# فحوصات آلية على كل push وكل pull request: syntax لكل ملفات JS، مراجع index.html وsw.js، أسرار مكشوفة،
+# وقاعدة رفع ?v و SHELL_CACHE. نفس الفحص بيشتغل محلياً: node scripts/ci-check.js
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Pick base ref for the version-bump rule
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "BASE_REF=origin/${{ github.base_ref }}" >> "$GITHUB_ENV"
+          elif [ "${{ github.ref_name }}" != "main" ]; then
+            echo "BASE_REF=origin/main" >> "$GITHUB_ENV"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "BASE_REF=${{ github.event.before }}" >> "$GITHUB_ENV"
+          fi
+      - name: Run checks
+        run: node scripts/ci-check.js
