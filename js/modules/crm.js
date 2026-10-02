@@ -181,7 +181,7 @@ async function crmLoadInteractionsData() {
     _crmTableMissing = false;
     try {
         const { data, error } = await sb.from('customer_interactions')
-            .select('*, customers(name,phone), sales_reps(name), archive_documents(title,file_url)').order('interaction_date', { ascending: false });
+            .select('*, customers(name,phone), sales_reps(name), archive_documents(title,file_url,file_path)').order('interaction_date', { ascending: false });
         if (error) throw error;
         _crmList = data || [];
     } catch (e) {
@@ -348,7 +348,7 @@ function crmRenderPage(c) {
                         <td>${CRM_TYPE_LABELS[x.type] || x.type}</td>
                         <td style="color:var(--inv-muted)">${assignedName}</td>
                         <td style="font-size:12px">${new Date(x.interaction_date).toLocaleDateString('ar-EG')}</td>
-                        <td style="color:var(--inv-muted);max-width:220px">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:var(--inv-gold)">📎 ${x.archive_documents.title}</a>` : ''}</td>
+                        <td style="color:var(--inv-muted);max-width:220px">${x.notes || '—'}${x.archive_documents ? `<br><a href="#" onclick="arcOpenFile('${x.archive_documents.file_path || ''}', '${x.archive_documents.file_url || ''}');return false" style="font-size:11px;color:var(--inv-gold)">📎 ${x.archive_documents.title}</a>` : ''}</td>
                         <td style="font-size:12px;${overdueRow ? 'color:var(--inv-red);font-weight:700' : ''}">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') : '—'}</td>
                         <td style="text-align:center;white-space:nowrap">
                             ${waLink ? `<a class="cc-edit" style="background:#DCFCE7;color:#16A34A;text-decoration:none" href="${waLink}" target="_blank">📲</a>` : ''}

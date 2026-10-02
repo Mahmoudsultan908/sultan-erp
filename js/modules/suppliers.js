@@ -95,7 +95,7 @@ window.supShowStatement = async function(supplierId) {
                 .eq('supplier_id', supplierId).in('kind', ['receive', 'reopen'])
                 .order('event_date', { ascending: true }).then(r => r, () => ({ data: [] })),
             // اختياري — لو جدول archive_documents لسه ما اتعملش، نتجاهل الخطأ بهدوء
-            sb.from('archive_documents').select('id,title,file_url,category,created_at')
+            sb.from('archive_documents').select('id,title,file_url,file_path,category,created_at')
                 .eq('linked_type', 'supplier').eq('linked_id', supplierId)
                 .order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
         ]);
@@ -247,7 +247,7 @@ window.supShowStatement = async function(supplierId) {
                 <div style="font-size:13px;font-weight:800;color:var(--inv-navy);margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
                 ${docs.length === 0 ? `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد مستندات مرتبطة بهذا المورد في الأرشيف.</div>` :
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
-                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:${supThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
+                    ${docs.map(d => `<a href="#" onclick="arcOpenFile('${d.file_path || ''}', '${d.file_url || ''}');return false" class="cc-edit" style="background:${supThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
                 </div>`}
             </div>`;
 
