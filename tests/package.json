@@ -1,0 +1,7 @@
+{
+  "name": "sultan-erp-tests",
+  "private": true,
+  "description": "Automated UI/logic tests (jsdom + node:test) — run: cd tests && npm install && npm test",
+  "scripts": { "test": "node --test" },
+  "devDependencies": { "jsdom": "^24.1.1" }
+}
