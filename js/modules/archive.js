@@ -91,7 +91,7 @@ function arcRenderPage(c) {
                 <div style="font-size:11.5px;color:var(--inv-muted);margin-bottom:6px">${arcLinkedLabel(d)}${d.category?' · '+d.category:''}</div>
                 <div style="font-size:11px;color:var(--inv-muted-light);margin-bottom:10px">${new Date(d.created_at).toLocaleDateString('ar-EG')}</div>
                 <div style="display:flex;gap:6px">
-                    <a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold);text-decoration:none;flex:1;text-align:center">👁️ فتح</a>
+                    <button class="cc-edit" style="background:var(--inv-gold-bg);color:var(--inv-gold);flex:1;text-align:center" onclick="arcOpenFile('${d.file_path || ''}', '${d.file_url || ''}')">👁️ فتح</button>
                     <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="arcDelete('${d.id}')">🗑️</button>
                 </div>
             </div>`).join('')}
@@ -250,6 +250,21 @@ window.arcSaveUpload = async function () {
         alert('❌ خطأ: ' + err.message + (_arcTableMissing ? '\n\nتأكد من تشغيل archive_documents_migration.sql وعمل باكت Storage اسمه archive-documents.' : ''));
         btn.innerText = '📤 رفع وحفظ'; btn.disabled = false;
         if (progress) progress.textContent = '';
+    }
+};
+
+// فتح ملف من الأرشيف: البوكت خاص، فبنطلب رابط مؤقت (5 دقايق) بدل الرابط العام. النافذة بتتفتح فوراً (عشان المتصفح ما يمنعهاش) وبعدين بنوجّهها للرابط.
+window.arcOpenFile = async function (path, fallbackUrl) {
+    const w = window.open('about:blank', '_blank');
+    try {
+        if (!path) throw new Error('مفيش مسار للملف');
+        const { data, error } = await sb.storage.from(ARC_BUCKET).createSignedUrl(path, 300);
+        if (error) throw error;
+        if (w) w.location.href = data.signedUrl; else window.location.href = data.signedUrl;
+    } catch (err) {
+        if (fallbackUrl && w) { w.location.href = fallbackUrl; return; }
+        if (w) w.close();
+        alert('❌ تعذّر فتح الملف: ' + err.message);
     }
 };
 

@@ -168,11 +168,11 @@ window.custShowStatement = async function(customerId) {
             sb.from('opening_balances').select('id, amount, as_of_date, notes')
                 .eq('customer_id', customerId).eq('balance_type', 'customer').eq('status', 'confirmed'),
             // اختياري — لو جدول archive_documents لسه ما اتعملش، نتجاهل الخطأ بهدوء
-            sb.from('archive_documents').select('id,title,file_url,category,created_at')
+            sb.from('archive_documents').select('id,title,file_url,file_path,category,created_at')
                 .eq('linked_type', 'customer').eq('linked_id', customerId)
                 .order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
             // اختياري — لو جدول customer_interactions لسه ما اتعملش، نتجاهل الخطأ بهدوء
-            sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done,sales_reps(name),archive_documents(title,file_url)')
+            sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done,sales_reps(name),archive_documents(title,file_url,file_path)')
                 .eq('customer_id', customerId)
                 .order('interaction_date', { ascending: false }).then(r => r, () => ({ data: [] })),
             cust.group_id ? sb.from('customer_groups').select('name').eq('id', cust.group_id).single().then(r => r, () => ({ data: null })) : Promise.resolve({ data: null }),
@@ -349,7 +349,7 @@ window.custShowStatement = async function(customerId) {
                 <div style="font-size:13px;font-weight:800;color:var(--inv-navy);margin-bottom:8px">📁 المستندات المرتبطة (${docs.length})</div>
                 ${docs.length === 0 ? `<div style="font-size:12.5px;color:var(--inv-muted-light)">لا توجد مستندات مرتبطة بهذا العميل في الأرشيف.</div>` :
                 `<div style="display:flex;flex-wrap:wrap;gap:8px">
-                    ${docs.map(d => `<a href="${d.file_url}" target="_blank" rel="noopener" class="cc-edit" style="background:${custThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
+                    ${docs.map(d => `<a href="#" onclick="arcOpenFile('${d.file_path || ''}', '${d.file_url || ''}');return false" class="cc-edit" style="background:${custThemeBg('var(--inv-gold-bg)','#2E2410')};color:var(--inv-gold);text-decoration:none">📄 ${d.title}${d.category?' ('+d.category+')':''}</a>`).join('')}
                 </div>`}
             </div>
 
@@ -839,7 +839,7 @@ function custInteractionsHTML(interactions) {
             <td>${typeLabels[x.type] || x.type}</td>
             <td style="color:var(--inv-muted)">${x.sales_reps?.name || '—'}</td>
             <td style="font-size:12px">${new Date(x.interaction_date).toLocaleDateString('ar-EG')}</td>
-            <td style="color:var(--inv-muted)">${x.notes || '—'}${x.archive_documents ? `<br><a href="${x.archive_documents.file_url}" target="_blank" rel="noopener" style="font-size:11px;color:var(--inv-gold)">📎 ${x.archive_documents.title}</a>` : ''}</td>
+            <td style="color:var(--inv-muted)">${x.notes || '—'}${x.archive_documents ? `<br><a href="#" onclick="arcOpenFile('${x.archive_documents.file_path || ''}', '${x.archive_documents.file_url || ''}');return false" style="font-size:11px;color:var(--inv-gold)">📎 ${x.archive_documents.title}</a>` : ''}</td>
             <td style="font-size:12px">${x.next_follow_up_date ? new Date(x.next_follow_up_date).toLocaleDateString('ar-EG') + (x.is_done ? ' ✅' : '') : '—'}</td>
         </tr>`).join('')}
     </tbody></table></div>`;
@@ -849,7 +849,7 @@ window.custRefreshInteractions = async function (customerId) {
     const wrap = document.getElementById('custInteractionsWrap');
     if (!wrap) return;
     try {
-        const { data } = await sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done,sales_reps(name),archive_documents(title,file_url)')
+        const { data } = await sb.from('customer_interactions').select('id,type,notes,interaction_date,next_follow_up_date,is_done,sales_reps(name),archive_documents(title,file_url,file_path)')
             .eq('customer_id', customerId).order('interaction_date', { ascending: false });
         wrap.innerHTML = custInteractionsHTML(data || []);
     } catch {}
