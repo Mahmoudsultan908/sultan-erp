@@ -133,11 +133,14 @@ window.rcrApprove = async function (id) {
 };
 
 window.rcrReject = async function (id) {
-    if (!confirm('رفض الطلب ده؟ بيانات العميل مش هتتغيّر.')) return;
+    const r = RCR_LIST.find(x => x.id === id);
+    // تسجيل جديد من سلطانو: الرفض بيوقف العميل ويقفل جلساته (مبقاش يقدر يدخل أو يطلب). غير كده الرفض بيغيّر حالة الطلب بس.
+    const blocksCustomer = r && r.request_type === 'new' && r.source === 'sultano';
+    if (!confirm(blocksCustomer
+        ? 'رفض تسجيل العميل ده؟ هيتوقف حسابه فوراً ومش هيقدر يدخل سلطانو أو يبعت طلبات.'
+        : 'رفض الطلب ده؟ بيانات العميل مش هتتغيّر.')) return;
     try {
-        const { error } = await sb.from('customer_change_requests').update({
-            status: 'rejected', reviewed_by: currentUser?.id || null, reviewed_at: new Date().toISOString(),
-        }).eq('id', id);
+        const { error } = await sb.rpc('fn_reject_customer_request', { p_request_id: id });
         if (error) throw error;
         renderRepCustomerRequests(document.getElementById('repMgmtBody') || document.getElementById('corBody') || document.getElementById('app-content'));
     } catch (err) {
