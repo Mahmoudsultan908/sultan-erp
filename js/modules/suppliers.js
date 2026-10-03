@@ -222,7 +222,7 @@ window.supShowStatement = async function(supplierId) {
             const earliestDate = moves.length ? new Date(new Date(moves[0].date).getTime() - 1000).toISOString() : (sup.created_at || new Date(0).toISOString());
             displayMoves.push({
                 date: earliestDate,
-                desc: 'رصيد مرحّل من النظام القديم (قبل سلطان)',
+                desc: 'رصيد مرحّل من النظام القديم (قبل ' + BRAND.short + ')',
                 debit: Math.max(-legacyDiff, 0), credit: Math.max(legacyDiff, 0),
                 type: 'legacy-carry',
             });
