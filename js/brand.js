@@ -49,6 +49,7 @@ async function brandLoad() {
         }
         try { localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(BRAND)); } catch { /* مش مهم */ }
         brandApply();
+        if (typeof brandInstallRewriter === 'function') { brandInstallRewriter(); brandRewriteTree(document.body); }
         return changed;
     } catch { return false; }
 }
@@ -84,4 +85,45 @@ window.brandSave = async function () {
     } catch (err) { alert('❌ ' + err.message); }
 };
 
-Object.assign(window, { BRAND, brandLoad, brandApply, brandRenderCard });
+// ── استبدال اسم تطبيق العملاء في كل النصوص الثابتة ──
+// نصوص كتير في الشاشات (أزرار، عناوين، رسائل تأكيد) فيها كلمة "سلطانو" مكتوبة جوه الكود. بدل ما نعدّل كل مكان،
+// لو اسم تطبيق العملاء في الهوية غير الأصلي بنبدّل الكلمة تلقائياً في أي نص بيظهر (عناصر الصفحة + alert/confirm/prompt).
+// لو الاسم هو الأصلي (سلطان نفسه) مفيش أي تدخّل ولا تكلفة. الكلمة الأصلية مكتوبة بالرموز عشان سكربت العملاء ما يمسّهاش.
+const BRAND_SRC_APP = 'سلطانو';   // = سلطانو
+function brandText(s) {
+    const to = BRAND.customerApp;
+    if (typeof s !== 'string' || !to || to === BRAND_SRC_APP || !s.includes(BRAND_SRC_APP)) return s;
+    const lam = 'ل';                                          // "لسلطانو" → "لـ" + الاسم (للاسم اللي بيبدأ بـ ال)
+    const withLam = to.startsWith('ال') ? lam + to.slice(1) : lam + to;
+    return s.split(lam + BRAND_SRC_APP).join(withLam).split(BRAND_SRC_APP).join(to);
+}
+function brandRewriteTree(root) {
+    try {
+        if (!root || BRAND.customerApp === BRAND_SRC_APP) return;
+        const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        let n; const todo = [];
+        while ((n = w.nextNode())) if (n.nodeValue.includes(BRAND_SRC_APP)) todo.push(n);
+        todo.forEach(t => { t.nodeValue = brandText(t.nodeValue); });
+        if (root.querySelectorAll) {
+            root.querySelectorAll('[placeholder],[title],[aria-label],[value]').forEach(el => {
+                for (const a of ['placeholder', 'title', 'aria-label']) { const v = el.getAttribute(a); if (v && v.includes(BRAND_SRC_APP)) el.setAttribute(a, brandText(v)); }
+            });
+        }
+    } catch { /* مش مهم */ }
+}
+function brandInstallRewriter() {
+    if (BRAND.customerApp === BRAND_SRC_APP || window.__brandRewriter) return;
+    window.__brandRewriter = true;
+    ['alert', 'confirm', 'prompt'].forEach(fn => {
+        const orig = window[fn]; if (typeof orig !== 'function') return;
+        window[fn] = function (msg, ...rest) { return orig.call(window, brandText(String(msg ?? '')), ...rest); };
+    });
+    let queued = false;
+    const run = () => { queued = false; brandRewriteTree(document.body); };
+    new MutationObserver(() => { if (!queued) { queued = true; (window.requestAnimationFrame || setTimeout)(run); } })
+        .observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    run();
+}
+brandInstallRewriter();
+
+Object.assign(window, { BRAND, brandLoad, brandApply, brandRenderCard, brandText, brandRewriteTree, brandInstallRewriter });

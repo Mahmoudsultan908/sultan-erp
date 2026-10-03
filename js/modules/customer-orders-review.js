@@ -613,7 +613,7 @@ async function corLinkRefreshBadge() {
         if (total > _corLastNotifiedCount) {
             corPlayNotifySound();
             if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                try { new Notification('🔗 حدث جديد في طلبات العملاء', { body: `عندك ${total} حدث جديد (طلبات/تسجيلات سلطانو) محتاج مراجعة`, icon: './icon-192.png' }); } catch (e) {}
+                try { new Notification('🔗 حدث جديد في طلبات العملاء', { body: (typeof brandText === 'function' ? brandText : (s => s))(`عندك ${total} حدث جديد (طلبات/تسجيلات سلطانو) محتاج مراجعة`), icon: './icon-192.png' }); } catch (e) {}
             }
         }
         _corLastNotifiedCount = total;

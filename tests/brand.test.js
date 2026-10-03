@@ -43,3 +43,32 @@ test('الهوية: الحفظ بيكتب الـ5 إعدادات', async () => {
     assert.equal(saved.find(r => r.key === 'brand_short_ar').value, 'الشركة');
     assert.ok(saved.every(r => r.value && r.key.startsWith('brand_')));
 });
+
+test('اسم تطبيق العملاء: بيتبدّل في النصوص والخصائص و alert/confirm، ولا يمس الاسم الأصلي', async () => {
+    const SRC = 'سلطانو';
+    const { JSDOM } = require('jsdom'); const fs = require('fs'); const path = require('path'); const vm = require('vm');
+    const mk = (cache) => {
+        const dom = new JSDOM(`<body><div id="a"><button title="زرار ${SRC}">📦 طلبات ${SRC}</button><input placeholder="بحث في ${SRC}"><p>🔑 رقم سري ل${SRC}</p></div></body>`, { runScripts: 'outside-only', url: 'http://localhost/' });
+        if (cache) dom.window.localStorage.setItem('brand_cache_v1', JSON.stringify(cache));
+        const alerts = []; dom.window.alert = (m) => alerts.push(m);
+        new vm.Script(fs.readFileSync(path.join(__dirname, '..', 'js/brand.js'), 'utf8')).runInContext(dom.getInternalVMContext());
+        return { w: dom.window, alerts };
+    };
+    // اسم مختلف
+    const { w, alerts } = mk({ customerApp: 'النور أونلاين' });
+    await new Promise(r => setTimeout(r, 60));
+    assert.equal(w.document.querySelector('button').textContent, '📦 طلبات النور أونلاين');
+    assert.equal(w.document.querySelector('button').getAttribute('title'), 'زرار النور أونلاين');
+    assert.equal(w.document.querySelector('input').getAttribute('placeholder'), 'بحث في النور أونلاين');
+    assert.equal(w.document.querySelector('p').textContent, '🔑 رقم سري للنور أونلاين'.replace('للنور', 'للنور'));
+    // عناصر بتتضاف بعدين
+    const el = w.document.createElement('span'); el.textContent = 'مفيش طلبات ' + SRC; w.document.body.appendChild(el);
+    await new Promise(r => setTimeout(r, 60));
+    assert.equal(el.textContent, 'مفيش طلبات النور أونلاين');
+    w.alert('تأكيد ' + SRC); assert.equal(alerts[0], 'تأكيد النور أونلاين');
+    // الاسم الأصلي: مفيش تغيير
+    const o = mk(null);
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(o.w.document.querySelector('button').textContent, '📦 طلبات ' + SRC);
+    o.w.alert('x ' + SRC); assert.equal(o.alerts[0], 'x ' + SRC);
+});
