@@ -135,6 +135,7 @@ async function renderPurchases(c) {
                 purEditingOldDueDate = oldPur.due_date || null;
                 purEditingOldDiscount = Number(oldPur.discount) || 0;
                 purEditingOldCreatedAt = oldPur.created_at || null;
+                purPendingPOOrderId = oldPur.purchase_order_id || null;   // الفاتورة المعدّلة تفضل مربوطة بنفس أمر الشراء
 
                 purItems = (oldPur.purchase_items || []).map(it => ({
                     id: Date.now() + Math.random(), pid: it.product_id,
@@ -1163,7 +1164,9 @@ async function purSave(andNew) {
         //   مش قبل كده (راجع التعليق في purchase-orders.js لسبب التعديل).
         if (purPendingPOOrderId) {
             try {
-                await sb.from('purchase_orders').update({ status: 'received' }).eq('id', purPendingPOOrderId);
+                // الربط + حالة الأمر (قائم / استلام جزئي / تم الاستلام) بيتحسبوا في القاعدة
+                const { error: poErr } = await sb.rpc('fn_link_purchase_to_po', { p_purchase_id: rpcRows[0].id, p_order_id: purPendingPOOrderId });
+                if (poErr) purToast('⚠️ الفاتورة اتحفظت لكن ربطها بأمر الشراء فشل: ' + poErr.message, 'error');
             } catch {}
             purPendingPOOrderId = null;
         }
