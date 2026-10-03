@@ -12,6 +12,7 @@ let _colSelectedId = null;
 let _colList = [];
 let _colTreasuries = [];
 let _colEditingId = null; // معرّف سند التحصيل الجاري تعديله (مودال التعديل)
+let _colEditingCreatedAt = null; // تاريخ ووقت السند الأصلي — بيتحافظ عليه في السند المعدّل
 let _colRepById = {}; // created_by => اسم المندوب، لو التحصيل مسجّل من تطبيق سلطانو
 
 // ════════════════════════════════════════════════════════════
@@ -538,7 +539,7 @@ window.colOpenEditModal = function(id) {
     const p = _colList.find(x => x.id === id);
     if (!p) return alert('تعذّر العثور على سند التحصيل');
     if (p.status !== 'confirmed') return alert('هذا السند غير مؤكد بالفعل ولا يمكن تعديله');
-    _colEditingId = id;
+    _colEditingId = id; _colEditingCreatedAt = p.created_at || null;
 
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
@@ -607,7 +608,7 @@ window.colSaveEdit = async function() {
     try {
         // 1) إلغاء السند القديم — UPDATE واحد ذرّي، الـ trigger بيرجّع
         //    الخزنة ورصيد العميل ويعكس القيد المحاسبي تلقائياً.
-        const { error: cancelErr } = await sb.from('customer_payments').update({ status: 'cancelled' }).eq('id', oldId);
+        const { error: cancelErr } = await sb.rpc('fn_reverse_customer_payment_for_edit', { p_payment_id: oldId });
         if (cancelErr) throw cancelErr;
 
         // 2) تسجيل سند جديد بالبيانات المعدّلة (نفس مسار colSave العادي)
@@ -619,6 +620,7 @@ window.colSaveEdit = async function() {
             discount,
             status: 'confirmed',
             treasury_id: treasuryId,
+            ...(_colEditingCreatedAt ? { created_at: _colEditingCreatedAt } : {}),   // السند المعدّل بيحافظ على تاريخ السند الأصلي
             created_by: currentUser?.id || null,
         });
         if (insErr) {

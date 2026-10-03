@@ -8,6 +8,7 @@ let _paySelectedId = null;
 let _payList = [];
 let _payTreasuries = [];
 let _payEditingId = null; // معرّف سند الصرف الجاري تعديله (مودال التعديل)
+let _payEditingCreatedAt = null; // تاريخ ووقت السند الأصلي — بيتحافظ عليه في السند المعدّل
 
 // ════════════════════════════════════════════════════════════
 // 1) التقديم الرئيسي
@@ -387,7 +388,7 @@ window.payOpenEditModal = function(id) {
     const p = _payList.find(x => x.id === id);
     if (!p) return alert('تعذّر العثور على سند الصرف');
     if (p.status !== 'confirmed') return alert('هذا السند غير مؤكد بالفعل ولا يمكن تعديله');
-    _payEditingId = id;
+    _payEditingId = id; _payEditingCreatedAt = p.created_at || null;
 
     const modal = document.createElement('div');
     modal.className = 'mod-modal-bg active';
@@ -451,7 +452,7 @@ window.paySaveEdit = async function() {
     try {
         // 1) إلغاء السند القديم — UPDATE واحد ذرّي، الـ trigger بيرجّع
         //    الخزنة ورصيد المورد ويعكس القيد المحاسبي تلقائياً.
-        const { error: cancelErr } = await sb.from('supplier_payments').update({ status: 'cancelled' }).eq('id', oldId);
+        const { error: cancelErr } = await sb.rpc('fn_reverse_supplier_payment_for_edit', { p_payment_id: oldId });
         if (cancelErr) throw cancelErr;
 
         // 2) تسجيل سند جديد بالبيانات المعدّلة (نفس مسار paySave العادي)
@@ -466,6 +467,7 @@ window.paySaveEdit = async function() {
             amount,
             status: 'confirmed',
             treasury_id: treasuryId,
+            ...(_payEditingCreatedAt ? { created_at: _payEditingCreatedAt } : {}),   // السند المعدّل بيحافظ على تاريخ السند الأصلي
             created_by: currentUser?.id || null,
         });
         if (insErr) {

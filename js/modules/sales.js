@@ -30,6 +30,7 @@ let invEditingOldInvoiceNo = null;
 let invEditingOldSourceApp = null; // source_app الأصلي للفاتورة قبل التعديل — عشان نحافظ عليه (راجع التعليق فوق fn_create_sale)
 let invEditingOldDueDate = null;
 let invEditingOldNotes = null;
+let invEditingOldCreatedAt = null;   // تاريخ ووقت الفاتورة الأصلية — بيتحافظ عليه عند التعديل
 let invEditingOldDiscount = 0;
 
 // المهلة الافتراضية لتاريخ استحقاق الفاتورة الآجلة (يوم) — قابلة للتعديل يدوي وقت البيع دايماً
@@ -318,7 +319,7 @@ async function renderSales(c) {
     invTreasuryId = INV_DB.treasuries?.find(t => t.is_default)?.id || null;
     invPriceLevelCode = 'RETAIL';
     invRepId = null;
-    invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null; invEditingOldNotes = null; invEditingOldDueDate = null; invEditingOldDiscount = 0;
+    invEditingId = null; invEditingOldCreatedAt = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null; invEditingOldNotes = null; invEditingOldDueDate = null; invEditingOldDiscount = 0;
     invPendingQuoteId = null;
     invPendingOrderId = null;
     invPendingCartCustId = null;
@@ -344,6 +345,7 @@ async function renderSales(c) {
                 invEditingOldSourceApp = oldSale.source_app;
                 invEditingOldDueDate = oldSale.due_date || null;
                 invEditingOldNotes = oldSale.notes || null;
+                invEditingOldCreatedAt = oldSale.created_at || null;
                 invEditingOldDiscount = Number(oldSale.discount) || 0;
 
                 invItems = (oldSale.sale_items || []).map(it => ({
@@ -484,7 +486,7 @@ function invHeaderHTML() {
             <select class="inv-date-input" id="invWarehouse" title="المخزن" onchange="invOnWarehouseChange()" style="cursor:pointer">
                 ${(INV_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===invWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
             </select>
-            <input type="date" class="inv-date-input" id="invDate" value="${invToday()}">
+            <input type="date" class="inv-date-input" id="invDate" value="${invEditingOldCreatedAt ? new Date(invEditingOldCreatedAt).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' }) : invToday()}" max="${invToday()}">
             <div class="inv-header-spacer"></div>
             <button class="inv-top-btn inv-top-help"   onclick="invShowShortcuts()" title="الاختصارات (F1)">⌨️</button>
             <button class="inv-top-btn" id="invFullscreenBtn" onclick="invToggleFullscreen()" title="إخفاء القائمة والشريط العلوي">${document.body.classList.contains('inv-fullscreen') ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة'}</button>
@@ -1483,6 +1485,7 @@ async function invSave(andNew) {
                     treasury_id: invPayType === 'cash' ? (document.getElementById('invTreasuryId')?.value || invTreasuryId || null) : null,
                     source_app: invEffectiveSourceApp(invNormalizeRepId(invRepId)), created_by: currentUser?.id || null,
                     credit_override_reason: creditOverrideReason,   // بيتبعت للقاعدة وقت المزامنة (أونلاين/أوفلاين نفس الشيء)
+                    created_at: window.txnCreatedAt(document.getElementById('invDate')?.value, null) || new Date().toISOString(),   // وقت/تاريخ المعاملة الحقيقي (مش وقت المزامنة)
                 },
                 items: filled.map(it => {
                     const prod = INV_DB.products.find(p=>p.id===it.pid);
@@ -1531,6 +1534,12 @@ async function invSave(andNew) {
         }
 
         // ★ لو في وضع تعديل: ألغِ الفاتورة القديمة وارجع المخزون والرصيد قبل إنشاء النسخة الجديدة
+        // تاريخ المعاملة: نتحقق منه الأول (قبل إلغاء الفاتورة القديمة) علشان الرفض ما يسيبش التعديل نص نص
+        const txnTs = window.txnCreatedAt(document.getElementById('invDate')?.value, invEditingOldCreatedAt);
+        if (txnTs) {
+            const { error: dateErr } = await sb.rpc('fn_assert_txn_date', { p_ts: txnTs, p_replaces_created: invEditingOldCreatedAt });
+            if (dateErr) throw dateErr;
+        }
         if (invEditingId) {
             await invReverseOldForEdit();
         }
@@ -1600,6 +1609,9 @@ async function invSave(andNew) {
             p_items: itemsPayload,
             // سبب تجاوز الحد الائتماني (الأدمن فقط) — بنبعته بس لما يكون فيه تجاوز فعلاً
             ...(creditOverrideReason ? { p_credit_override_reason: creditOverrideReason } : {}),
+            // تاريخ المعاملة: التعديل بيحافظ على تاريخ الفاتورة الأصلية، والتسجيل بتاريخ سابق من خانة التاريخ
+            ...(txnTs ? { p_created_at: txnTs } : {}),
+            ...(invEditingId ? { p_replaces_id: invEditingId } : {}),
         });
         if (rpcErr) throw rpcErr;
         if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
@@ -1699,7 +1711,7 @@ async function invSave(andNew) {
         localStorage.removeItem(INV_AUTOSAVE_KEY);
         if (invEditingId) {
             invToast(`✅ تم إلغاء الفاتورة ${invEditingOldInvoiceNo} وتسجيل الفاتورة المعدّلة ${invoiceNo} — ${invFmt(net)} ج.م`, 'success');
-            invEditingId = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null;
+            invEditingId = null; invEditingOldCreatedAt = null; invEditingOldItems = []; invEditingOldInvoiceNo = null; invEditingOldSourceApp = null;
         } else {
             invToast(`✅ تم حفظ الفاتورة ${invoiceNo} — ${invFmt(net)} ج.م`, 'success');
         }
@@ -1884,7 +1896,21 @@ function invToArabicWords(num) {
 // 11) الأدوات المساعدة
 // ════════════════════════════════════════════════════════════
 function invFmt(n) { return (n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function invToday() { return new Date().toISOString().slice(0,10); }
+function invToday() { return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' }); }
+
+// تاريخ المعاملة اللي بنبعته لقاعدة البيانات (p_created_at):
+//  - لو التاريخ اللي في الخانة هو نفس يوم المعاملة الأصلية (تعديل) → بنرجّع الأصلي بالظبط (التاريخ والوقت ما بيتغيروش)
+//  - لو هو النهارده → null (الوقت الحالي)
+//  - غير كده (تسجيل بتاريخ سابق، أو تعديل التاريخ) → الساعة 12 ظهراً بتوقيت الجهاز من اليوم ده
+window.txnCreatedAt = function (dateStr, oldCreatedAt) {
+    const cairoDay = d => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    const today = cairoDay(Date.now());
+    if (!dateStr) return oldCreatedAt || null;
+    if (oldCreatedAt && cairoDay(oldCreatedAt) === dateStr) return oldCreatedAt;
+    if (dateStr === today) return null;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0).toISOString();
+};
 
 function invToast(msg, type='info') {
     let t = document.getElementById('invToast');
@@ -2049,6 +2075,8 @@ if (typeof registerSyncHandler === 'function') {
                 p_created_by: saleRow.created_by,
                 p_items: items,
                 ...(saleRow.credit_override_reason ? { p_credit_override_reason: saleRow.credit_override_reason } : {}),
+                // تاريخ المعاملة الأصلي (لو عدّى يوم أو أكتر على الأوفلاين) — بس لو في حدود 9 أيام علشان حماية الـ10 أيام ما ترفضش فاتورة سليمة
+                ...((saleRow.created_at && (Date.now() - new Date(saleRow.created_at).getTime()) < 9 * 86400000 && (Date.now() - new Date(saleRow.created_at).getTime()) > 120000) ? { p_created_at: saleRow.created_at } : {}),
             });
             if (rpcErr) return { ok: false, error: rpcErr.message, summary: `فاتورة ${tempInvoiceNo}` };
             const invoiceNo = rpcRows[0].invoice_no;

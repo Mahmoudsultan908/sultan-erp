@@ -49,6 +49,7 @@ let retPayCash = false;
 //   بدل التعديل المباشر فوق نفس السجل. راجع returns_edit_reversal_migration.sql.
 let retEditingId = null;
 let retEditingOldReturnNo = null;
+let retEditingOldCreatedAt = null;   // تاريخ ووقت المرتجع الأصلي — بيتحافظ عليه عند التعديل
 let retEditingLinkId = null; // sale_id/purchase_id الأصلي بتاع المرتجع القديم (لو كان مرتبط بفاتورة) — بنحافظ عليه في المرتجع الجديد
 
 // ★ Supabase بيرجع 1000 صف كحد أقصى افتراضي لأي select عادي —
@@ -146,7 +147,7 @@ async function renderReturns(c) {
 
     // إعادة ضبط الحالة
     retType = 'sales'; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retRepId = null; retItems = [];
-    retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
+    retEditingId = null; retEditingOldReturnNo = null; retEditingOldCreatedAt = null; retEditingLinkId = null;
     retPriceLevelCode = ''; retAffectsBalance = true; retPayCash = false;
     const mainWh = RET_DB.warehouses.find(w => w.is_main) || RET_DB.warehouses[0];
     retWarehouseId = mainWh?.id || null;
@@ -165,6 +166,7 @@ async function renderReturns(c) {
             if (oldRet) {
                 retEditingId = oldRet.id;
                 retEditingOldReturnNo = oldRet.return_no;
+                retEditingOldCreatedAt = oldRet.created_at || null;
                 retEditingLinkId = oldRet.sale_id || oldRet.purchase_id || null;
                 // ★ وضع "مستقل" دايماً وقت التعديل — بيسيب المستخدم يعدّل الكميات/الأسعار
                 //   بحرية من غير قيد maxQty بتاع الفاتورة الأصلية (اللي مطبّق بس في وضع linked).
@@ -247,7 +249,7 @@ window.retSwitchType = async function (type) {
     if (retItems.filter(i => i.pid).length && !confirm('سيتم فقد البيانات غير المحفوظة. تبديل نوع المرتجع؟')) return;
     if (retEditingId && !confirm('سيتم إلغاء وضع التعديل الحالي. تبديل نوع المرتجع؟')) return;
     retType = type; retMode = 'linked'; retLinkedDoc = null; retEntityId = null; retRepId = null; retItems = [];
-    retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
+    retEditingId = null; retEditingOldReturnNo = null; retEditingOldCreatedAt = null; retEditingLinkId = null;
     retPriceLevelCode = ''; retAffectsBalance = true; retPayCash = false;
     if (!RET_DB.isOfflineData) await retLoadRecent();
     await retLoadPendingList();
@@ -1229,6 +1231,8 @@ window.retSave = async function () {
                 p_reason: notes,
                 p_created_by: currentUser?.id || null,
                 p_items: itemsPayload,
+                // المرتجع المعدّل بيحافظ على تاريخ المرتجع الأصلي
+                ...(retEditingOldCreatedAt ? { p_created_at: retEditingOldCreatedAt, p_replaces_id: retEditingId } : {}),
             });
             if (rpcErr) throw rpcErr;
             if (rpcRows?.[0]?.return_no) returnNo = rpcRows[0].return_no;
@@ -1261,6 +1265,8 @@ window.retSave = async function () {
                 p_reason: notes,
                 p_created_by: currentUser?.id || null,
                 p_items: itemsPayload,
+                // المرتجع المعدّل بيحافظ على تاريخ المرتجع الأصلي
+                ...(retEditingOldCreatedAt ? { p_created_at: retEditingOldCreatedAt, p_replaces_id: retEditingId } : {}),
             });
             if (rpcErr) throw rpcErr;
             // العداد بيتقفل ويتحرك جوه الـ RPC نفسها (سباق بين مستخدمين
@@ -1271,7 +1277,7 @@ window.retSave = async function () {
 
         if (retEditingId) {
             retToast(`✅ تم إلغاء المرتجع ${retEditingOldReturnNo} وتسجيل المرتجع المعدّل ${returnNo}`, 'success');
-            retEditingId = null; retEditingOldReturnNo = null; retEditingLinkId = null;
+            retEditingId = null; retEditingOldReturnNo = null; retEditingOldCreatedAt = null; retEditingLinkId = null;
         } else {
             retToast(`✅ تم حفظ المرتجع ${returnNo} بنجاح`, 'success');
         }
