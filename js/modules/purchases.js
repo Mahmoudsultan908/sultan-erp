@@ -30,6 +30,7 @@ let purEditingOldPayType = null;
 let purEditingOldInvoiceNo = null;
 let purEditingOldDueDate = null;
 let purEditingOldDiscount = 0;
+let purEditingOldCreatedAt = null;   // تاريخ ووقت فاتورة الشراء الأصلية — بيتحافظ عليه عند التعديل
 let purPendingPOOrderId = null; // أمر شراء بيتحوّل حالياً — يتعلّم "تم الاستلام" بعد نجاح الحفظ بس (مش قبله)
 
 // المهلة الافتراضية لتاريخ استحقاق فاتورة الشراء الآجلة (يوم) — قابلة للتعديل يدوي وقت الشراء دايماً
@@ -112,7 +113,7 @@ async function renderPurchases(c) {
     purSupplierId = null;
     purPayType = 'credit';
     purTreasuryId = PUR_DB.treasuries?.find(t => t.is_default)?.id || null;
-    purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null; purEditingOldDueDate = null; purEditingOldDiscount = 0;
+    purEditingId = null; purEditingOldCreatedAt = null; purEditingOldItems = []; purEditingOldInvoiceNo = null; purEditingOldDueDate = null; purEditingOldDiscount = 0;
     purPendingPOOrderId = null;
 
     // ★ وضع تعديل فاتورة قديمة (قادم من صفحة "مراجعة الفواتير")
@@ -133,6 +134,7 @@ async function renderPurchases(c) {
                 purEditingOldInvoiceNo = oldPur.invoice_no;
                 purEditingOldDueDate = oldPur.due_date || null;
                 purEditingOldDiscount = Number(oldPur.discount) || 0;
+                purEditingOldCreatedAt = oldPur.created_at || null;
 
                 purItems = (oldPur.purchase_items || []).map(it => ({
                     id: Date.now() + Math.random(), pid: it.product_id,
@@ -238,7 +240,7 @@ function purHeaderHTML() {
             <select class="inv-date-input" id="purWarehouse" title="المخزن" onchange="purOnWarehouseChange()" style="cursor:pointer">
                 ${(PUR_DB.warehouses||[]).map(w => `<option value="${w.id}" ${w.id===purWarehouseId?'selected':''}>🏭 ${w.name}${w.is_main?' (رئيسي)':''}</option>`).join('') || '<option value="">لا يوجد مخزن</option>'}
             </select>
-            <input type="date" class="inv-date-input" id="purDate" value="${new Date().toISOString().split('T')[0]}">
+            <input type="date" class="inv-date-input" id="purDate" value="${purEditingOldCreatedAt ? new Date(purEditingOldCreatedAt).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' }) : new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' })}" max="${new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' })}">
             <div class="inv-header-spacer"></div>
             <button class="inv-top-btn inv-top-help" onclick="purShowShortcuts()" title="الاختصارات (F1)">⌨️</button>
             <button class="inv-top-btn" id="purFullscreenBtn" onclick="purToggleFullscreen()" title="إخفاء القائمة والشريط العلوي">${document.body.classList.contains('inv-fullscreen') ? '⛶ إظهار القائمة' : '⛶ ملء الشاشة'}</button>
@@ -1077,6 +1079,12 @@ async function purSave(andNew) {
     saveBtns.forEach(b => { b.innerText = '⏳ جاري الحفظ...'; b.disabled = true; });
 
     try {
+        // تاريخ المعاملة: التحقق منه الأول (قبل إلغاء القديمة) علشان الرفض ما يسيبش التعديل نص نص
+        const txnTs = window.txnCreatedAt(document.getElementById('purDate')?.value, purEditingOldCreatedAt);
+        if (txnTs) {
+            const { error: dateErr } = await sb.rpc('fn_assert_txn_date', { p_ts: txnTs, p_replaces_created: purEditingOldCreatedAt });
+            if (dateErr) throw dateErr;
+        }
         // ★ لو في وضع تعديل: ألغِ فاتورة الشراء القديمة وارجع المخزون والرصيد قبل إنشاء النسخة الجديدة
         if (purEditingId) {
             await purReverseOldForEdit();
@@ -1130,6 +1138,9 @@ async function purSave(andNew) {
             p_treasury_id: purPayType === 'cash' ? (document.getElementById('purTreasuryId')?.value || purTreasuryId || null) : null,
             p_created_by: currentUser?.id || null,
             p_items: itemsPayload,
+            // تاريخ المعاملة: التعديل بيحافظ على التاريخ الأصلي، والتسجيل بتاريخ سابق من خانة التاريخ
+            ...(txnTs ? { p_created_at: txnTs } : {}),
+            ...(purEditingId ? { p_replaces_id: purEditingId } : {}),
         });
         if (rpcErr) throw rpcErr;
         if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
@@ -1160,7 +1171,7 @@ async function purSave(andNew) {
         localStorage.removeItem(PUR_AUTOSAVE_KEY);
         if (purEditingId) {
             purToast(`✅ تم إلغاء فاتورة الشراء ${purEditingOldInvoiceNo} وتسجيل الفاتورة المعدّلة ${invoiceNo} — ${purFmt(net)} ج.م`, 'success');
-            purEditingId = null; purEditingOldItems = []; purEditingOldInvoiceNo = null;
+            purEditingId = null; purEditingOldCreatedAt = null; purEditingOldItems = []; purEditingOldInvoiceNo = null;
         } else {
             purToast(`✅ تم حفظ فاتورة المشتريات ${invoiceNo} — ${purFmt(net)} ج.م`, 'success');
         }
