@@ -115,6 +115,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="reports-hub" onclick="loadMod(this, 'reports-hub')">📈 التقارير</div>
         <div class="nav-item" data-mod="quotations" onclick="loadMod(this, 'quotations')">📋 عروض الأسعار</div>
         <div class="nav-item" data-mod="purchase-orders" onclick="loadMod(this, 'purchase-orders')">📋 أوامر الشراء</div>
+        <div class="nav-item" data-mod="landed-cost" onclick="loadMod(this, 'landed-cost')">🚚 تكلفة الشحن</div>
         <div class="nav-item" data-mod="purchase-suggestions" onclick="loadMod(this, 'purchase-suggestions')">💡 اقتراح أمر شراء</div>
         <div class="nav-item" data-mod="whatsapp" onclick="loadMod(this, 'whatsapp')">💬 رسائل واتساب</div>
         <div class="nav-item" data-mod="ai-dashboard" onclick="loadMod(this, 'ai-dashboard')">🤖 لوحة الذكاء الاصطناعي <span class="nav-soon-badge">قريباً</span></div>
@@ -439,6 +440,7 @@ const titles = {
         'purchases': 'فاتورة مشتريات جديدة',
         'purchase-price-bulk': 'تعديل الأسعار الجماعية',
         'purchase-orders': 'أوامر الشراء',
+        'landed-cost': 'تكلفة الشحن والمصاريف',
         'purchase-suggestions': 'اقتراح أمر شراء',
         'private-chat': 'محادثة خاصة',
         'payments': 'دفع الموردين (سندات صرف)',
@@ -488,6 +490,7 @@ async function _dispatchRender(modName, c) {
     if (modName === 'purchases' && typeof renderPurchases === 'function') await renderPurchases(c);
     if (modName === 'purchase-price-bulk' && typeof renderPurchasePriceBulk === 'function') await renderPurchasePriceBulk(c);
     if (modName === 'purchase-orders' && typeof renderPurchaseOrders === 'function') await renderPurchaseOrders(c);
+    if (modName === 'landed-cost' && typeof renderLandedCost === 'function') await renderLandedCost(c);
     if (modName === 'purchase-suggestions' && typeof renderPurchaseSuggestions === 'function') await renderPurchaseSuggestions(c);
     if (modName === 'private-chat' && typeof renderPrivateChat === 'function') await renderPrivateChat(c);
     if (modName === 'payments' && typeof renderPayments === 'function') await renderPayments(c);
