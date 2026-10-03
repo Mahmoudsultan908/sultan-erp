@@ -14,7 +14,8 @@ let _poItems = [];
 let _poCounter = 1;
 
 function poFmt(n) { return (Number(n)||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-const PO_STATUS_LABELS = { pending: '⏳ قائم', received: '✅ تم الاستلام', cancelled: '🚫 ملغي' };
+const PO_STATUS_LABELS = { pending: '⏳ قائم', partial: '📦 استلام جزئي', received: '✅ تم الاستلام', cancelled: '🚫 ملغي' };
+const PO_MATCH_LABELS = { ok: '✅ مطابق', short: '⬇️ ناقص', over: '⬆️ زيادة', none: '⏳ لسه ما وصلش', unordered: '❓ مش في الأمر' };
 
 // ════════════════════════════════════════════════════════════
 // 1) العرض الرئيسي — قائمة أوامر الشراء
@@ -24,6 +25,7 @@ async function renderPurchaseOrders(c) {
     try {
         const { data: orders } = await sb.from('purchase_orders')
             .select('*, suppliers(name)').order('created_at', { ascending: false }).limit(100);
+        const matchOn = typeof ftOn === 'function' && await ftOn('feature_po_match');
 
         c.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
@@ -43,8 +45,9 @@ async function renderPurchaseOrders(c) {
                     <td style="text-align:left;font-weight:700">${poFmt(o.total)}</td>
                     <td>${PO_STATUS_LABELS[o.status]||o.status}</td>
                     <td>
-                        ${o.status==='pending' ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="poConvertToPurchase('${o.id}')">🔄 تحويل لفاتورة</button>
-                        <button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="poCancel('${o.id}')">🚫</button>` : ''}
+                        ${matchOn && o.status!=='cancelled' ? `<button class="cc-edit" onclick="poOpenMatch('${o.id}')">🔍 مطابقة</button>` : ''}
+                        ${o.status==='pending' || o.status==='partial' ? `<button class="cc-edit" style="background:var(--inv-green-light);color:var(--inv-green)" onclick="poConvertToPurchase('${o.id}')">${o.status==='partial' ? '🔄 استلام الباقي' : '🔄 تحويل لفاتورة'}</button>` : ''}
+                        ${o.status==='pending' ? `<button class="cc-edit" style="background:var(--inv-red-bg);color:var(--inv-red)" onclick="poCancel('${o.id}')">🚫</button>` : ''}
                     </td>
                 </tr>`).join('') : '<tr><td colspan="6" class="empty-state"><span>📋</span>لا توجد أوامر شراء بعد</td></tr>'}
             </tbody></table>
@@ -182,9 +185,17 @@ window.poSave = async function() {
 window.poConvertToPurchase = async function(orderId) {
     if (!confirm('سيتم فتح شاشة المشتريات مع تحميل أصناف الأمر تلقائياً. راجع الفاتورة واحفظها من هناك. متابعة؟')) return;
     try {
-        const { data: items } = await sb.from('purchase_order_items').select('*, products(*)').eq('order_id', orderId);
+        const { data: allItems } = await sb.from('purchase_order_items').select('*, products(*)').eq('order_id', orderId);
         const { data: order } = await sb.from('purchase_orders').select('*').eq('id', orderId).single();
-        if (!items || !items.length) { alert('⚠️ لا توجد أصناف في هذا الأمر'); return; }
+        if (!allItems || !allItems.length) { alert('⚠️ لا توجد أصناف في هذا الأمر'); return; }
+        // لو الأمر اتستلم جزء منه قبل كده: بنحمّل المتبقي بس (المطلوب − اللي وصل في فواتير سابقة)
+        const recv = {};
+        if (order.status === 'partial') {
+            const { data: m } = await sb.rpc('fn_po_match', { p_order_id: orderId });
+            (m || []).forEach(r => { recv[r.product_id] = Number(r.received_qty) || 0; });
+        }
+        const items = allItems.map(it => ({ ...it, qty: Math.max(0, Number(it.qty) - (recv[it.product_id] || 0)) })).filter(it => it.qty > 0);
+        if (!items.length) { alert('⚠️ كل أصناف الأمر اتستلمت'); return; }
 
         // ★ الأمر بيفضل "قائم" لحد ما فاتورة الشراء الفعلية تتحفظ بنجاح —
         //   purchases.js هو اللي بيعلّمه "تم الاستلام" بعد الحفظ، مش هنا.
@@ -206,6 +217,33 @@ window.poConvertToPurchase = async function(orderId) {
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };
 
+// مطابقة أمر الشراء: المطلوب ↔ اللي وصل (فواتير الشراء المربوطة) ↔ سعر الفاتورة
+window.poOpenMatch = async function(orderId) {
+    try {
+        const { data, error } = await sb.rpc('fn_po_match', { p_order_id: orderId });
+        if (error) throw error;
+        const rows = data || [];
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const bad = rows.filter(r => r.qty_status !== 'ok' || r.price_flag).length;
+        document.getElementById('poMatchModal')?.remove();
+        const m = document.createElement('div');
+        m.className = 'mod-modal-bg active'; m.id = 'poMatchModal';
+        m.innerHTML = `<div class="mod-modal" style="max-width:900px"><div class="mod-modal-header"><h3>🔍 مطابقة أمر الشراء</h3><button class="mod-modal-close" onclick="document.getElementById('poMatchModal').remove()">&times;</button></div>
+            <div class="mod-modal-body">
+            <p style="font-size:13px;margin-bottom:10px">${rows.some(r => Number(r.received_qty) > 0) ? (bad ? `⚠️ فيه <b>${bad}</b> صنف محتاج مراجعة` : '✅ كل الأصناف مطابقة') : 'لسه مفيش فاتورة شراء مربوطة بالأمر ده.'}</p>
+            <div class="mod-table-wrap"><table class="mod-table"><thead><tr><th>الصنف</th><th>المطلوب</th><th>وصل</th><th>الفرق</th><th>سعر الأمر</th><th>سعر الفاتورة</th><th>الحالة</th></tr></thead><tbody>
+            ${rows.map(r => `<tr><td>${esc(r.product_name)}</td><td>${poFmt(r.ordered_qty)}</td><td>${poFmt(r.received_qty)}</td>
+                <td style="color:${Number(r.qty_diff) < 0 ? 'var(--inv-red)' : Number(r.qty_diff) > 0 ? '#B45309' : 'inherit'}">${poFmt(r.qty_diff)}</td>
+                <td>${poFmt(r.ordered_price)}</td>
+                <td style="${r.price_flag ? 'color:var(--inv-red);font-weight:700' : ''}">${Number(r.received_qty) > 0 ? poFmt(r.invoiced_price) : '—'}${r.price_diff_pct != null ? ` <small>(${Number(r.price_diff_pct) > 0 ? '+' : ''}${r.price_diff_pct}%)</small>` : ''}${r.price_flag ? ' ⚠️' : ''}</td>
+                <td>${PO_MATCH_LABELS[r.qty_status] || r.qty_status}</td></tr>`).join('') || '<tr><td colspan="7" class="empty-state">لا توجد أصناف</td></tr>'}
+            </tbody></table></div>
+            <p style="font-size:11px;color:var(--inv-muted);margin-top:8px">"وصل" = مجموع فواتير الشراء المؤكدة المربوطة بالأمر. هامش القبول (كمية/سعر) من إعدادات po_match_qty_tol_pct و po_match_price_tol_pct (نسبة مئوية، الافتراضي 0).</p>
+            </div></div>`;
+        document.body.appendChild(m);
+    } catch (err) { alert('❌ خطأ: ' + err.message); }
+};
+
 window.poCancel = async function(id) {
     if (!confirm('إلغاء أمر الشراء هذا؟')) return;
     try {
@@ -214,4 +252,4 @@ window.poCancel = async function(id) {
     } catch (err) { alert('❌ خطأ: ' + err.message); }
 };
 
-Object.assign(window, { renderPurchaseOrders, poOpenAdd, poAddItem, poRemoveItem, poUpdateTotal, poSave, poConvertToPurchase, poCancel });
+Object.assign(window, { renderPurchaseOrders, poOpenAdd, poAddItem, poRemoveItem, poUpdateTotal, poSave, poConvertToPurchase, poCancel, poOpenMatch });
