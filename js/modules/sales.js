@@ -480,7 +480,7 @@ function invHeaderHTML() {
         <div class="inv-header-row1">
             <div class="inv-header-brand">
                 <div class="ic">🧾</div>
-                <div class="ttl">فاتورة مبيعات<small> Sultan ERP</small></div>
+                <div class="ttl">فاتورة مبيعات<small> ${BRAND.erp}</small></div>
             </div>
             <span class="inv-no-badge">${invEditingId ? '✏️ ' + invEditingOldInvoiceNo : 'INV-' + String(INV_DB.invoiceNo).padStart(4,'0')}</span>
             <select class="inv-date-input" id="invWarehouse" title="المخزن" onchange="invOnWarehouseChange()" style="cursor:pointer">

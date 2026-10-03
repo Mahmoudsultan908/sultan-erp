@@ -19,6 +19,7 @@ const SHELL_URLS = [
     './icon-512.png',
     './css/claude-modules.css',
     './js/supabase.js',
+    './js/brand.js',
     './js/offline.js',
     './js/search-utils.js',
     './js/report-utils.js',

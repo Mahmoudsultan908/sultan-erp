@@ -33,7 +33,7 @@ const AP_PAGE_GROUPS = [
     { title: 'المبيعات والعملاء', pages: [
         ['sales', '🧾 فاتورة المبيعات'], ['quotations', '📋 عروض الأسعار'],
         ['collections', '💵 تحصيل العملاء'], ['crm', '🤝 إدارة علاقات العملاء'],
-        ['rep-app-link', '🚗 مندوب سلطان'], ['customer-orders-link', '🔗 طلبات العملاء'],
+        ['rep-app-link', `🚗 مندوب ${BRAND.short}`], ['customer-orders-link', '🔗 طلبات العملاء'],
     ]},
     { title: 'المشتريات والموردين', pages: [
         ['purchases', '📥 فاتورة المشتريات'], ['purchase-orders', '📋 أوامر الشراء'],

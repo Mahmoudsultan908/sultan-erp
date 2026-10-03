@@ -319,7 +319,7 @@ window.custShowStatement = async function(customerId) {
             const earliestDate = moves.length ? new Date(new Date(moves[0].date).getTime() - 1000).toISOString() : (cust.created_at || new Date(0).toISOString());
             displayMoves.push({
                 date: earliestDate,
-                desc: 'رصيد مرحّل من النظام القديم (قبل سلطان)',
+                desc: 'رصيد مرحّل من النظام القديم (قبل ' + BRAND.short + ')',
                 debit: Math.max(legacyDiff, 0), credit: Math.max(-legacyDiff, 0),
                 type: 'legacy-carry', nav: null,
             });
@@ -558,7 +558,7 @@ function custStmtWaButtonHtml() {
     if (d.dueDate) msg += '، وميعاد السداد ' + d.dueDate;
     msg += '.';
     if (d.lim.key === 'over') msg += '\nالرصيد فوق الحد المسموح بـ ' + custFmt(d.lim.over) + ' جنيه.';
-    msg += '\nنرجو تحديد ميعاد للتحصيل. شكرًا — جملة سلطان';
+    msg += '\nنرجو تحديد ميعاد للتحصيل. شكرًا — جملة ' + BRAND.short;
     return `<a class="cc-edit" style="text-decoration:none;padding:8px 12px;font-size:12px" href="${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">💬 رسالة تحصيل واتساب</a>`;
 }
 
@@ -887,7 +887,7 @@ window.custPortalPin = async function (customerId) {
         const { data, error } = await sb.rpc('fn_portal_generate_pin', { p_customer_id: customerId });
         if (error) throw error;
         const wa = custDetWaLink(phone);
-        const msg = 'السلام عليكم ' + custName + '\nالرقم السري لدخول تطبيق سلطانو: ' + data + '\nرقم التليفون هو اسم المستخدم. — جملة سلطان';
+        const msg = 'السلام عليكم ' + custName + '\nالرقم السري لدخول تطبيق ' + BRAND.customerApp + ': ' + data + '\nرقم التليفون هو اسم المستخدم. — جملة ' + BRAND.short;
         const bg = document.createElement('div');
         bg.className = 'mod-modal-bg active';
         bg.style.zIndex = '10060';
