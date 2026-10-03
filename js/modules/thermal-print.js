@@ -37,9 +37,23 @@ async function tpGetCompanyInfo() {
 // ════════════════════════════════════════════════════════════
 // نقطة الدخول الرئيسية
 // ════════════════════════════════════════════════════════════
+// كود QR على إيصال البيع (ميزة feature_invoice_qr — مقفولة افتراضياً). النص: اسم الشركة + رقم الفاتورة + التاريخ + الإجمالي،
+// تقدر تمسحه بأي كاميرا وتتأكد من بيانات الفاتورة. (ده مش كود الفاتورة الإلكترونية الضريبية — ده بيتفعّل مع التسجيل الضريبي.)
+// المكتبة (qrcode-generator) بتتحمّل من CDN وبتتخزّن في الكاش؛ لو مش موجودة بنطبع من غير QR بهدوء.
+function tpQrDataUri(text) {
+    try {
+        if (typeof qrcode !== 'function') return '';
+        const q = qrcode(0, 'M'); q.addData(String(text), 'Byte'); q.make();
+        return q.createDataURL(4, 2);
+    } catch { return ''; }
+}
+
 async function printThermalReceipt(type, data) {
     const company = await tpGetCompanyInfo();
     let html;
+    if (type === 'sale' && typeof ftOn === 'function' && await ftOn('feature_invoice_qr')) {
+        data = { ...data, qrUri: tpQrDataUri([company.name, data.invoiceNo, tpDateStr(new Date()), 'Total ' + (Number(data.total) || 0).toFixed(2)].join('\n')) };
+    }
     if (type === 'sale') html = tpBuildSaleHTML(company, data);
     else if (type === 'collection') html = tpBuildVoucherHTML(company, data, 'collection');
     else if (type === 'payment') html = tpBuildVoucherHTML(company, data, 'payment');
@@ -234,6 +248,7 @@ function tpBuildSaleHTML(company, data) {
             <td><span class="lbl">الخصم</span><span class="val">${tpFmt(data.discount)} ج.م</span></td>
         </tr>
     </table>
+    ${data.qrUri ? `<div class="tp-center" style="margin-top:8px"><img src="${data.qrUri}" alt="QR" style="width:90px;height:90px"></div>` : ''}
     <div class="tp-center" style="font-size:11px;color:#000;margin-top:8px">‹‹‹‹‹‹ لطباعة الفاتورة ››››››</div>`;
     return tpWrapper(company, 'فاتورة مبيعات ' + data.invoiceNo, body, tpBuildSaleHeaderHTML(company));
 }
