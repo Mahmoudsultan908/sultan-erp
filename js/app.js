@@ -13,7 +13,7 @@ let currentUser = null;
             <div class="login-wrapper">
                 <div class="login-card">
                     <div class="login-logo">🏪</div>
-                    <h2 style="margin-bottom:6px;color:#0F172A">مرحباً بك في Sultan ERP</h2>
+                    <h2 style="margin-bottom:6px;color:#0F172A">مرحباً بك في ${BRAND.erp}</h2>
                     <p style="color:#64748B;margin-bottom:20px">سجّل دخولك للمتابعة</p>
                     <input type="email" id="loginEmail" class="login-input" placeholder="البريد الإلكتروني" dir="ltr">
                     <input type="password" id="loginPass" class="login-input" placeholder="كلمة المرور" dir="ltr" onkeydown="if(event.key==='Enter')handleLogin()">
@@ -58,7 +58,7 @@ function buildLayout() {
       <aside class="sidebar">
         <div class="sidebar-logo">
             <div class="logo-icon">🏪</div>
-            <div class="logo-text"><h1>Sultan ERP</h1><span>SMART EDITION V2.0</span></div>
+            <div class="logo-text"><h1 data-brand="erp">${BRAND.erp}</h1><span>SMART EDITION V2.0</span></div>
         </div>
         <div class="nav-item active" data-mod="dashboard" onclick="loadMod(this, 'dashboard')"><span class="nav-icon">🏠</span><span class="nav-label">لوحة التحكم</span></div>
 
@@ -81,7 +81,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="purchases" onclick="loadMod(this, 'purchases')">📥 فاتورة المشتريات</div>
         <div class="nav-item" data-mod="purchase-price-bulk" onclick="loadMod(this, 'purchase-price-bulk')">💲 تعديل الأسعار الجماعية</div>
         <div class="nav-item" data-mod="returns" onclick="loadMod(this, 'returns')">↩️ المرتجعات</div>
-        <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">🚗 مندوب سلطان <span id="repLinkBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
+        <div class="nav-item" data-mod="rep-app-link" onclick="loadMod(this, 'rep-app-link')">🚗 <span data-brand-prefix="مندوب " data-brand2="short">مندوب ${BRAND.short}</span> <span id="repLinkBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         <div class="nav-item" data-mod="crm" onclick="loadMod(this, 'crm')">🤝 إدارة علاقات العملاء <span id="crmOverdueBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-right:6px"></span></div>
         <div class="nav-item" data-mod="invoice-review" onclick="loadMod(this, 'invoice-review')">🔍 مراجعة الفواتير</div>
         </div>
@@ -122,7 +122,7 @@ function buildLayout() {
         <div class="nav-item" data-mod="private-chat" onclick="loadMod(this, 'private-chat')"><span class="nav-icon">🔒</span><span class="nav-label">محادثة خاصة</span></div>
         <div class="nav-item" data-mod="settings-hub" onclick="loadMod(this, 'settings-hub')"><span class="nav-icon">⚙️</span><span class="nav-label">الإعدادات</span></div>
 
-        <div class="sidebar-footer"><span>© 2026 Sultan Food</span><span style="color:var(--inv-gold-light)">v2.0</span></div>
+        <div class="sidebar-footer"><span>© 2026 <span data-brand="footer">${BRAND.footer}</span></span><span style="color:var(--inv-gold-light)">v2.0</span></div>
       </aside>
       <div id="railFlyout"><div class="rf-title" id="railFlyoutTitle"></div></div>
       <div class="main">
@@ -312,6 +312,7 @@ function railScheduleHide() {
 }
 
 async function setupApp() {
+    if (typeof brandLoad === 'function') brandLoad();   // هوية الشركة من الإعدادات (غير معطّل لو فشلت)
     restoreSidebarState();
     document.getElementById('userAvatar').textContent = currentUser.email.charAt(0).toUpperCase();
     document.getElementById('userBadge').innerHTML = `${currentUser.email} <span>مدير النظام</span>`;
@@ -463,7 +464,7 @@ const titles = {
         'expense-decision': 'مركز قرار المصروفات',
         'liquidity-forecast': 'توقع السيولة',
         'customer-orders-link': 'طلبات العملاء',
-        'rep-app-link': 'مندوب سلطان',
+        'rep-app-link': `مندوب ${BRAND.short}`,
         'reports-hub': 'التقارير',
         'opening-balances': 'الأرصدة الافتتاحية',
         'settings-hub': 'الإعدادات'

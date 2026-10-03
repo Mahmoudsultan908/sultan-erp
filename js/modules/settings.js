@@ -83,6 +83,7 @@ async function renderSettings(container) {
 
             <div id="set-branches-card"></div>
             <div id="set-features-card"></div>
+            <div id="set-brand-card"></div>
 
             <div class="dash-card" style="padding:24px;margin-top:16px">
                 <h3 style="margin:0 0 16px;font-size:15px">🛒 إعدادات سلطانو</h3>
@@ -117,6 +118,7 @@ async function renderSettings(container) {
         // كارت الفروع (branches.js) — بيختفي لوحده لو جدول الفروع مش موجود
         if (typeof brRenderCard === 'function') brRenderCard(document.getElementById('set-branches-card'));
         if (typeof ftRenderCard === 'function') ftRenderCard(document.getElementById('set-features-card'));
+        if (typeof brandRenderCard === 'function' && window._currentUserRole === 'admin') brandRenderCard(document.getElementById('set-brand-card'));
 
         window.settSaveAll = async () => {
             // مؤشرات اللوحة: نتأكد من المدى قبل الحفظ (القاعدة كمان بترجع للافتراضي لو القيمة برا المدى)

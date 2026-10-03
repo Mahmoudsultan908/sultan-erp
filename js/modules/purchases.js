@@ -234,7 +234,7 @@ function purHeaderHTML() {
         <div class="inv-header-row1">
             <div class="inv-header-brand">
                 <div class="ic" style="background:linear-gradient(135deg,#16A34A,#22C55E);box-shadow:0 4px 12px rgba(22,163,74,0.4)">📥</div>
-                <div class="ttl">فاتورة مشتريات<small> Sultan ERP</small></div>
+                <div class="ttl">فاتورة مشتريات<small> ${BRAND.erp}</small></div>
             </div>
             <span class="inv-no-badge" style="background:rgba(22,163,74,0.18);color:#4ADE80;border-color:rgba(22,163,74,0.35)">${purEditingId ? '✏️ ' + purEditingOldInvoiceNo : 'PUR-' + String(PUR_DB.purchaseNo).padStart(4,'0')}</span>
             <select class="inv-date-input" id="purWarehouse" title="المخزن" onchange="purOnWarehouseChange()" style="cursor:pointer">

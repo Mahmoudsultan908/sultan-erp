@@ -50,7 +50,7 @@ const CRM_LEAD_STAGE_KEYS = Object.keys(CRM_LEAD_STAGES);
 const CRM_DEFAULT_TEMPLATES = {
     'جديد':
 `السلام عليكم أستاذ {name} 👋
-معاك {agent} من شركة سلطان للمواد الغذائية 🌟
+معاك {agent} من شركة ${BRAND.ar} 🌟
 
 حضرتك مسجل معنا وحابين نتعرف على احتياجات {shop} ونرشح لك أفضل الأصناف.
 
@@ -100,7 +100,7 @@ function crmLeadUrgent(l) {
     return crmDaysDiff(l.last_contact_date) >= cfg.days;
 }
 function crmAgentName(l) {
-    return _crmProfiles.find(p => p.id === l.assigned_to)?.name || currentUser?.name || 'سلطان';
+    return _crmProfiles.find(p => p.id === l.assigned_to)?.name || currentUser?.name || BRAND.short;
 }
 function crmWaMsg(l, variant) {
     let tmpl;
@@ -146,7 +146,7 @@ window.crmSendLeadWa = function (id) {
 const CRM_CUSTOMER_TPL_KEY = 'متابعة_عميل_حالي';
 const CRM_DEFAULT_CUSTOMER_TPL =
 `السلام عليكم أستاذ {name} 👋
-معاك {agent} من شركة سلطان للمواد الغذائية 🌟
+معاك {agent} من شركة ${BRAND.ar} 🌟
 
 حابين نطمن عليك ونعرف احتياجاتك الحالية، وهل محتاج أي أصناف تانية.
 
@@ -154,7 +154,7 @@ const CRM_DEFAULT_CUSTOMER_TPL =
 
 function crmCustomerWaMsg(x) {
     const tmpl = _crmTemplates[CRM_CUSTOMER_TPL_KEY] || CRM_DEFAULT_CUSTOMER_TPL;
-    const agent = _crmProfiles.find(p => p.id === x.assigned_to)?.name || currentUser?.name || 'سلطان';
+    const agent = _crmProfiles.find(p => p.id === x.assigned_to)?.name || currentUser?.name || BRAND.short;
     return tmpl.replace(/{name}/g, x.customers?.name || 'العميل').replace(/{agent}/g, agent);
 }
 function crmCustomerWaLink(x) {

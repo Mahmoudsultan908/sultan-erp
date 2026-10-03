@@ -359,7 +359,7 @@ function retHeaderHTML() {
         <div class="inv-header-row1">
             <div class="inv-header-brand">
                 <div class="ic">↩️</div>
-                <div class="ttl">مرتجع ${retType === 'sales' ? 'مبيعات' : 'مشتريات'}<small> Sultan ERP</small></div>
+                <div class="ttl">مرتجع ${retType === 'sales' ? 'مبيعات' : 'مشتريات'}<small> ${BRAND.erp}</small></div>
             </div>
             <span class="inv-no-badge">${prefix}-${String(counter).padStart(4, '0')}</span>
 

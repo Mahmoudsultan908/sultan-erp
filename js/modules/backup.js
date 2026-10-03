@@ -83,7 +83,7 @@ window.backupRunFull = async function () {
         if (ce) throw new Error(/غير مسموح/.test(ce.message || '') ? 'النسخة الاحتياطية للأدمن فقط' : ce.message);
 
         const names = Object.keys(counts).filter(t => !BKP_EXCLUDE.has(t)).sort();
-        const meta = { exported_at: new Date().toISOString(), label: 'نسخة من سلطان ERP', user: (typeof currentUser !== 'undefined' && currentUser?.email) || '', counts: {}, failed: [], warnings: [] };
+        const meta = { exported_at: new Date().toISOString(), label: 'نسخة من ' + BRAND.erp, user: (typeof currentUser !== 'undefined' && currentUser?.email) || '', counts: {}, failed: [], warnings: [] };
         const tables = {};
         for (let i = 0; i < names.length; i++) {
             const t = names[i];
