@@ -151,7 +151,7 @@ window.custShowStatement = async function(customerId) {
             { data: openingBalances },
             docsResult,
             interactionsResult,
-            groupRes, clsRes, regRes, repRes, agingRes,
+            groupRes, clsRes, regRes, repRes, agingRes, notesRes,
         ] = await Promise.all([
             sb.from('sales').select('id, invoice_no, total, payment_type, status, created_at, notes')
                 .eq('customer_id', customerId).order('created_at', { ascending: true }),
@@ -181,6 +181,9 @@ window.custShowStatement = async function(customerId) {
             (cust.default_rep_id || cust.primary_rep_id) ? sb.from('sales_reps').select('name').eq('id', cust.default_rep_id || cust.primary_rep_id).single().then(r => r, () => ({ data: null })) : Promise.resolve({ data: null }),
             // أعمار المديونية الدقيقة من قاعدة البيانات (fn_customer_aging_cfg — شرائحها من الإعدادات العامة) — لو فشلت نرجع للحساب المحلي التقريبي
             sb.rpc('fn_customer_aging_cfg', { p_customer_id: customerId }).then(r => r, () => ({ data: null, error: true })),
+            // إشعارات دائن/مدين (اختياري — لو الجدول مش موجود نتجاهل)
+            sb.from('adjustment_notes').select('id, note_no, kind, amount, reason, ref_doc, created_at')
+                .eq('customer_id', customerId).eq('status', 'confirmed').order('created_at', { ascending: true }).then(r => r, () => ({ data: [] })),
         ]);
         // ── بطاقة تفاصيل العميل: حد ائتماني/استحقاق/أعمار/دفعة مستهدفة (بند 2026-09-21) ──
         const custDetNow = Date.now(), custDetTodayD = custDetToday();
@@ -241,6 +244,11 @@ window.custShowStatement = async function(customerId) {
         (openingBalances||[]).forEach(o => {
             const amt = Number(o.amount) || 0;
             moves.push({ date: o.as_of_date, desc: `رصيد افتتاحي${o.notes ? ' — '+o.notes : ''}`, debit: Math.max(amt,0), credit: Math.max(-amt,0), type: 'opening', nav: { kind: 'opening' } });
+        });
+        // إشعار دائن (يخفض الرصيد) / إشعار مدين (يزوده) — راجع fn_adjustment_note_apply
+        (notesRes?.data||[]).forEach(n => {
+            const isCr = n.kind === 'customer_credit', amt = Number(n.amount)||0;
+            moves.push({ date: n.created_at, desc: `${isCr ? 'إشعار دائن' : 'إشعار مدين'} ${n.note_no} — ${custDetEsc(n.reason)}${n.ref_doc ? ' (' + custDetEsc(n.ref_doc) + ')' : ''}`, debit: isCr ? 0 : amt, credit: isCr ? amt : 0, type: 'note', nav: { kind: 'note' } });
         });
         moves.sort((a,b) => new Date(a.date) - new Date(b.date));
 
@@ -584,6 +592,7 @@ function custStmtRowsHtml(moves) {
             : m.nav?.kind === 'return' ? `<button class="cc-edit" title="افتح المرتجع" onclick="custGoToDoc('sales_return','${m.nav.no}')">🔗</button>`
             : m.nav?.kind === 'payment' ? `<button class="cc-edit" title="افتح سند التحصيل" onclick="custGoToPayment('${m.nav.id}')">🔗</button>`
             : m.nav?.kind === 'transfer' ? `<button class="cc-edit" title="افتح تحويل الأرصدة" onclick="custGoToModule('balance-transfer')">🔗</button>`
+            : m.nav?.kind === 'note' ? `<button class="cc-edit" title="افتح الإشعارات" onclick="custGoToModule('adjustment-notes')">🔗</button>`
             : m.nav?.kind === 'opening' ? `<button class="cc-edit" title="افتح الأرصدة الافتتاحية" onclick="custGoToModule('opening-balances')">🔗</button>`
             : '';
         return `<tr style="background:${bg}">

@@ -63,6 +63,7 @@ window.supShowStatement = async function(supplierId) {
             { data: deferredAuto },
             { data: deferredReceipts },
             docsResult,
+            notesRes,
         ] = await Promise.all([
             sb.from('purchases').select('id, invoice_no, total, payment_type, status, created_at')
                 .eq('supplier_id', supplierId).order('created_at', { ascending: true }),
@@ -98,6 +99,9 @@ window.supShowStatement = async function(supplierId) {
             sb.from('archive_documents').select('id,title,file_url,file_path,category,created_at')
                 .eq('linked_type', 'supplier').eq('linked_id', supplierId)
                 .order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
+            // إشعارات دائن/مدين (اختياري — لو الجدول مش موجود نتجاهل)
+            sb.from('adjustment_notes').select('id, note_no, kind, amount, reason, ref_doc, created_at')
+                .eq('supplier_id', supplierId).eq('status', 'confirmed').order('created_at', { ascending: true }).then(r => r, () => ({ data: [] })),
         ]);
         const docs = docsResult?.data || [];
 
@@ -195,6 +199,11 @@ window.supShowStatement = async function(supplierId) {
                 type: 'deferred-auto'
             });
         }
+        // إشعار دائن من المورد (بيقلل اللي علينا = مدين) / إشعار مدين للمورد (بيزوده = دائن)
+        (notesRes?.data||[]).forEach(n => {
+            const isCr = n.kind === 'supplier_credit', amt = Number(n.amount)||0;
+            moves.push({ date: n.created_at, desc: `${isCr ? 'إشعار دائن' : 'إشعار مدين'} ${n.note_no} — ${String(n.reason).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}${n.ref_doc ? ' (' + String(n.ref_doc).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) + ')' : ''}`, debit: isCr ? amt : 0, credit: isCr ? 0 : amt, type: 'note' });
+        });
         moves.sort((a,b) => new Date(a.date) - new Date(b.date));
 
         // تبويب "الأصناف" — بند 5، 2026-07-25. إجمالي المشتريات من كل صنف
