@@ -683,7 +683,7 @@ function retRenderItems() {
             <td style="text-align:center;font-size:12px;color:var(--inv-muted)">${it.unit || 'قطعة'}</td>
             <td class="inv-cell-stock">
                 ${retMode === 'linked'
-                    ? `<span class="num">${it.maxQty}</span><div class="low-lbl" style="color:var(--inv-muted)">أصلية</div>`
+                    ? `<span class="num">${it.maxQty}</span><div class="low-lbl" style="color:var(--inv-muted)">${it.prevReturned ? `متاح — اترجع قبل كده ${it.prevReturned}` : 'أصلية'}</div>`
                     : `<span class="num ${lowStock ? 'low' : ''}">${it.pid ? liveStock : '—'}</span>${lowStock ? '<div class="low-lbl">نقص</div>' : ''}`}
             </td>
             <td>
@@ -1012,6 +1012,38 @@ function retRowKey(e, idx, field) {
 // ════════════════════════════════════════════════════════════
 // 5) وضع "مرتبط بفاتورة": البحث عن الفاتورة وتحميل بنودها
 // ════════════════════════════════════════════════════════════
+
+// ★ الكمية اللي اترجعت قبل كده من نفس الفاتورة (مرتجعات مؤكدة بس) لكل صنف — قبل كده "أقصى كمية للإرجاع"
+//   كانت الكمية الأصلية دايماً، فنفس الفاتورة كانت ممكن تترجع أكتر من مرة. قاعدة البيانات كمان بترفض
+//   أي زيادة (تريجر trg_*_return_items_qty_guard) — ده عشان المستخدم يشوف المتاح قبل ما يحفظ.
+async function retLoadReturnedQty(type, docId) {
+    const table = type === 'sales' ? 'sales_returns' : 'purchase_returns';
+    const itemsTable = type === 'sales' ? 'sale_return_items' : 'purchase_return_items';
+    const linkCol = type === 'sales' ? 'sale_id' : 'purchase_id';
+    const { data, error } = await sb.from(table).select(`id, ${itemsTable}(product_id, qty)`)
+        .eq(linkCol, docId).eq('status', 'confirmed');
+    if (error) throw error;
+    const map = {};
+    (data || []).forEach(r => (r[itemsTable] || []).forEach(it => {
+        map[it.product_id] = (map[it.product_id] || 0) + (Number(it.qty) || 0);
+    }));
+    return map;
+}
+
+// بيوزّع المرتجع السابق على سطور الفاتورة (لو الصنف متكرر في أكتر من سطر) ويخلّي أقصى كمية = الباقي
+function retApplyReturnedQty(items, returnedMap) {
+    const left = { ...returnedMap };
+    items.forEach(it => {
+        const used = Math.min(left[it.pid] || 0, it.maxQty || 0);
+        if (used <= 0) return;
+        left[it.pid] -= used;
+        it.prevReturned = Math.round(used * 1000) / 1000;
+        it.maxQty = Math.max(0, Math.round((it.maxQty - used) * 1000) / 1000);
+        it.qty = it.maxQty;
+    });
+    return items.some(it => it.prevReturned);
+}
+
 window.retSearchInvoice = async function () {
     const no = document.getElementById('retInvNo')?.value.trim();
     if (!no) { retToast('⚠️ أدخل رقم الفاتورة', 'error'); return; }
@@ -1028,6 +1060,7 @@ window.retSearchInvoice = async function () {
             const cached = typeof dbGetCache === 'function' ? await dbGetCache('recent_sales') : null;
             const data = (cached?.data || []).find(s => s.invoice_no === no);
             if (!data) { retToast('❌ الفاتورة دي مش موجودة في آخر نسخة محفوظة (📴 أوفلاين) — جرّب لما الاتصال يرجع', 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
+            if (data.status && data.status !== 'confirmed') { retToast(`❌ الفاتورة ${no} ملغاة أو اتعدّلت — اعمل المرتجع على الفاتورة الحالية`, 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
             retLinkedDoc = data;
             retEntityId = data.customer_id;
             // ★ اقتراح مندوب الفاتورة الأصلية تلقائياً (قابل للتغيير عادي من الدروب داون)
@@ -1058,6 +1091,7 @@ window.retSearchInvoice = async function () {
                 .eq('invoice_no', no).maybeSingle();
             if (error) throw error;
             if (!data) { retToast('❌ لا توجد فاتورة بيع بهذا الرقم', 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
+            if (data.status !== 'confirmed') { retToast(`❌ الفاتورة ${no} ملغاة أو اتعدّلت — اعمل المرتجع على الفاتورة الحالية`, 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
             retLinkedDoc = data;
             retEntityId = data.customer_id;
             // ★ اقتراح مندوب الفاتورة الأصلية تلقائياً (قابل للتغيير عادي من الدروب داون)
@@ -1076,6 +1110,7 @@ window.retSearchInvoice = async function () {
                 .eq('invoice_no', no).maybeSingle();
             if (error) throw error;
             if (!data) { retToast('❌ لا توجد فاتورة شراء بهذا الرقم', 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
+            if (data.status !== 'confirmed') { retToast(`❌ فاتورة الشراء ${no} ملغاة أو اتعدّلت — اعمل المرتجع على الفاتورة الحالية`, 'error'); retItems = []; retLinkedDoc = null; retRenderItems(); retUpdateSummary(); return; }
             retLinkedDoc = data;
             retEntityId = data.supplier_id;
             retWarehouseId = data.warehouse_id || retWarehouseId;
@@ -1088,6 +1123,9 @@ window.retSearchInvoice = async function () {
             }));
         }
 
+        const hadReturns = retApplyReturnedQty(retItems, await retLoadReturnedQty(retType, retLinkedDoc.id));
+        const nothingLeft = retItems.length > 0 && retItems.every(it => !(it.maxQty > 0));
+
         const whSel = document.getElementById('retWarehouse');
         if (whSel) whSel.value = retWarehouseId || '';
         const repSel = document.getElementById('retRepId');
@@ -1097,23 +1135,19 @@ window.retSearchInvoice = async function () {
         retUpdateEntityChip();
         const docInfoEl = document.getElementById('retDocInfoCard');
         if (docInfoEl) docInfoEl.outerHTML = retDocInfoCardHTML();
-        retToast(`✅ تم تحميل بنود الفاتورة ${no} — عدّل الكمية المرتجعة لكل صنف (بحد أقصى الكمية الأصلية)`, 'success');
+        if (nothingLeft) retToast(`⚠️ الفاتورة ${no} اترجعت كلها قبل كده — مفيش حاجة تانية تترجع منها`, 'error');
+        else if (hadReturns) retToast(`✅ تم تحميل بنود الفاتورة ${no} — فيه أصناف اترجعت منها قبل كده، والكمية الظاهرة هي الباقي بس`, 'success');
+        else retToast(`✅ تم تحميل بنود الفاتورة ${no} — عدّل الكمية المرتجعة لكل صنف (بحد أقصى الكمية الأصلية)`, 'success');
     } catch (err) {
         retToast('❌ خطأ: ' + err.message, 'error');
     }
 };
 
-// ═══════════════ عكس مرتجع قديم وقت التعديل — عبر RPC واحدة ذرّية ═══════════════
-// راجع returns_edit_reversal_migration.sql (fn_reverse_sales_return_for_edit /
-// fn_reverse_purchase_return_for_edit) — نفس فلسفة fn_reverse_sale_for_edit
-// و fn_reverse_purchase_for_edit في edit_reversal_atomic_migration.sql بالظبط،
-// بس بعكس اتجاه أثر تريجرز المرتجع (مرتجع بيع رجّع مخزون → التعديل بيخصمه
-// تاني، مرتجع بيع آجل نقّص رصيد العميل → التعديل بيرجّعه، ...إلخ).
-async function retReverseOldForEdit() {
-    const rpcName = retType === 'sales' ? 'fn_reverse_sales_return_for_edit' : 'fn_reverse_purchase_return_for_edit';
-    const { error } = await sb.rpc(rpcName, { p_return_id: retEditingId });
-    if (error) throw error;
-}
+// ═══════════════ تعديل مرتجع قديم — نداء واحد ذرّي ═══════════════
+// fn_edit_sales_return / fn_edit_purchase_return: بيقفلوا المرتجع، يرفضوا لو اتلغى أو اتعدّل من جهاز
+// تاني، يعكسوا القديم (fn_reverse_*_return_for_edit) ويسجّلوا المعدّل بنفس تاريخ الأصلي في نفس الترانزاكشن.
+// قبل كده العكس والتسجيل كانوا نداءين منفصلين — لو التاني فشل (مثلاً كمية أكبر من المتاح) كان القديم
+// بيتلغي والجديد ما يتسجّلش.
 
 // ════════════════════════════════════════════════════════════
 // 6) الحفظ — INSERT فقط (الـ Trigger يتكفّل بالمخزون/الأرصدة) — نفس المنطق القديم بالحرف
@@ -1195,12 +1229,6 @@ window.retSave = async function () {
     }
 
     try {
-        // ★ لو في وضع تعديل: ألغِ المرتجع القديم وارجع أثره على المخزون/الرصيد
-        //   قبل إنشاء النسخة الجديدة (نفس ترتيب invReverseOldForEdit/purReverseOldForEdit)
-        if (retEditingId) {
-            await retReverseOldForEdit();
-        }
-
         const counterKey = retType === 'sales' ? 'sales_return_counter' : 'purchase_return_counter';
         const prefix = retType === 'sales' ? 'RS' : 'RP';
         const { data: counterRow } = await sb.from('app_settings').select('value').eq('key', counterKey).maybeSingle();
@@ -1218,7 +1246,7 @@ window.retSave = async function () {
                 line_total: (it.qty || 0) * (it.price || 0) * (1 - (it.disc || 0) / 100),
                 unit_name: it.unit || 'قطعة',
             }));
-            const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_sales_return', {
+            const returnArgs = {
                 p_customer_id: retEntityId || null,
                 p_sale_id: retLinkedDoc?.id || retEditingLinkId || null,
                 p_warehouse_id: retWarehouseId,
@@ -1231,9 +1259,11 @@ window.retSave = async function () {
                 p_reason: notes,
                 p_created_by: currentUser?.id || null,
                 p_items: itemsPayload,
-                // المرتجع المعدّل بيحافظ على تاريخ المرتجع الأصلي
-                ...(retEditingOldCreatedAt ? { p_created_at: retEditingOldCreatedAt, p_replaces_id: retEditingId } : {}),
-            });
+            };
+            // التعديل بيحافظ على تاريخ المرتجع الأصلي (الدالة بتاخده من المرتجع نفسه)
+            const { data: rpcRows, error: rpcErr } = retEditingId
+                ? await sb.rpc('fn_edit_sales_return', { p_return_id: retEditingId, ...returnArgs })
+                : await sb.rpc('fn_create_sales_return', returnArgs);
             if (rpcErr) throw rpcErr;
             if (rpcRows?.[0]?.return_no) returnNo = rpcRows[0].return_no;
         } else {
@@ -1252,7 +1282,7 @@ window.retSave = async function () {
                 line_total: (it.qty || 0) * (it.price || 0),
                 unit_name: it.unit || 'قطعة',
             }));
-            const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_purchase_return', {
+            const returnArgs = {
                 p_supplier_id: retEntityId || null,
                 p_purchase_id: retLinkedDoc?.id || retEditingLinkId || null,
                 p_warehouse_id: retWarehouseId,
@@ -1265,9 +1295,11 @@ window.retSave = async function () {
                 p_reason: notes,
                 p_created_by: currentUser?.id || null,
                 p_items: itemsPayload,
-                // المرتجع المعدّل بيحافظ على تاريخ المرتجع الأصلي
-                ...(retEditingOldCreatedAt ? { p_created_at: retEditingOldCreatedAt, p_replaces_id: retEditingId } : {}),
-            });
+            };
+            // التعديل بيحافظ على تاريخ المرتجع الأصلي (الدالة بتاخده من المرتجع نفسه)
+            const { data: rpcRows, error: rpcErr } = retEditingId
+                ? await sb.rpc('fn_edit_purchase_return', { p_return_id: retEditingId, ...returnArgs })
+                : await sb.rpc('fn_create_purchase_return', returnArgs);
             if (rpcErr) throw rpcErr;
             // العداد بيتقفل ويتحرك جوه الـ RPC نفسها (سباق بين مستخدمين
             // في نفس اللحظة ممكن يخلي التخمين المحلي فوق مش دقيق) — نعتمد

@@ -1043,13 +1043,9 @@ function purCalcChange() {
 }
 
 // ═══════════════ INSERT فقط — الـ Triggers تتولى الباقي ═══════════════
-async function purReverseOldForEdit() {
-    // ★ عملية واحدة ذرّية في قاعدة البيانات بدل 3 نداءات منفصلة —
-    //   راجع نفس التعليق في invReverseOldForEdit (sales.js) وملف
-    //   edit_reversal_atomic_migration.sql.
-    const { error } = await sb.rpc('fn_reverse_purchase_for_edit', { p_purchase_id: purEditingId });
-    if (error) throw error;
-
+// ★ التعديل نفسه (إلغاء القديمة + تسجيل المعدّلة) بقى نداء واحد fn_edit_purchase جوه purSave —
+//   الدالة دي بقت بتحدّث الكاش المحلي بس بعد نجاح التعديل (نفس invApplyOldEditToCache في sales.js).
+function purApplyOldEditToCache() {
     // تحديث الكاش المحلي (تقدير للعرض بس) بنفس القيم اللي السيرفر طبّقها فعلاً
     if (purEditingOldWarehouse) {
         for (const it of purEditingOldItems) {
@@ -1085,10 +1081,6 @@ async function purSave(andNew) {
         if (txnTs) {
             const { error: dateErr } = await sb.rpc('fn_assert_txn_date', { p_ts: txnTs, p_replaces_created: purEditingOldCreatedAt });
             if (dateErr) throw dateErr;
-        }
-        // ★ لو في وضع تعديل: ألغِ فاتورة الشراء القديمة وارجع المخزون والرصيد قبل إنشاء النسخة الجديدة
-        if (purEditingId) {
-            await purReverseOldForEdit();
         }
 
         // ★ إنشاء الهيدر + البنود + زيادة العداد كلهم في ترانزاكشن واحدة عبر
@@ -1128,7 +1120,7 @@ async function purSave(andNew) {
                 ...(PUR_DB.expiryOn && it.expiry ? { batch_no: (it.batch || '').trim() || null, expiry_date: it.expiry } : {}),
             };
         });
-        const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_purchase', {
+        const purchaseArgs = {
             p_supplier_id: purSupplierId || null,
             p_payment_type: purPayType,
             p_subtotal: subtotal,
@@ -1141,9 +1133,15 @@ async function purSave(andNew) {
             p_items: itemsPayload,
             // تاريخ المعاملة: التعديل بيحافظ على التاريخ الأصلي، والتسجيل بتاريخ سابق من خانة التاريخ
             ...(txnTs ? { p_created_at: txnTs } : {}),
-            ...(purEditingId ? { p_replaces_id: purEditingId } : {}),
-        });
+        };
+        // ★ التعديل: نداء واحد ذرّي fn_edit_purchase (يقفل الفاتورة، يرفض لو اتلغت/اتعدّلت من جهاز تاني، أو عليها
+        //   مؤجل اتستلم أو مرتجع شراء أو مصاريف شراء، يلغي القديمة ويسجّل المعدّلة في نفس الترانزاكشن).
+        //   الدالة مالهاش قيم افتراضية فلازم p_discount و p_created_at يتبعتوا دايماً.
+        const { data: rpcRows, error: rpcErr } = purEditingId
+            ? await sb.rpc('fn_edit_purchase', { p_purchase_id: purEditingId, p_created_at: null, ...purchaseArgs })
+            : await sb.rpc('fn_create_purchase', purchaseArgs);
         if (rpcErr) throw rpcErr;
+        if (purEditingId) purApplyOldEditToCache();
         if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
 
         // ★ due_date مش parameter في fn_create_purchase (نفس سبب sales.js

@@ -770,9 +770,17 @@ window.prodSave = async function() {
             const { data: pub } = sb.storage.from(PROD_IMAGE_BUCKET).getPublicUrl(path);
             payload.images = [pub.publicUrl];
         }
-        // مزامنة wholesale_price/retail_price (أعمدة WorkFlow Hub القديمة) من أول مستويين — للتوافق مع sales.js
-        if (_prodPriceLevels[0]) payload.wholesale_price = levelPrices.find(lp=>lp.levelId===_prodPriceLevels[0].id)?.price || 0;
-        if (_prodPriceLevels[1]) payload.retail_price = levelPrices.find(lp=>lp.levelId===_prodPriceLevels[1].id)?.price || 0;
+        // مزامنة wholesale_price/retail_price (أعمدة WorkFlow Hub القديمة بيقراها نقطة البيع وعروض الأسعار وبضاعة العربية)
+        // ★ حسب كود المستوى (RETAIL/WHOLESALE) مش ترتيبه — الترتيب القديم (أول مستويين) كان بيحط سعر نص الجملة في
+        //   retail_price لما الترتيب يكون جملة/نص جملة/قطاعي. قاعدة البيانات كمان بتزامنهم تلقائي من product_prices
+        //   (تريجر trg_product_prices_sync_cols) — فده بس عشان الصف يتحفظ صح من أول نداء.
+        const prodLevelPrice = levelCode => {
+            const lvl = _prodPriceLevels.find(l => l.code === levelCode);
+            return lvl ? (levelPrices.find(lp => lp.levelId === lvl.id)?.price || 0) : undefined;
+        };
+        const retailLevelPrice = prodLevelPrice('RETAIL'), wholesaleLevelPrice = prodLevelPrice('WHOLESALE');
+        if (retailLevelPrice !== undefined) payload.retail_price = retailLevelPrice;
+        if (wholesaleLevelPrice !== undefined) payload.wholesale_price = wholesaleLevelPrice;
 
         let productId = _prodEditingId;
         let savedRow;
