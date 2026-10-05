@@ -45,6 +45,8 @@
 ### 2.3 دوال RPC المهمة (كلها SECURITY DEFINER)
 - **إنشاء ذري:** `fn_create_sale`, `fn_create_purchase`, `fn_create_sales_return`, `fn_create_purchase_return`, `fn_create_rep_customer_return` (المرتجع يرجع لعربية المندوب؛ فيها فحص `auth.uid()`).
 - **عكس للتعديل:** `fn_reverse_sale_for_edit`, `fn_reverse_purchase_for_edit`, `fn_reverse_sales_return_for_edit`, `fn_reverse_purchase_return_for_edit` ("تعديل فاتورة" = إلغاء القديمة + إنشاء جديدة).
+- **تعديل ذرّي (2026-10-05):** `fn_edit_sale`, `fn_edit_purchase`, `fn_edit_sales_return`, `fn_edit_purchase_return` — بتقفل المستند، ترفض لو مش `confirmed` (اتلغى/اتعدّل من جهاز تاني)، وبعدين reverse + create جوه ترانزاكشن واحدة. `fn_edit_sale` بترفض فاتورة عليها مرتجع مؤكد، و`fn_edit_purchase` بترفض لو فيه مؤجل اتستلم أو مرتجع أو مصاريف شراء. الشاشات (sales/purchases/returns.js) بتناديهم بدل نداءين منفصلين.
+- **Triggers حماية (2026-10-05):** `trg_product_prices_sync_cols` على `product_prices` بيخلّي `products.retail_price/wholesale_price` = سعر مستوى `RETAIL`/`WHOLESALE` بالكود من أي شاشة. `trg_sale_return_items_qty_guard` و`trg_purchase_return_items_qty_guard` (الدالة `fn__guard_return_qty`): المرتجع المرتبط بفاتورة مايزيدش عن اللي الفاتورة حرّكته في المخزن بالقطعة (الكرتونة × عدد القطع، والمجاني مش محسوب لأنه مابيتخصمش أصلاً) ومايتعملش على فاتورة ملغاة.
 - **مخزون:** `adjust_stock`, `adjust_van_stock`, `fn_apply_stock_count`, `fn_apply_van_stock_count`.
 - **نقدية/قيود:** `post_cash` (3 overloads), `post_journal` (overloadان), `build_lines`, `get_cash_balance`, `get_treasury_balances`, `log_financial_event`.
 - **مستثمرون/التزامات:** `fn_close_investor_month`, `fn_post_capital_partner_transaction`, `fn_settle_accrued_liability`, `fn_sync_owner_deficit_to_ledger` (trigger).
@@ -94,7 +96,7 @@
 - **CSS:** `<style>` داخل `index.html` (`.mod-*`, `.inv-*`, tokens `--inv-*`) + `css/claude-modules.css` (`.dash-*`). ألوان hex مكررة في ~48 ملف (ديون تنظيمية، لا تُعالج بحذف جماعي).
 
 ### 3.2 خريطة الموديولات (الملف ← الوظيفة)
-- **مبيعات:** `sales.js` (2020 سطر — فاتورة ثنائية الأعمدة، مسودات/حفظ تلقائي، تنبيه تجاوز حد الائتمان + إشعار الأدمن، تعديل عبر reverse+create، اختصارات كيبورد), `pos.js` (كاشير سريع + باركود + مخزون حي), `quotations.js`, `returns.js` (مرتجع بيع/شراء), `invoice-review.js`, `thermal-print.js` (80mm), `print-center.js` (A4).
+- **مبيعات:** `sales.js` (2020 سطر — فاتورة ثنائية الأعمدة، مسودات/حفظ تلقائي، تنبيه تجاوز حد الائتمان + إشعار الأدمن، تعديل ذرّي عبر fn_edit_sale، اختصارات كيبورد), `pos.js` (كاشير سريع + باركود + مخزون حي), `quotations.js`, `returns.js` (مرتجع بيع/شراء), `invoice-review.js`, `thermal-print.js` (80mm), `print-center.js` (A4).
 - **مشتريات:** `purchases.js` (المؤجل: deferred_rate/type/due_date + سؤال تحديث سعر الشراء الرئيسي), `purchase-price-bulk.js`, `purchase-orders.js`, `purchase-suggestions.js`.
 - **عملاء/موردون:** `master-data.js` (القائمة الموحدة), `customers.js`/`suppliers.js` (كشف الحساب), `collections.js` (سندات قبض), `payments.js` (سندات صرف), `balance-transfer.js`, `customer-decision-center.js`/`supplier-decision-center.js`/`item-decision-center.js`/`expense-decision-center.js`/`employee-decision-center.js` (تصنيف رباعي بقواعد قابلة للتعديل في `app_settings`), `customer-supplier-import.js`, `product-import.js`, `general-import-export.js`.
 - **مخزون:** `inventory.js` (أرصدة + جرد فعلي), `stock-transfer.js`, `warehouses.js`, `warehouse-reports.js`, `van-stock-load/return/view/count.js`.
