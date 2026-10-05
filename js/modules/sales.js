@@ -1331,15 +1331,9 @@ function invCheckAutoSaveRestore() {
     } catch {}
 }
 
-async function invReverseOldForEdit() {
-    // ★ الإلغاء + إرجاع المخزون + إرجاع الرصيد كانوا 3 نداءات منفصلة من
-    //   المتصفح — لو حصل قطع اتصال في النص، ممكن يفضل المخزون أو الرصيد
-    //   متسق جزئياً بس. دلوقتي عملية واحدة ذرّية في قاعدة البيانات
-    //   (fn_reverse_sale_for_edit — راجع edit_reversal_atomic_migration.sql)،
-    //   كلها بتنجح أو كلها بترجع. نفس الحسابات بالظبط اللي كانت هنا.
-    const { error } = await sb.rpc('fn_reverse_sale_for_edit', { p_sale_id: invEditingId });
-    if (error) throw error;
-
+// ★ التعديل نفسه (إلغاء القديمة + تسجيل المعدّلة) بقى نداء واحد fn_edit_sale جوه invSave —
+//   الدالة دي بقت بتحدّث الكاش المحلي بس بعد نجاح التعديل (رجوع مخزون/رصيد الفاتورة القديمة).
+function invApplyOldEditToCache() {
     // تحديث الكاش المحلي (تقدير للعرض بس) بنفس القيم اللي السيرفر طبّقها فعلاً
     if (invEditingOldWarehouse) {
         for (const it of invEditingOldItems) {
@@ -1359,7 +1353,7 @@ async function invSave(andNew) {
     const offline = typeof isOnline === 'function' && !isOnline();
 
     // ★ تعديل فاتورة موجودة محتاج يلغي القديمة ويرجع المخزون/الرصيد أونلاين
-    //   (invReverseOldForEdit) — ده معقّد وخطير يتنفّذ بتقدير محلي، فبيفضل
+    //   (fn_edit_sale) — ده معقّد وخطير يتنفّذ بتقدير محلي، فبيفضل
     //   محتاج اتصال. الحفظ العادي (فاتورة جديدة) هو المدعوم أوفلاين.
     if (invEditingId && offline) {
         invToast('📴 تعديل فاتورة موجودة محتاج اتصال بالإنترنت — التعديل هيتاح تاني لما الاتصال يرجع', 'error');
@@ -1533,15 +1527,11 @@ async function invSave(andNew) {
             return { ok: true, invoiceNo: payload.tempInvoiceNo };
         }
 
-        // ★ لو في وضع تعديل: ألغِ الفاتورة القديمة وارجع المخزون والرصيد قبل إنشاء النسخة الجديدة
-        // تاريخ المعاملة: نتحقق منه الأول (قبل إلغاء الفاتورة القديمة) علشان الرفض ما يسيبش التعديل نص نص
+        // تاريخ المعاملة: نتحقق منه الأول علشان رسالة الرفض تظهر بدري (الدالة نفسها بتتحقق تاني جوه)
         const txnTs = window.txnCreatedAt(document.getElementById('invDate')?.value, invEditingOldCreatedAt);
         if (txnTs) {
             const { error: dateErr } = await sb.rpc('fn_assert_txn_date', { p_ts: txnTs, p_replaces_created: invEditingOldCreatedAt });
             if (dateErr) throw dateErr;
-        }
-        if (invEditingId) {
-            await invReverseOldForEdit();
         }
 
         // ★ تطبيع + تحقق حي من rep_id قبل الإرسال.
@@ -1594,7 +1584,7 @@ async function invSave(andNew) {
                 unit_name: prod?.unit || it.unit || 'قطعة',
             };
         });
-        const { data: rpcRows, error: rpcErr } = await sb.rpc('fn_create_sale', {
+        const saleArgs = {
             p_customer_id: invCustId || null,
             p_payment_type: invPayType,
             p_subtotal: subtotal,
@@ -1611,9 +1601,15 @@ async function invSave(andNew) {
             ...(creditOverrideReason ? { p_credit_override_reason: creditOverrideReason } : {}),
             // تاريخ المعاملة: التعديل بيحافظ على تاريخ الفاتورة الأصلية، والتسجيل بتاريخ سابق من خانة التاريخ
             ...(txnTs ? { p_created_at: txnTs } : {}),
-            ...(invEditingId ? { p_replaces_id: invEditingId } : {}),
-        });
+        };
+        // ★ التعديل: نداء واحد ذرّي fn_edit_sale (يقفل الفاتورة، يرفض لو اتلغت/اتعدّلت من جهاز تاني أو عليها
+        //   مرتجع، يلغي القديمة ويسجّل المعدّلة في نفس الترانزاكشن) — قبل كده كانوا نداءين منفصلين، فلو النداء
+        //   التاني فشل أو النت قطع في النص كانت القديمة بتتلغي والجديدة ما تتسجّلش.
+        const { data: rpcRows, error: rpcErr } = invEditingId
+            ? await sb.rpc('fn_edit_sale', { p_sale_id: invEditingId, ...saleArgs })
+            : await sb.rpc('fn_create_sale', saleArgs);
         if (rpcErr) throw rpcErr;
+        if (invEditingId) invApplyOldEditToCache();
         if (rpcRows?.[0]?.invoice_no) invoiceNo = rpcRows[0].invoice_no;
 
         // ★ تاريخ الاستحقاق مش موجود كـ parameter في fn_create_sale (الدالة دي
